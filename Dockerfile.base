@@ -1,4 +1,0 @@
-FROM python:3.10
-USER root
-ADD requirements.txt /fed-flow/
-COPY fedflow-env/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
