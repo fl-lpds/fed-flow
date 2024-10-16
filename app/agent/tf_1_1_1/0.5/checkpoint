@@ -1,2 +1,0 @@
-model_checkpoint_path: "/fed-flow/app/agent/tf_1_1_1/0.5/agent-200200"
-all_model_checkpoint_paths: "/fed-flow/app/agent/tf_1_1_1/0.5/agent-200200"
