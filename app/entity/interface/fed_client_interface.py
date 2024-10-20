@@ -8,14 +8,11 @@ from app.util import model_utils
 
 
 class FedClientInterface(ABC, Communicator):
-    def __init__(self, server, datalen, model_name, dataset,
-                 train_loader, LR, edge_based, simnet):
+    def __init__(self, server, datalen, model_name, dataset, train_loader, LR, edge_based, simnet):
         super(FedClientInterface, self).__init__()
         self.datalen = datalen
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model_name = model_name
-        self.simnet: bool = simnet
-        self.simnetbw = 10 if self.simnet else 0
         self.edge_based = edge_based
         self.server_id = server
         self.dataset = dataset
@@ -26,8 +23,10 @@ class FedClientInterface(ABC, Communicator):
         # self.uninet = model_utils.get_model('Unit', config.split_layer[config.index], self.device, edge_based)
         self.net = self.uninet
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.SGD(self.net.parameters(), lr=LR,
-                                   momentum=0.9)
+        self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9)
+
+        self.simnet: bool = simnet
+        self.simnetbw = 10_000_000 if self.simnet else 0  # 10 Mbps
 
     @abstractmethod
     def initialize(self, split_layer, LR, simnetbw: float = None):

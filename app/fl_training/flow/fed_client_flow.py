@@ -25,16 +25,16 @@ def run_edge_based(client: FedClientInterface, LR):
     batch_num = data_size / config.B
     # final=[]
     for r in range(config.R):
-        simnet_BW = 5
+        simnet_BW = 5_000_000  # Mbps
 
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
 
+        st = time.time()
+
         fed_logger.info("receiving global weights")
         client.get_edge_global_weights()
-
-        st = time.time()
 
         if not client.simnet:
             fed_logger.info("test network")
@@ -45,8 +45,8 @@ def run_edge_based(client: FedClientInterface, LR):
 
         fed_logger.info("receiving splitting info")
         client.get_split_layers_config_from_edge()
-        fed_logger.info("initializing client")
 
+        fed_logger.info("initializing client")
         energy_estimation.computation_start()
         client.initialize(client.split_layers, LR, simnetbw=simnet_BW)
         energy_estimation.computation_end()
@@ -61,15 +61,22 @@ def run_edge_based(client: FedClientInterface, LR):
         et = time.time()
 
         fed_logger.info('ROUND: {} END'.format(r))
-        fed_logger.info('==> Waiting for aggregration')
+        fed_logger.info('==> Waiting for aggregation')
 
-        tt = et - st
+        tt = 0
+        if client.simnet:
+            transmission_time = float(energy_estimation.get_transmission_time())
+            computation_time = float(energy_estimation.get_computation_time())
+            tt = transmission_time + computation_time
+        else:
+            tt = et - st
 
         energy = float(energy_estimation.energy())
-        # energy /= batch_num
-        fed_logger.info(Fore.CYAN + f"Energy_tt : {energy}, {tt}")
         remaining_energy = float(energy_estimation.remaining_energy())
-        fed_logger.info(Fore.MAGENTA + f"remaining energy: {remaining_energy}")
+        # energy /= batch_num
+        fed_logger.info(f"TT: {tt}")
+        fed_logger.info(Fore.MAGENTA + f"Energy, TT, Remaining-energy: {energy}, {tt}, {remaining_energy}")
+        fed_logger.info("Sending Energy, TT, Remaining-energy to edge.")
         client.energy_tt(remaining_energy, energy, tt)
         client.e_next_round_attendance(remaining_energy)
 

@@ -1,9 +1,11 @@
 import socket
 import threading
 import time
+import sys
 
 from colorama import Fore
 from torch import optim, nn
+sys.path.append('../../')
 
 import config
 from app.config.logger import fed_logger
@@ -48,8 +50,8 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def forward_propagation(self, client_ip):
         i = 0
-        flag = self.recv_msg(client_ip,
-                             f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}')[1]
+        msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}')
+        flag = msg[1]
         if self.split_layers[config.CLIENTS_CONFIG.get(client_ip)][1] < model_utils.get_unit_model_len() - 1:
             flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
             self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg)
@@ -60,8 +62,8 @@ class FedEdgeServer(FedEdgeServerInterface):
 
         while flag:
             if self.split_layers[config.CLIENTS_CONFIG.get(client_ip)][0] < model_utils.get_unit_model_len() - 1:
-                flag = self.recv_msg(client_ip,
-                                     f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}')[1]
+                msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}')
+                flag = msg[1]
 
                 if not flag:
                     flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
@@ -102,16 +104,16 @@ class FedEdgeServer(FedEdgeServerInterface):
                         gradients = msg[1].to(self.device)
                         # fed_logger.info(client_ip + " training model backward")
                         energy_estimation.computation_start()
-                        self.start_time_of_computation_each_client = time.time()
+                        self.start_time_of_computation_each_client[client_ip] = time.time()
                         outputs.backward(gradients)
-                        self.computation_time_of_each_client += (
-                                    time.time() - self.start_time_of_computation_each_client[client_ip])
+                        self.computation_time_of_each_client[client_ip] += (
+                                time.time() - self.start_time_of_computation_each_client[client_ip])
                         energy_estimation.computation_end()
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
                         self.send_msg(exchange=client_ip, msg=msg, is_weight=True)
                     else:
                         energy_estimation.computation_start()
-                        self.start_time_of_computation_each_client = time.time()
+                        self.start_time_of_computation_each_client[client_ip] = time.time()
                         outputs = self.nets[client_ip](inputs)
                         loss = self.criterion(outputs, targets)
                         loss.backward()
@@ -178,17 +180,15 @@ class FedEdgeServer(FedEdgeServerInterface):
         self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg)
 
     def send_simnet_bw_to_server(self, simnetbw):
-        start_transmission()
         msg = [message_utils.simnet_bw_edge_to_server(), simnetbw]
         self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=False)
-        end_transmission(data_utils.sizeofmessage(msg))
         fed_logger.info("Simnet BW sent")
 
     def get_simnet_client_network(self):
-        for clientip in config.EDGE_MAP[config.index]:
-            self.client_bandwidth[clientip] = self.recv_msg(exchange=clientip,
-                                                            expect_msg_type=message_utils.simnet_bw_client_to_edge(),
-                                                            is_weight=False)[1]
+        for clientip in config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]:
+            msg = self.recv_msg(exchange=clientip, expect_msg_type=message_utils.simnet_bw_client_to_edge(),
+                                is_weight=False)
+            self.client_bandwidth[clientip] = msg[1]
 
     def get_split_layers_config(self, client_ips):
         """
@@ -224,16 +224,16 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def energy(self, client_ips):
         energy_tt_list = []
+        edge_tt_list = {}
         for c in config.CLIENTS_CONFIG.keys():
             if client_ips.__contains__(c):
-                ms = self.recv_msg(c,
-                                   message_utils.energy_client_to_edge() + "_" + c)
+                ms = self.recv_msg(c, message_utils.energy_client_to_edge() + "_" + c)
                 fed_logger.info(f"client message: {ms}")
-                energy_tt_list.append([ms[1], ms[2], ms[3]])
+                energy_tt_list.append([ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]])
             else:
-                energy_tt_list.append([0, 0, 0])
+                energy_tt_list.append([0, 0, 0, 0])
         # fed_logger.info(f"sending enery tt {socket.gethostname()}")
-        msg = [message_utils.energy_tt_edge_to_server(), energy_tt_list]
+        msg = [message_utils.energy_tt_edge_to_server(), energy_tt_list, ]
         self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg)
 
     def global_weights(self, client_ips: []):

@@ -1,5 +1,4 @@
 import logging
-import random
 import subprocess
 import time
 
@@ -65,7 +64,8 @@ def end_transmission(process, bits):
     # energy_logger.info(Fore.MAGENTA+f"{bits}")
     process.end_tr_time = time.time()
     if process.bandwidth != 0:
-        process.transmission_time += bits / process.bandwidth
+        energy_logger.info(f"Bandwidth : {process.bandwidth}")
+        process.transmission_time += bits / float(process.bandwidth)
     else:
         # b = bits / (process.end_tr_time - process.start_tr_time)
         # energy_logger.info((f"bandwidth: {bits/(process.end_tr_time - process.start_tr_time)}, {bits}"))
@@ -134,6 +134,14 @@ def computation_end(process):
 
 def remaining_energy(process):
     return process.remaining_energy
+
+
+def get_transmission_time(process):
+    return process.transmission_time
+
+
+def get_computation_time(process):
+    return process.comp_time
 
 
 def set_simnet(process, simnetbw):

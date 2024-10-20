@@ -1,5 +1,4 @@
 import logging
-import subprocess
 import threading
 import warnings
 
@@ -59,6 +58,14 @@ async def end_transmission(bits):
     system_utils.end_transmission(config.process, int(bits))
 
 
+@app.get("/get-transmission-time/")
+async def get_transmission_time():
+    return system_utils.get_transmission_time(config.process)
+
+@app.get("/get-computation-time/")
+async def get_computation_time():
+    return system_utils.get_computation_time(config.process)
+
 @app.get("/set-simnet/{simnetbw}")
 async def set_simnet(simnetbw):
     system_utils.set_simnet(config.process, simnetbw)
@@ -97,5 +104,6 @@ async def energy_and_time_comp_tr():
 @app.get("/get-cpu-utilization/{pid}")
 async def get_cpu_utilization(pid):
     return system_utils.get_cpu_u(pid)
+
 
 uvicorn.run(app, host="0.0.0.0", port=8023)

@@ -76,6 +76,24 @@ def remaining_energy():
         return result.text
 
 
+def get_transmission_time():
+    global is_init
+    if is_init:
+        session = requests.session()
+        session.trust_env = False
+        result = session.get(url=URL + "/get-transmission-time/")
+        return result.text
+
+
+def get_computation_time():
+    global is_init
+    if is_init:
+        session = requests.session()
+        session.trust_env = False
+        result = session.get(url=URL + "/get-computation-time/")
+        return result.text
+
+
 def energy_and_time_comp_tr():
     global is_init
     if is_init:

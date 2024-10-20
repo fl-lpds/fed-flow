@@ -38,6 +38,8 @@ class FedServerInterface(ABC, Communicator):
         self.client_training_transmissionTime = {}
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
+        self.computation_time_of_each_client_on_edges = {}
+        self.aggregation_time = 0
 
         self.uninet = model_utils.get_model('Unit', None, self.device, self.edge_based)
         self.testset = data_utils.get_testset()
@@ -107,7 +109,7 @@ class FedServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def initialize(self, split_layers, LR):
+    def initialize(self, split_layers, LR,  simnetbw: float = None):
         pass
 
     @abstractmethod

@@ -56,7 +56,7 @@ def run_edge_based_no_offload(server: FedServerInterface, LR, options):
 
 
 def run_edge_based_offload(server: FedServerInterface, LR, options):
-    server.initialize(config.split_layer, LR)
+    server.initialize(config.split_layer, LR, simnetbw=20_000_000)
     training_time = 0
     energy_tt_list = []
     energy_x = []
@@ -70,6 +70,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     fed_logger.info(f"OPTION: {options}")
     for r in range(config.R):
+        simnetbw = 20_000_000  # 20 Mbps
+
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
         if config.K > 0:
             config.current_round = r
@@ -77,10 +79,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('====================================>')
             fed_logger.info('==> Round {:} Start'.format(r))
 
+            s_time = time.time()
             fed_logger.info("sending global weights")
             server.edge_offloading_global_weights()
 
-            s_time = time.time()
             if not server.simnet:
                 fed_logger.info("receiving client network info")
                 server.client_network(config.EDGE_SERVER_LIST)
@@ -110,13 +112,15 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             server.split(state, options)
             fed_logger.info(f"Action : {server.split_layers}")
             # server.split_layers = split_list[r]
+
+            fed_logger.info(f"Scattering splitting info to edges.")
             server.get_split_layers_config_from_edge()
 
             if r > 49:
                 LR = config.LR * 0.1
 
             fed_logger.info("initializing server")
-            server.initialize(server.split_layers, LR)
+            server.initialize(server.split_layers, LR, simnetbw=simnetbw)
 
             # fed_logger.info('==> Reinitialization Finish')
 
@@ -126,16 +130,25 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info("receiving local weights")
             local_weights = server.e_local_weights(config.CLIENTS_LIST)
 
+            aggregation_start_time = time.time()
             fed_logger.info("aggregating weights")
             server.call_aggregation(options, local_weights)
+            aggregation_end_time = time.time()
+            aggregation_time = aggregation_end_time - aggregation_start_time
 
+            fed_logger.info("receiving Energy, TT, Remaining-energy")
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
-            print(f"E TT :{energy_tt_list}")
+            fed_logger.info(f"Energy, TT, Remaining-energy :{energy_tt_list}")
+
+            fed_logger.info(f"computation time of each client: {server.computation_time_of_each_client}")
+            fed_logger.info(f"computation time of each client: {server.computation_time_of_each_client_on_edges}")
+            simnet_tt = energy_estimation.get_computation_time()
             clientEnergy = []
             for i in range(config.K):
                 clientEnergy.append(energy_tt_list[i][0])
                 remainingEnergy.append(energy_tt_list[i][2])
             avgEnergy.append(sum(clientEnergy) / int(config.K))
+
             server.e_client_attendance(config.CLIENTS_LIST)
 
             e_time = time.time()
@@ -143,6 +156,16 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # Recording each round training time, bandwidth and test_app accuracy
             training_time = e_time - s_time
             tt.append(training_time)
+            max_tt_in_clients = max([e_tt_client[1] for e_tt_client in energy_tt_list])
+            trainingTime_simnetBW = float(energy_estimation.get_transmission_time()) + \
+                                    max_tt_in_clients + \
+                                    sum(server.computation_time_of_each_client.values()) + \
+                                    sum(server.client_training_transmissionTime.values()) + \
+                                    sum(server.computation_time_of_each_client_on_edges.values()) + \
+                                    aggregation_time
+
+            fed_logger.info(f"Training Time using time.time(): {training_time}")
+            fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
 
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())
@@ -155,10 +178,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
-
-            plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
+            # plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
         else:
             break
+
     fed_logger.info(f"{socket.gethostname()} quit")
 
 

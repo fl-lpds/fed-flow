@@ -30,8 +30,7 @@ class Client(FedClientInterface):
         fed_logger.debug(self.net)
         self.criterion = nn.CrossEntropyLoss()
         if len(list(self.net.parameters())) != 0:
-            self.optimizer = optim.SGD(self.net.parameters(), lr=LR,
-                                       momentum=0.9)
+            self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9)
 
     def send_local_weights_to_edge(self):
         msg = [message_utils.local_weights_client_to_edge(), self.net.cpu().state_dict()]
@@ -83,7 +82,7 @@ class Client(FedClientInterface):
 
     def get_split_layers_config_from_edge(self):
         """
-        receive splitting data
+        receive splitting data from edge
         """
         start_transmission()
         msg = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.split_layers_edge_to_client())
@@ -95,10 +94,10 @@ class Client(FedClientInterface):
         receive global weights
         """
         start_transmission()
-        weights = \
-            self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.initial_global_weights_edge_to_client(),
-                          True)[1]
-        end_transmission(data_utils.sizeofmessage(weights))
+        msg = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.initial_global_weights_edge_to_client(),
+                          True)
+        weights = msg[1]
+        end_transmission(data_utils.sizeofmessage(msg))
         pweights = model_utils.split_weights_client(weights, self.net.state_dict())
         self.net.load_state_dict(pweights)
 

@@ -23,7 +23,7 @@ def run_offload(server: FedEdgeServerInterface, LR):
     for r in range(config.R):
         fed_logger.info(Fore.LIGHTRED_EX + f" left clients {client_ips}")
         if len(config.CLIENTS_LIST) > 0:
-            simnetbw = 10
+            simnetbw = 10_000_000  # 10 Mbps
 
             config.current_round = r
             fed_logger.info('====================================>')
@@ -56,16 +56,20 @@ def run_offload(server: FedEdgeServerInterface, LR):
             threads = {}
             fed_logger.info("start training")
             for i in range(len(client_ips)):
-                server.computation_time_of_each_client[client_ips] = 0
+                server.computation_time_of_each_client[client_ips[i]] = 0
                 threads[client_ips[i]] = threading.Thread(target=server.thread_offload_training,
                                                           args=(client_ips[i],), name=client_ips[i])
                 threads[client_ips[i]].start()
 
             for i in range(len(client_ips)):
                 threads[client_ips[i]].join()
+
+            fed_logger.info("receiving Energy, TT, Remaining-energy from clients and sending to server")
             server.energy(client_ips)
+
             if r > 49:
                 LR = config.LR * 0.1
+
             server.client_attendance(client_ips)
             client_ips = config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]
             # energy = float(energy_estimation.energy())
