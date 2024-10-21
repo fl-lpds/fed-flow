@@ -23,7 +23,7 @@ def run_offload(server: FedEdgeServerInterface, LR):
     for r in range(config.R):
         fed_logger.info(Fore.LIGHTRED_EX + f" left clients {client_ips}")
         if len(config.CLIENTS_LIST) > 0:
-            simnetbw = 10_000_000  # 10 Mbps
+            simnetbw = 150_000_000  # 150 Mbps
 
             config.current_round = r
             fed_logger.info('====================================>')
@@ -120,7 +120,7 @@ def run(options_ins):
     LR = config.LR
     fed_logger.info('Preparing Sever.')
     offload = options_ins.get('offload')
-    simnet = options_ins.get('simulatebandwidth')
+    simnet = options_ins.get("simulatebandwidth") == "True"
     if offload:
         energy_estimation.init(os.getpid())
         edge_server_ins = FedEdgeServer(

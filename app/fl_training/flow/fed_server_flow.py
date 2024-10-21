@@ -70,7 +70,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     fed_logger.info(f"OPTION: {options}")
     for r in range(config.R):
-        simnetbw = 20_000_000  # 20 Mbps
+        simnetbw = 580_000_000  # 150 Mbps
 
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
         if config.K > 0:
@@ -141,7 +141,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info(f"Energy, TT, Remaining-energy :{energy_tt_list}")
 
             fed_logger.info(f"computation time of each client: {server.computation_time_of_each_client}")
-            fed_logger.info(f"computation time of each client: {server.computation_time_of_each_client_on_edges}")
+            fed_logger.info(
+                f"computation time of each client on edge: {server.computation_time_of_each_client_on_edges}")
+            fed_logger.info(f"Transmission time of each client on server: {server.client_training_transmissionTime}")
+
             simnet_tt = energy_estimation.get_computation_time()
             clientEnergy = []
             for i in range(config.K):
@@ -157,24 +160,31 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             training_time = e_time - s_time
             tt.append(training_time)
             max_tt_in_clients = max([e_tt_client[1] for e_tt_client in energy_tt_list])
-            trainingTime_simnetBW = float(energy_estimation.get_transmission_time()) + \
-                                    max_tt_in_clients + \
-                                    sum(server.computation_time_of_each_client.values()) + \
-                                    sum(server.client_training_transmissionTime.values()) + \
-                                    sum(server.computation_time_of_each_client_on_edges.values()) + \
-                                    aggregation_time
+            if server.simnet:
+                total_computation_time_for_each_client = {}
+                for clientip in config.CLIENTS_LIST:
+                    total_computation_time_for_each_client[clientip] = server.computation_time_of_each_client_on_edges[
+                                                                           clientip] + \
+                                                                       server.computation_time_of_each_client[
+                                                                           clientip] + \
+                                                                       energy_tt_list[config.CLIENTS_CONFIG[clientip]][
+                                                                           1] + \
+                                                                       server.client_training_transmissionTime[clientip]
+                trainingTime_simnetBW = float(energy_estimation.get_transmission_time()) + \
+                                        max(total_computation_time_for_each_client.values()) + \
+                                        aggregation_time
+                fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
 
             fed_logger.info(f"Training Time using time.time(): {training_time}")
-            fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
 
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())
-            with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
-                pickle.dump(res, f)
+            # with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
+            #     pickle.dump(res, f)
 
-            fed_logger.info("testing accuracy")
-            test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
-            res['test_acc_record'].append(test_acc)
+            # fed_logger.info("testing accuracy")
+            # test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
+            # res['test_acc_record'].append(test_acc)
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
@@ -362,7 +372,7 @@ def run(options_ins):
     fed_logger.info("start mode: " + str(options_ins.values()))
     offload = options_ins.get('offload')
     edge_based = options_ins.get('edgebased')
-    simnet = options_ins.get('simulatebandwidth')
+    simnet = options_ins.get("simulatebandwidth") == "True"
 
     if edge_based and offload:
         energy_estimation.init(os.getpid())

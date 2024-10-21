@@ -77,8 +77,9 @@ class FedServer(FedServerInterface):
     def edge_offloading_train(self, client_ips):
         self.threads = {}
         for i in range(len(client_ips)):
-            self.computation_time_of_each_client[client_ips[i]] = 0
-            self.client_training_transmissionTime[client_ips[i]] = 0
+            if self.simnet:
+                self.computation_time_of_each_client[client_ips[i]] = 0
+                self.client_training_transmissionTime[client_ips[i]] = 0
             self.threads[client_ips[i]] = threading.Thread(target=self._thread_edge_training,
                                                            args=(client_ips[i],), name=client_ips[i])
             fed_logger.info(str(client_ips[i]) + ' offloading training start')
@@ -153,7 +154,9 @@ class FedServer(FedServerInterface):
         msg = self.recv_msg(config.CLIENT_MAP[client_ip],
                             f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}',
                             url=config.CLIENT_MAP[client_ip])
-        self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
+        if self.simnet:
+            self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
+
         flag = msg[1]
         i += 1
         fed_logger.info(Fore.RED + f"{flag}")
@@ -168,7 +171,8 @@ class FedServer(FedServerInterface):
                 msg = self.recv_msg(config.CLIENT_MAP[client_ip],
                                     f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}',
                                     url=config.CLIENT_MAP[client_ip])
-                self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
+                if self.simnet:
+                    self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
                 flag = msg[1]
                 fed_logger.info(Fore.RED + f"{flag}")
                 if not flag:
@@ -176,7 +180,8 @@ class FedServer(FedServerInterface):
                 msg = self.recv_msg(config.CLIENT_MAP[client_ip],
                                     f'{message_utils.local_activations_edge_to_server() + "_" + client_ip}_{i}', True,
                                     config.CLIENT_MAP[client_ip])
-                self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
+                if self.simnet:
+                    self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
 
                 smashed_layers = msg[1]
                 labels = msg[2]
@@ -190,12 +195,14 @@ class FedServer(FedServerInterface):
                 loss.backward()
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].step()
-                self.computation_time_of_each_client[client_ip] += (
-                        time.time() - self.start_time_of_computation_each_client[client_ip])
+                if self.simnet:
+                    self.computation_time_of_each_client[client_ip] += (
+                            time.time() - self.start_time_of_computation_each_client[client_ip])
                 # Send gradients to edge
                 # fed_logger.info(client_ip + " sending gradients")
                 msg = [f'{message_utils.server_gradients_server_to_edge() + str(client_ip)}_{i}', inputs.grad]
-                self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
+                if self.simnet:
+                    self.client_training_transmissionTime[client_ip] += (data_utils.sizeofmessage(msg) / self.simnetbw)
                 self.send_msg(config.CLIENT_MAP[client_ip], msg, True, config.CLIENT_MAP[client_ip])
             i += 1
 
@@ -248,14 +255,16 @@ class FedServer(FedServerInterface):
         if self.edge_based:
             url = connection_ip
         network_time_start = time.time()
-        msg = [message_utils.test_server_network_from_server(), self.uninet.cpu().state_dict()]
-        self.send_msg(exchange=connection_ip, msg=msg, url=url, is_weight=True)
+        msg1 = [message_utils.test_server_network_from_server(), self.uninet.cpu().state_dict()]
+        self.send_msg(exchange=connection_ip, msg=msg1, url=url, is_weight=True)
         fed_logger.info("server test network sent")
-        msg = self.recv_msg(exchange=connection_ip, expect_msg_type=message_utils.test_server_network_from_connection(),
+        network_time_end = time.time()
+
+        msg2 = self.recv_msg(exchange=connection_ip, expect_msg_type=message_utils.test_server_network_from_connection(),
                             url=url, is_weight=True)
         fed_logger.info("server test network received")
-        network_time_end = time.time()
-        self.edge_bandwidth[connection_ip] = data_utils.sizeofmessage(msg) / (network_time_end - network_time_start)
+        self.edge_bandwidth[connection_ip] = data_utils.sizeofmessage(msg1) / (network_time_end - network_time_start)
+        fed_logger.info(Fore.LIGHTBLUE_EX + f"Cloud-Edge BW: {self.edge_bandwidth}")
 
     def client_network(self, edge_ips):
         """
@@ -324,9 +333,9 @@ class FedServer(FedServerInterface):
             fed_logger.info(f"coming message: {msg[1]}")
             for i in range(len(config.EDGE_MAP[edge])):
                 energy_tt_list.append(msg[1][i])
-                self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = msg[1][i][3]
-                fed_logger.info(f"msg[1][i][3]: {msg[1][i][3]}")
-            fed_logger.info(f"computation of each client on edge: {self.computation_time_of_each_client_on_edges}")
+                if self.simnet:
+                    self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = msg[1][i][3]
+                    fed_logger.info(f"msg[1][i][3]: {msg[1][i][3]}")
         self.client_remaining_energy = []
         for i in range(len(energy_tt_list)):
             self.client_remaining_energy.append(energy_tt_list[i][2])

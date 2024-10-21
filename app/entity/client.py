@@ -95,7 +95,7 @@ class Client(FedClientInterface):
         """
         start_transmission()
         msg = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.initial_global_weights_edge_to_client(),
-                          True)
+                            True)
         weights = msg[1]
         end_transmission(data_utils.sizeofmessage(msg))
         pweights = model_utils.split_weights_client(weights, self.net.state_dict())

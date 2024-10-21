@@ -22,6 +22,7 @@ services:
     entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -s fake_splitting -e True & python3 /fed-flow/energy/service.py  "
 
   broker:
+    attach: false
     image: rabbitmq:3.13-management
     ports:
       - "5672:5672"
@@ -35,9 +36,6 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
-    labels:
-        com.docker-tc.enabled: "1"     # Enables Traffic Control mangement
-        com.docker-tc.limit: "0.5mbps"  # Setting the bandwidth limit to 25mbit
     ports:
       - "5001:5001"
     hostname: edge1
@@ -53,7 +51,7 @@ services:
     depends_on:
       - server
       - broker
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -o True  -sb True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -o True -sb True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
 
   client1:
     volumes:

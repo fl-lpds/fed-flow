@@ -1,10 +1,11 @@
 import socket
+import sys
 import threading
 import time
-import sys
 
 from colorama import Fore
 from torch import optim, nn
+
 sys.path.append('../../')
 
 import config
@@ -159,12 +160,14 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def _thread_client_network_testing(self, client_ip):
         network_time_start = time.time()
-        msg = [message_utils.test_network_edge_to_client(), self.uninet.cpu().state_dict()]
-        self.send_msg(exchange=client_ip, msg=msg, is_weight=True)
-        msg = self.recv_msg(exchange=client_ip, expect_msg_type=message_utils.test_network_client_to_edge(),
-                            is_weight=True)
+        msg1 = [message_utils.test_network_edge_to_client(), self.uninet.cpu().state_dict()]
+        self.send_msg(exchange=client_ip, msg=msg1, is_weight=True)
+        msg2 = self.recv_msg(exchange=client_ip, expect_msg_type=message_utils.test_network_client_to_edge(),
+                             is_weight=True)
         network_time_end = time.time()
-        self.client_bandwidth[client_ip] = data_utils.sizeofmessage(msg) / (network_time_end - network_time_start)
+        self.client_bandwidth[client_ip] = (data_utils.sizeofmessage(msg1) + data_utils.sizeofmessage(msg2)) / (
+                    network_time_end - network_time_start)
+        fed_logger.info(f"Client-Edge BW: {self.client_bandwidth}")
 
     def test_server_network(self):
         msg = self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
@@ -229,7 +232,10 @@ class FedEdgeServer(FedEdgeServerInterface):
             if client_ips.__contains__(c):
                 ms = self.recv_msg(c, message_utils.energy_client_to_edge() + "_" + c)
                 fed_logger.info(f"client message: {ms}")
-                energy_tt_list.append([ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]])
+                if self.simnet:
+                    energy_tt_list.append([ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]])
+                else:
+                    energy_tt_list.append([ms[1], ms[2], ms[3]])
             else:
                 energy_tt_list.append([0, 0, 0, 0])
         # fed_logger.info(f"sending enery tt {socket.gethostname()}")
