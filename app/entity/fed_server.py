@@ -184,7 +184,7 @@ class FedServer(FedBaseNodeInterface):
             if HTTPCommunicator.get_is_leader(neighbor):
                 HTTPCommunicator.set_leader(neighbor, neighbor.ip, neighbor.port, False)
                 weights, dataset_size = client_local_weights[str(neighbor)]
-                weight_ratio = dataset_size / total_data_size  # Calculate the weight ratio based on dataset size
+                weight_ratio = dataset_size / total_data_size
                 w_local_list.append((weights, weight_ratio))
 
         zero_model = model_utils.zero_init(self.uninet).state_dict()

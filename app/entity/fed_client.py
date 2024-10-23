@@ -147,14 +147,17 @@ class FedClient(FedBaseNodeInterface):
         msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()], config.N)
         self.scatter_msg(msg, [NodeType.CLIENT])
         gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.CLIENT])
-        total_data_size = sum([msg.message.dataset_len for msg in gathered_msgs])
-        gathered_models = []
+        total_data_size = config.N + sum([msg.message.dataset_len for msg in gathered_msgs])
+        gathered_models = [(self.uninet.state_dict(), config.N/total_data_size)]
         for msg in gathered_msgs:
             weights = msg.message.weights[0]
             dataset_size = msg.message.dataset_len
             weight_ratio = dataset_size / total_data_size
             gathered_models.append((weights, weight_ratio))
+            fed_logger.info(f"Aggregating current node's neighbor model:"
+                            f" dataset size={config.N}, weight ratio={weight_ratio:.4f}")
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)
+
 
