@@ -58,14 +58,28 @@ def run_edge_based_no_offload(server: FedServerInterface, LR, options):
 def run_edge_based_offload(server: FedServerInterface, LR, options):
     server.initialize(config.split_layer, LR, simnetbw=20_000_000)
     training_time = 0
+    totalIOTNum = len(config.CLIENTS_INDEX.keys())
+    totalEdgeNum = len(config.EDGE_MAP.keys())
     energy_tt_list = []
     energy_x = []
     training_y = []
-    avgEnergy, tt, remainingEnergy = [], [], []
-    iotBW, edgeBW = [], []
+    avgEnergy, tt = [], []
+    iotBW, edgeBW, serverBW = {}, {}, []
+    clientRemainingEnergy = {}
+    clientConsumedEnergy = {}
+
     x = []
+
+    for i in range(totalIOTNum):
+        iotBW[i] = []
+        clientRemainingEnergy[i] = []
+        clientConsumedEnergy[i] = []
+
+    for i in range(totalEdgeNum):
+        edgeBW[i] = []
     for c in config.CLIENTS_LIST:
         energy_tt_list.append([0, 0])
+
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     fed_logger.info(f"OPTION: {options}")
@@ -105,8 +119,12 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             state = server.edge_based_state()
             fed_logger.info("state: " + str(state))
-            iotBW.append(state[:config.K])
-            edgeBW.append(state[config.K:config.K + config.S])
+
+            for i in range(totalIOTNum):
+                iotBW[i].append(state[i])
+            for i in range(totalEdgeNum):
+                edgeBW[i].append(state[totalIOTNum + i])
+            serverBW.append(simnetbw)
 
             fed_logger.info("splitting")
             server.split(state, options)
@@ -140,17 +158,19 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
             fed_logger.info(f"Energy, TT, Remaining-energy :{energy_tt_list}")
 
-            fed_logger.info(f"computation time of each client: {server.computation_time_of_each_client}")
+            fed_logger.info(f"computation time of each client on server: {server.computation_time_of_each_client}")
             fed_logger.info(
                 f"computation time of each client on edge: {server.computation_time_of_each_client_on_edges}")
             fed_logger.info(f"Transmission time of each client on server: {server.client_training_transmissionTime}")
+            fed_logger.info(f"Aggregation Time Simnet bw : {aggregation_time}")
+            fed_logger.info(f"Server Sequential Transmission time: {float(energy_estimation.get_transmission_time())}")
 
-            simnet_tt = energy_estimation.get_computation_time()
-            clientEnergy = []
-            for i in range(config.K):
-                clientEnergy.append(energy_tt_list[i][0])
-                remainingEnergy.append(energy_tt_list[i][2])
-            avgEnergy.append(sum(clientEnergy) / int(config.K))
+            energy = 0
+            for i in range(totalIOTNum):
+                clientConsumedEnergy[i].append(energy_tt_list[i][0])
+                clientRemainingEnergy[i].append(energy_tt_list[i][2])
+                energy += energy_tt_list[i][0]
+            avgEnergy.append(energy / int(config.K))
 
             server.e_client_attendance(config.CLIENTS_LIST)
 
@@ -159,21 +179,25 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # Recording each round training time, bandwidth and test_app accuracy
             training_time = e_time - s_time
             tt.append(training_time)
-            max_tt_in_clients = max([e_tt_client[1] for e_tt_client in energy_tt_list])
+
             if server.simnet:
                 total_computation_time_for_each_client = {}
-                for clientip in config.CLIENTS_LIST:
-                    total_computation_time_for_each_client[clientip] = server.computation_time_of_each_client_on_edges[
-                                                                           clientip] + \
-                                                                       server.computation_time_of_each_client[
-                                                                           clientip] + \
-                                                                       energy_tt_list[config.CLIENTS_CONFIG[clientip]][
-                                                                           1] + \
-                                                                       server.client_training_transmissionTime[clientip]
-                trainingTime_simnetBW = float(energy_estimation.get_transmission_time()) + \
-                                        max(total_computation_time_for_each_client.values()) + \
-                                        aggregation_time
-                fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
+                if len(config.CLIENTS_LIST) > 0:
+                    for clientip in config.CLIENTS_LIST:
+                        total_computation_time_for_each_client[clientip] = \
+                            server.computation_time_of_each_client_on_edges[
+                                clientip] + \
+                            server.computation_time_of_each_client[
+                                clientip] + \
+                            energy_tt_list[config.CLIENTS_CONFIG[clientip]][
+                                1] + \
+                            server.client_training_transmissionTime[clientip]
+                    trainingTime_simnetBW = float(energy_estimation.get_transmission_time()) + \
+                                            max(total_computation_time_for_each_client.values()) + \
+                                            aggregation_time
+                    fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
+                else:
+                    fed_logger.info("All Clients had been Turned off.")
 
             fed_logger.info(f"Training Time using time.time(): {training_time}")
 
@@ -182,13 +206,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
             #     pickle.dump(res, f)
 
-            # fed_logger.info("testing accuracy")
-            # test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
-            # res['test_acc_record'].append(test_acc)
+            fed_logger.info("testing accuracy")
+            test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
+            res['test_acc_record'].append(test_acc)
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
-            # plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
+            plot_graph(x, tt, avgEnergy, clientRemainingEnergy, iotBW, edgeBW, serverBW, res['test_acc_record'])
         else:
             break
 
@@ -297,24 +321,21 @@ def run_no_edge(server: FedServerInterface, options):
     fed_logger.info(f"{socket.gethostname()} quit")
 
 
-def plot_graph(x, tt=None, avgEnergy=None, remainingEnergy=None, iotBW=None, edgeBW=None, accuracy=None):
+def plot_graph(x, tt=None, avgEnergy=None, remainingEnergy=None, iotBW=None, edgeBW=None, serverBW=None, accuracy=None):
     if tt:
-        rl_utils.draw_graph(10, 5, x, tt, "Training time", "FL Rounds", "Training Time", "/fed-flow/Graphs",
+        rl_utils.draw_graph(10, 5, tt, "Training time", "FL Rounds", "Training Time", "/fed-flow/Graphs",
                             "trainingTime", True)
     if avgEnergy:
-        rl_utils.draw_graph(10, 5, x, avgEnergy, "Energy time", "FL Rounds", "Energy", "/fed-flow/Graphs",
+        rl_utils.draw_graph(10, 5, avgEnergy, "Energy", "FL Rounds", "Energy", "/fed-flow/Graphs",
                             "energy", True)
     if accuracy:
-        rl_utils.draw_graph(10, 5, x, accuracy, "Accuracy", "FL Rounds", "Accuracy", "/fed-flow/Graphs",
+        rl_utils.draw_graph(10, 5, accuracy, "Accuracy", "FL Rounds", "Accuracy", "/fed-flow/Graphs",
                             "accuracy", True)
 
     if remainingEnergy:
-        x = [i for i in range(len(remainingEnergy) - 1)]
         plt.figure(figsize=(int(25), int(5)))
-        iotDevice_K = []
-        for k in range(config.K):
-            for i in range(len(remainingEnergy)):
-                iotDevice_K.append(remainingEnergy[i][k])
+        for k in range(len(remainingEnergy.keys())):
+            iotDevice_K = remainingEnergy[k]
             r = random.random()
             b = random.random()
             g = random.random()
@@ -322,18 +343,19 @@ def plot_graph(x, tt=None, avgEnergy=None, remainingEnergy=None, iotBW=None, edg
             plt.title(f"Remaining Energy of iot devices")
             plt.xlabel("timestep")
             plt.ylabel("remaining energy")
-            plt.plot(x, iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Remaining Energies"))
         plt.close()
 
+    if serverBW:
+        rl_utils.draw_graph(10, 5, serverBW, "Server BW", "FL Rounds", "Server BW", "/fed-flow/Graphs",
+                            "ServerBW", True)
+
     if iotBW:
-        x = [i for i in range(len(iotBW) - 1)]
         plt.figure(figsize=(int(25), int(5)))
-        iotDevice_K = []
-        for k in range(config.K):
-            for i in range(len(iotBW)):
-                iotDevice_K.append(iotBW[i][k])
+        for k in range(len(iotBW.keys())):
+            iotDevice_K = iotBW[k]
             r = random.random()
             b = random.random()
             g = random.random()
@@ -347,12 +369,9 @@ def plot_graph(x, tt=None, avgEnergy=None, remainingEnergy=None, iotBW=None, edg
         plt.close()
 
     if edgeBW:
-        x = [i for i in range(len(edgeBW) - 1)]
         plt.figure(figsize=(int(25), int(5)))
-        edgeDevice_K = []
-        for k in range(config.S):
-            for i in range(len(edgeBW)):
-                edgeDevice_K.append(edgeBW[i][k])
+        for k in range(len(edgeBW.keys())):
+            edgeDevice_K = edgeBW[k]
             r = random.random()
             b = random.random()
             g = random.random()

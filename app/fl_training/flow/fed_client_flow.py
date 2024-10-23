@@ -25,7 +25,7 @@ def run_edge_based(client: FedClientInterface, LR):
     batch_num = data_size / config.B
     # final=[]
     for r in range(config.R):
-        simnet_BW = 130_000_000  # Mbps
+        simnet_BW = 190_000_000  # Mbps
 
         config.current_round = r
         fed_logger.info('====================================>')
@@ -62,6 +62,8 @@ def run_edge_based(client: FedClientInterface, LR):
         fed_logger.info('ROUND: {} END'.format(r))
         fed_logger.info('==> Waiting for aggregation')
 
+        et = time.time()
+
         tt = 0
         if client.simnet:
             transmission_time = float(energy_estimation.get_transmission_time())
@@ -70,23 +72,18 @@ def run_edge_based(client: FedClientInterface, LR):
             fed_logger.info(Fore.MAGENTA + f"Client SIMNET Total time: {tt}")
         else:
             tt = et - st
+        fed_logger.info(Fore.MAGENTA + f"Client Real Total time: {et - st}")
 
         energy = float(energy_estimation.energy())
         remaining_energy = float(energy_estimation.remaining_energy())
-        # energy /= batch_num
-        fed_logger.info(f"TT: {tt}")
+
         fed_logger.info(Fore.MAGENTA + f"Energy, TT, Remaining-energy: {energy}, {tt}, {remaining_energy}")
         fed_logger.info("Sending Energy, TT, Remaining-energy to edge.")
         client.energy_tt(remaining_energy, energy, tt)
         client.e_next_round_attendance(remaining_energy)
-        et = time.time()
-        fed_logger.info(Fore.MAGENTA + f"Client Real Total time: {et - st}")
-
-        # final.append(energy)
 
         if r > 49:
             LR = config.LR * 0.1
-    # fed_logger.info(f"test network{final}")
 
 
 def run_no_offload_edge(client: FedClientInterface, LR):

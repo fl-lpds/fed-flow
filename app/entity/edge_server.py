@@ -279,8 +279,7 @@ class FedEdgeServer(FedEdgeServerInterface):
     def client_attendance(self, client_ips):
         attend = {}
         for client_ip in client_ips:
-            ms = self.recv_msg(client_ip,
-                               message_utils.client_quit_client_to_edge() + "_" + client_ip)
+            ms = self.recv_msg(client_ip, message_utils.client_quit_client_to_edge() + "_" + client_ip)
             msg = [message_utils.client_quit_done(), True]
             self.send_msg(client_ip, msg)
             attend[client_ip] = ms[1]

@@ -33,6 +33,7 @@ services:
     hostname: broker
 
   edge1:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
@@ -57,9 +58,6 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
-    labels:
-      com.docker-tc.enabled: "1"     # Enables Traffic Control mangement
-      com.docker-tc.limit: "0.5mbps"  # Setting the bandwidth limit to 25mbit
     hostname: client1
     deploy:
       resources:
@@ -80,9 +78,6 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
-    labels:
-      com.docker-tc.enabled: "1"     # Enables Traffic Control mangement
-      com.docker-tc.limit: "0.5mbps"  # Setting the bandwidth limit to 25mbit
     hostname: client2
     deploy:
       resources:

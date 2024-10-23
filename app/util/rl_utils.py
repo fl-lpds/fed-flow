@@ -42,10 +42,10 @@ class CustomEnv(gym.Env):
         pass
 
 
-def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):
+def draw_graph(figSizeX, figSizeY, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):
     # Create a plot
     plt.figure(figsize=(int(figSizeX), int(figSizeY)))  # Set the figure size
-    plt.plot(x, y)
+    plt.plot(y)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)

@@ -1,82 +1,119 @@
-version: '3'
 services:
   server:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
-    image: fed-flow:test
+      - ./../../../Graphs:/fed-flow/Graphs
+      - ./../../../app/logs:/fed-flow/app/logs
+    image: autlpdslab/fedflow:rabbitmq
     ports:
       - "5002:5002"
     hostname: server
     deploy:
       resources:
         limits:
-          cpus: '3'
+          cpus: '1'
+        reservations:
+          cpus: '1'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -s fake_splitting -e True"
+    depends_on:
+      - broker
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb False -s fake_splitting -e True & python3 /fed-flow/energy/service.py  "
+
+  broker:
+    attach: false
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+    hostname: broker
 
   edge1:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
-    image: fed-flow:test
+    image: autlpdslab/fedflow:rabbitmq
     ports:
       - "5001:5001"
     hostname: edge1
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '1'
+        reservations:
+          cpus: '1'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
       - server
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -s fake_splitting -e True"
+      - broker
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -o True -sb False -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+
   client1:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
-    image: fed-flow:test
+    image: autlpdslab/fedflow:rabbitmq
     hostname: client1
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '1.0'
+        reservations:
+          cpus: '1.0'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
+      - server
+      - broker
       - edge1
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb False -s fake_splitting -en True -e True & wait -n"
 
   client2:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
-    image: fed-flow:test
+    image: autlpdslab/fedflow:rabbitmq
     hostname: client2
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '1.0'
+        reservations:
+          cpus: '1.0'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
+      - server
+      - broker
       - edge1
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb False -s fake_splitting -en True -e True & wait -n"
 
   client3:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
-    image: fed-flow:test
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
     hostname: client3
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '1.0'
+        reservations:
+          cpus: '1.0'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
+      - server
+      - broker
       - edge1
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb False -s fake_splitting -en True -e True & wait -n"

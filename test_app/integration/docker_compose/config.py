@@ -18,7 +18,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 5000  # data length
+N = 500  # data length
 # mq_url = "sparrow.rmq.cloudamqp.com"
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
@@ -37,7 +37,7 @@ model_len = 7
 
 # FL training configration
 
-R = 5  # FL rounds
+R = 100  # FL rounds
 LR = 0.01  # Learning rate
 B = 100  # Batch size
 

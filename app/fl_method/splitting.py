@@ -5,7 +5,6 @@ import torch
 from stable_baselines3 import PPO, DDPG
 
 from app.config import config
-from app.config.logger import fed_logger
 # from app.model.entity.rl_model import PPO
 from app.util import model_utils, rl_utils
 
@@ -21,6 +20,9 @@ def edge_based_rl_splitting(state, labels):
                         rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[1]])
 
     return actions
+
+
+# def heuristic_splitting(state, label):
 
 
 def rl_splitting(state, labels):

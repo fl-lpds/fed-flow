@@ -260,8 +260,9 @@ class FedServer(FedServerInterface):
         fed_logger.info("server test network sent")
         network_time_end = time.time()
 
-        msg2 = self.recv_msg(exchange=connection_ip, expect_msg_type=message_utils.test_server_network_from_connection(),
-                            url=url, is_weight=True)
+        msg2 = self.recv_msg(exchange=connection_ip,
+                             expect_msg_type=message_utils.test_server_network_from_connection(),
+                             url=url, is_weight=True)
         fed_logger.info("server test network received")
         self.edge_bandwidth[connection_ip] = data_utils.sizeofmessage(msg1) / (network_time_end - network_time_start)
         fed_logger.info(Fore.LIGHTBLUE_EX + f"Cloud-Edge BW: {self.edge_bandwidth}")
@@ -330,12 +331,10 @@ class FedServer(FedServerInterface):
             start_transmission()
             msg = self.recv_msg(exchange=edge, expect_msg_type=message_utils.energy_tt_edge_to_server(), url=edge)
             end_transmission(data_utils.sizeofmessage(msg))
-            fed_logger.info(f"coming message: {msg[1]}")
             for i in range(len(config.EDGE_MAP[edge])):
                 energy_tt_list.append(msg[1][i])
                 if self.simnet:
                     self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = msg[1][i][3]
-                    fed_logger.info(f"msg[1][i][3]: {msg[1][i][3]}")
         self.client_remaining_energy = []
         for i in range(len(energy_tt_list)):
             self.client_remaining_energy.append(energy_tt_list[i][2])
@@ -377,31 +376,16 @@ class FedServer(FedServerInterface):
             state.append(self.client_bandwidth[i])
         for i in self.edge_bandwidth:
             state.append(self.edge_bandwidth[i])
-        fed_logger.info(f"remainings: {self.client_remaining_energy}")
+
+        if self.simnet:
+            state.append(self.simnetbw)
+
         if len(self.client_remaining_energy) == 0:
             for i in range(config.K):
                 state.append(0)
         else:
             for i in self.client_remaining_energy:
                 state.append(i)
-
-        #
-        # edge_offloading = []
-        # server_offloading = 0
-        # for i in range(len(config.EDGE_MAP)):
-        #     edge_offloading.append(0)
-        #     for j in range(len(config.EDGE_MAP.get((list(config.EDGE_MAP.keys()))[i]))):
-        #         split_key = config.CLIENTS_CONFIG.get(config.EDGE_MAP.get(list(config.EDGE_MAP.keys())[i])[j])
-        #         if self.split_layers[split_key][0] < self.split_layers[split_key][1]:
-        #             edge_offloading[i] += 1
-        #         if self.split_layers[split_key][1] < model_utils.get_unit_model_len() - 1:
-        #             server_offloading += 1
-        #     state.append(edge_offloading[i])
-        # state.append(server_offloading)
-
-        # for i in range(len(offloading)):
-        #     state.append(offloading[i][0])
-        #     state.append(offloading[i][1])
         return state
 
     def edge_based_reward_function_data(self, energy_tt_list, total_tt):
@@ -419,12 +403,12 @@ class FedServer(FedServerInterface):
 
     def e_client_attendance(self, client_ips):
         """
-        Returns: average energy consumption of clients
+        Checks clients run ouf of charge or not
+        Returns: Updates CLIENT_LIST
         """
         attend = {}
         for edge in list(config.EDGE_SERVER_LIST):
-            msg = self.recv_msg(exchange=edge,
-                                expect_msg_type=message_utils.client_quit_edge_to_server(), url=edge)
+            msg = self.recv_msg(exchange=edge, expect_msg_type=message_utils.client_quit_edge_to_server(), url=edge)
             attend.update(msg[1])
             msg = [message_utils.client_quit_done(), True]
             self.send_msg(exchange=edge, msg=msg, url=edge)
@@ -433,11 +417,11 @@ class FedServer(FedServerInterface):
         temp_list = []
         for client_ip in client_ips:
             if not attend[client_ip]:
-                # config.CLIENTS_LIST.remove(client_ip)
+                config.CLIENTS_LIST.remove(client_ip)
                 config.K -= 1
-            else:
-                temp_list.append(client_ip)
-        config.CLIENTS_LIST = temp_list
+        #     else:
+        #         temp_list.append(client_ip)
+        # config.CLIENTS_LIST = temp_list
 
     def client_attendance(self, client_ips):
         attend = {}
