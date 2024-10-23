@@ -36,7 +36,6 @@ class FedClient(FedBaseNodeInterface):
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9)
         self.uninet = model_utils.get_model('Unit', None, self.device, False)
 
-
     @property
     def is_edge_based(self) -> bool:
         if self._edge_based is not None:
@@ -130,7 +129,8 @@ class FedClient(FedBaseNodeInterface):
     def scatter_random_local_weights(self):
         is_leader = HTTPCommunicator.get_is_leader(self)
         if is_leader:
-            self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()]), [NodeType.SERVER])
+            self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()], config.N),
+                             [NodeType.SERVER])
 
     def no_offloading_train(self):
         self.net.to(self.device)
@@ -144,11 +144,16 @@ class FedClient(FedBaseNodeInterface):
             self.optimizer.step()
 
     def gossip_with_neighbors(self):
-        edge_neighbors = self.get_neighbors([NodeType.CLIENT])
-        msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()])
+        msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()], config.N)
         self.scatter_msg(msg, [NodeType.CLIENT])
         gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.CLIENT])
-        gathered_models = [(msg.message.weights[0], config.N / len(edge_neighbors)) for msg in gathered_msgs]
+        total_data_size = sum([msg.message.dataset_len for msg in gathered_msgs])
+        gathered_models = []
+        for msg in gathered_msgs:
+            weights = msg.message.weights[0]
+            dataset_size = msg.message.dataset_len
+            weight_ratio = dataset_size / total_data_size
+            gathered_models.append((weights, weight_ratio))
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)
