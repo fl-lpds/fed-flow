@@ -32,7 +32,6 @@ class FedClient(FedBaseNodeInterface):
         self.net = model_utils.get_model('Unit', None, self.device, True)
         self.criterion = nn.CrossEntropyLoss()
         self.mobility_manager = MobilityManager(self)
-        self.leader_info = None
         self.aggregator = aggregator
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9)
         self.uninet = model_utils.get_model('Unit', None, self.device, False)
