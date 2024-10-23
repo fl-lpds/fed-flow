@@ -22,7 +22,8 @@ options = {
     '-ip': ['--ip', 'client1', 'IP address of the node'],
     '-en': ['--energy', 'False', 'enable or disable energy estimation'],
     '-r': ['--rabbitmq-url', 'amqp://rabbitmq:rabbitmq@localhost:5672/%2F', 'RabbitMQ endpoint'],
-    '-cl': ['--cluster', 'default_cluster', 'name of the cluster the node belongs to']
+    '-cl': ['--cluster', 'default_cluster', 'name of the cluster the node belongs to'],
+    '-ds': ['--dataset-size', '100', 'size of the dataset for the node']
 }
 
 
@@ -94,5 +95,6 @@ def parse_argument(parser: argparse.ArgumentParser):
     config.dataset_name = option.get('dataset')
     config.model_name = option.get('model')
     config.index = int(option.get('index'))
+    config.N = int(option.get('dataset_size'))
     model_utils.download_model(option.get('modellink'))
     return option
