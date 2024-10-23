@@ -1,0 +1,180 @@
+services:
+  node_base: &node_base
+    image: autlpdslab/fedflow:mega-v0.0.1
+    working_dir: /fed-flow/app/fl_training/runner
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    depends_on:
+      - broker
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "none_spliting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "0.0.0.0"
+      PORT: "8080"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/"
+      NEIGHBORS: ""
+      NODE_TYPE: "CLIENT"
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_base_run.py
+      --aggregation $$AGGREGATION
+      --decentralized $$DECENTRALIZED
+      --mobility $$MOBILITY
+      --clustering $$CLUSTERING
+      -o $$OFFLOADING
+      -s $$SPLITTING_METHOD
+      --model $$MODEL
+      --dataset $$DATASET
+      --index $$NODE_INDEX
+      --ip $$IP
+      --port $$PORT
+      --rabbitmq-url $$RABBITMQ_URL
+      --neighbors $$NEIGHBORS
+      --node-type $$NODE_TYPE"
+  client1:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "1"
+      IP: "client1"
+      PORT: "8080"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client1"
+      NEIGHBORS: "edge1,8084"
+      NODE_TYPE: "client"
+  
+  client2:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "2"
+      IP: "client2"
+      PORT: "8081"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client2"
+      NEIGHBORS: "edge1,8084"
+      NODE_TYPE: "client"
+  
+  client3:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "3"
+      IP: "client3"
+      PORT: "8082"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client3"
+      NEIGHBORS: "edge2,8085"
+      NODE_TYPE: "client"
+  
+  client4:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "4"
+      IP: "client4"
+      PORT: "8083"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client4"
+      NEIGHBORS: "edge2,8085"
+      NODE_TYPE: "client"
+  
+  edge1:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "1"
+      IP: "edge1"
+      PORT: "8084"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge1"
+      NEIGHBORS: "server,8086 client1,8080 client2,8081"
+      NODE_TYPE: "edge"
+  
+  edge2:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "2"
+      IP: "edge2"
+      PORT: "8085"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge2"
+      NEIGHBORS: "server,8086 client3,8082 client4,8083"
+      NODE_TYPE: "edge"
+  
+  server:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "False"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "server"
+      PORT: "8086"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/server"
+      NEIGHBORS: "edge1,8084 edge2,8085"
+      NODE_TYPE: "server"
+  
+  broker:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+      RABBITMQ_MAX_MESSAGE_SIZE: 536870912
+
+volumes:
+  rabbitmq_data:

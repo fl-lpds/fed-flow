@@ -1,3 +1,4 @@
+from app.config.logger import fed_logger
 from app.entity.aggregators.base_aggregator import BaseAggregator
 from app.dto.base_model import BaseModel
 
