@@ -3,7 +3,9 @@ import sys
 import time
 import warnings
 
+from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_client import FedClient
+from app.entity.node_type import NodeType
 from app.util.mobility_data_utils import start_mobility_simulation_thread
 
 sys.path.append('../../../')
@@ -22,7 +24,7 @@ def run_client(client: FedClient, learning_rate):
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r + 1))
         fed_logger.info("receiving global weights")
-        client.gather_global_weights()
+        client.gather_global_weights(NodeType.EDGE)
         fed_logger.info("test network")
         client.scatter_network_speed_to_edges()
         fed_logger.info("receiving splitting info")
@@ -32,6 +34,22 @@ def run_client(client: FedClient, learning_rate):
         client.start_offloading_train()
         fed_logger.info("sending local weights")
         client.scatter_local_weights()
+        fed_logger.info('ROUND: {} END'.format(r + 1))
+
+
+def run_d2d(client: FedClient):
+    for r in range(config.R):
+        config.current_round = r
+        fed_logger.info('====================================>')
+        fed_logger.info('ROUND: {} START'.format(r + 1))
+        fed_logger.info("receiving global weights")
+        client.gather_global_weights(NodeType.SERVER)
+        fed_logger.info("start training")
+        client.no_offloading_train()
+        fed_logger.info("gossip with neighbors")
+        client.gossip_with_neighbors()
+        fed_logger.info("sending local weights")
+        client.scatter_random_local_weights()
         fed_logger.info('ROUND: {} END'.format(r + 1))
 
 
@@ -48,21 +66,28 @@ def run(options_ins):
 
     estimate_energy = options_ins.get("energy") == "True"
     mobility = options_ins.get('mobility')
+    d2d = options_ins.get('d2d')
 
     if estimate_energy:
         energy_estimation.init(os.getpid())
 
     ip = options_ins.get('ip')
     port = options_ins.get('port')
+    cluster = options_ins.get('cluster')
+
+    aggregator = create_aggregator(options_ins.get('aggregation'))
 
     client = FedClient(ip=ip, port=port, model_name=options_ins.get('model'),
                        dataset=options_ins.get('dataset'), train_loader=train_loader, LR=learning_rate,
-                       neighbors=config.CURRENT_NODE_NEIGHBORS)
+                       cluster=cluster, aggregator=aggregator, neighbors=config.CURRENT_NODE_NEIGHBORS)
     if mobility:
         start_mobility_simulation_thread(client)
         # client.mobility_manager.discover_edges()
         # client.mobility_manager.monitor_and_migrate()
+    if d2d:
+        run_d2d(client)
 
-    run_client(client, learning_rate)
+    else:
+        run_client(client, learning_rate)
     time.sleep(10)
     client.stop_server()

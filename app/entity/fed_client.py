@@ -1,11 +1,11 @@
 import torch.nn as nn
 from torch import optim
-from tqdm import tqdm
-
+import tqdm
 from app.config import config
 from app.config.logger import fed_logger
 from app.dto.message import GlobalWeightMessage, NetworkTestMessage, SplitLayerConfigMessage, IterationFlagMessage
 from app.dto.received_message import ReceivedMessage
+from app.entity.aggregators.base_aggregator import BaseAggregator
 from app.entity.fed_base_node_interface import FedBaseNodeInterface
 from app.entity.http_communicator import HTTPCommunicator
 from app.entity.mobility_manager import MobilityManager
@@ -18,9 +18,9 @@ from app.util import model_utils
 # noinspection PyTypeChecker
 class FedClient(FedBaseNodeInterface):
 
-    def __init__(self, ip: str, port: int, model_name, dataset, train_loader, LR,
-                 neighbors: list[NodeIdentifier] = None):
-        super().__init__(ip, port, NodeType.CLIENT, neighbors)
+    def __init__(self, ip: str, port: int, model_name, dataset, train_loader, LR, cluster,
+                 aggregator: BaseAggregator, neighbors: list[NodeIdentifier] = None):
+        super().__init__(ip, port, NodeType.CLIENT, cluster, neighbors)
         self._edge_based = None
         self.scheduler = None
         self.optimizer = None
@@ -32,6 +32,10 @@ class FedClient(FedBaseNodeInterface):
         self.net = model_utils.get_model('Unit', None, self.device, True)
         self.criterion = nn.CrossEntropyLoss()
         self.mobility_manager = MobilityManager(self)
+        self.aggregator = aggregator
+        self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9)
+        self.uninet = model_utils.get_model('Unit', None, self.device, False)
+
 
     @property
     def is_edge_based(self) -> bool:
@@ -50,8 +54,8 @@ class FedClient(FedBaseNodeInterface):
         self.optimizer = optim.SGD(self.net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, config.lr_step_size, config.lr_gamma)
 
-    def gather_global_weights(self):
-        msgs: list[ReceivedMessage] = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.EDGE])
+    def gather_global_weights(self, node_type: NodeType):
+        msgs: list[ReceivedMessage] = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [node_type])
         msg: GlobalWeightMessage = msgs[0].message
         pweights = model_utils.split_weights_client(msg.weights[0], self.net.state_dict())
         self.net.load_state_dict(pweights)
@@ -122,3 +126,30 @@ class FedClient(FedBaseNodeInterface):
 
     def scatter_local_weights(self):
         self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()]), [NodeType.EDGE])
+
+    def scatter_random_local_weights(self):
+        is_leader = HTTPCommunicator.get_is_leader(self)
+        if is_leader:
+            self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()]), [NodeType.SERVER])
+
+    def no_offloading_train(self):
+        self.net.to(self.device)
+        self.net.train()
+        for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
+            self.optimizer.zero_grad()
+            outputs = self.net(inputs)
+            loss = self.criterion(outputs, targets)
+            loss.backward()
+            self.optimizer.step()
+
+    def gossip_with_neighbors(self):
+        edge_neighbors = self.get_neighbors([NodeType.CLIENT])
+        msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()])
+        self.scatter_msg(msg, [NodeType.CLIENT])
+        gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.CLIENT])
+        gathered_models = [(msg.message.weights[0], config.N / len(edge_neighbors)) for msg in gathered_msgs]
+        zero_model = model_utils.zero_init(self.uninet).state_dict()
+        aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
+        self.uninet.load_state_dict(aggregated_model)
+

@@ -3,6 +3,7 @@ import time
 
 from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_server import FedServer
+from app.entity.node_type import NodeType
 
 sys.path.append('../../../')
 from app.config import config
@@ -79,6 +80,36 @@ def run_centralized(server: FedServer, learning_rate: float, options):
                         f"accuracy-{str(server)}", True)
 
 
+def run_d2d(server: FedServer, options):
+    training_times = []
+    accuracy = []
+    rounds = []
+    for r in range(config.R):
+        config.current_round = r
+        rounds.append(r)
+        fed_logger.info('====================================>')
+        fed_logger.info('==> Round {:} Start'.format(r + 1))
+        fed_logger.info("sending global weights")
+        server.scatter_global_weights([NodeType.CLIENT])
+
+        s_time = time.time()
+        server.choose_random_leader_per_cluster()
+        local_weights = server.receive_leaders_local_weights()
+        server.d2d_aggregate(local_weights)
+
+        e_time = time.time()
+        training_time = e_time - s_time
+        training_times.append(training_time)
+
+        fed_logger.info("testing accuracy")
+        test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
+        fed_logger.info(f"Test Accuracy : {test_acc}")
+        accuracy.append(test_acc)
+        fed_logger.info('Round Finish')
+        fed_logger.info('==> Round {:} End'.format(r + 1))
+        fed_logger.info('==> Round Training Time: {:}'.format(training_time))
+
+
 def run(options_ins):
     learning_rate = config.learning_rate
     fed_logger.info('Preparing Sever.')
@@ -86,5 +117,10 @@ def run(options_ins):
     aggregator = create_aggregator(options_ins.get('aggregation'))
     fed_server = FedServer(options_ins.get('ip'), options_ins.get('port'), options_ins.get('model'),
                            options_ins.get('dataset'), aggregator, config.CURRENT_NODE_NEIGHBORS)
-    run_centralized(fed_server, learning_rate, options_ins)
+    d2d = options_ins.get('d2d')
+    if d2d:
+        run_d2d(fed_server, options_ins)
+    else:
+        run_centralized(fed_server, learning_rate, options_ins)
     fed_server.stop_server()
+

@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from uvicorn import Server
 
 from app.config import config
+from app.config.logger import fed_logger
 from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_coordinate import NodeCoordinate
 from app.entity.node_identifier import NodeIdentifier
@@ -19,14 +20,16 @@ class Node:
     _node_type: NodeType
     node_coordinate: NodeCoordinate
     discovered_edges: set[NodeIdentifier]
+    cluster: str
+    is_leader: False
 
-    def __init__(self, ip: str, port: int, node_type: NodeType, neighbors: list[NodeIdentifier] = None):
+    def __init__(self, ip: str, port: int, node_type: NodeType, cluster, neighbors: list[NodeIdentifier] = None):
         self._server_started = False
         self.ip = ip
         self.port = port
         self._node_type = node_type
         self.neighbors = []
-        self.node_coordinate = config.INITIAL_NODE_COORDINATE
+        # self.node_coordinate = config.INITIAL_NODE_COORDINATE
         self.discovered_edges = set()
         self._app = FastAPI()
         self._server: Server
@@ -34,6 +37,8 @@ class Node:
             self.add_neighbors(neighbors)
         self._setup_routes()
         self._start_server_in_thread(port)
+        self.cluster = cluster
+        self.is_leader = False
 
     def __str__(self):
         return f'{self.ip}:{self.port}'
@@ -45,6 +50,9 @@ class Node:
         self._app.add_route("/get-neighbors-info", self.get_neighbors_info, methods=["GET"])
         self._app.add_route("/add-neighbor", self.add_neighbor_api, methods=["POST"])
         self._app.add_route("/remove-neighbor", self.remove_neighbor_api, methods=["POST"])
+        self._app.add_route("/get-cluster", self.get_cluster, methods=["GET"])
+        self._app.add_route("/set-leader", self.set_leader_api, methods=["POST"])
+        self._app.add_route("/get-is-leader", self.get_is_leader_api, methods=["GET"])
 
     async def get_node_type(self, _: Request):
         return JSONResponse({'node_type': self._node_type.name}, http.HTTPStatus.OK)
@@ -136,3 +144,16 @@ class Node:
         self._server_started = True
         server_thread = threading.Thread(target=self._run_server, args=(port,))
         server_thread.start()
+
+    async def get_cluster(self, _: Request):
+        return JSONResponse({'cluster': self.cluster}, http.HTTPStatus.OK)
+
+    async def set_leader_api(self, request: Request):
+        data = await request.json()
+        if 'is_leader' not in data:
+            raise HTTPException(status_code=400, detail="Missing 'is_leader' field.")
+        self.is_leader = data['is_leader']
+        return JSONResponse({'message': f"Node is_leader set to {self.is_leader}"}, http.HTTPStatus.OK)
+
+    async def get_is_leader_api(self, _: Request):
+        return JSONResponse({'is_leader': self.is_leader}, http.HTTPStatus.OK)

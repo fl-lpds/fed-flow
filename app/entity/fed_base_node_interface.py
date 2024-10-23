@@ -3,6 +3,7 @@ import time
 from abc import ABC
 
 from app.config import config
+from app.config.logger import fed_logger
 from app.dto.bandwidth import BandWidth
 from app.dto.message import BaseMessage, GlobalWeightMessage, SplitLayerConfigMessage, MessageType, NetworkTestMessage
 from app.dto.received_message import ReceivedMessage
@@ -16,8 +17,8 @@ from app.util import data_utils
 
 # noinspection PyTypeChecker
 class FedBaseNodeInterface(ABC, Node, Communicator):
-    def __init__(self, ip: str, port: int, node_type: NodeType, neighbors: list[NodeIdentifier] = None):
-        Node.__init__(self, ip, port, node_type, neighbors)
+    def __init__(self, ip: str, port: int, node_type: NodeType, cluster, neighbors: list[NodeIdentifier] = None):
+        Node.__init__(self, ip, port, node_type, cluster, neighbors)
         Communicator.__init__(self)
         self.neighbor_bandwidth: dict[NodeIdentifier, BandWidth] = {}
         self.uninet = None
@@ -39,7 +40,7 @@ class FedBaseNodeInterface(ABC, Node, Communicator):
             self.send_msg(self.get_exchange_name(), HTTPCommunicator.get_rabbitmq_url(neighbor), msg)
 
     def gather_msgs(self, msg_type: MessageType, neighbors_types: list[NodeType] = None) -> list[
-            ReceivedMessage]:  # (ip, msg)
+        ReceivedMessage]:  # (ip, msg)
         messages = []
         for neighbor in self.get_neighbors():
             neighbor_type = HTTPCommunicator.get_node_type(neighbor)

@@ -1,5 +1,7 @@
+import random
 import threading
 import time
+from collections import defaultdict
 
 import numpy as np
 from colorama import Fore
@@ -8,6 +10,7 @@ from torch import nn, optim
 from app.config import config
 from app.config.logger import fed_logger
 from app.dto.bandwidth import BandWidth
+from app.dto.base_model import BaseModel
 from app.dto.message import IterationFlagMessage, GlobalWeightMessage, NetworkTestMessage, JsonMessage, \
     SplitLayerConfigMessage, BaseMessage
 from app.entity.aggregators.base_aggregator import BaseAggregator
@@ -24,7 +27,7 @@ from app.util import model_utils, data_utils
 class FedServer(FedBaseNodeInterface):
     def __init__(self, ip: str, port: int, model_name, dataset, aggregator: BaseAggregator,
                  neighbors: list[NodeIdentifier]):
-        super().__init__(ip, port, NodeType.SERVER, neighbors)
+        super().__init__(ip, port, NodeType.SERVER, None, neighbors)
 
         self.optimizers = {}
         self.nets = {}
@@ -169,3 +172,45 @@ class FedServer(FedBaseNodeInterface):
 
     def get_neighbors_bandwidth(self) -> dict[str, BandWidth]:
         return self.neighbors_bandwidth
+
+    def d2d_aggregate(self, client_local_weights: dict[str, BaseModel]) -> None:
+        w_local_list = []
+        client_neighbors = self.get_neighbors([NodeType.CLIENT])
+        for neighbor in client_neighbors:
+            if HTTPCommunicator.get_is_leader(neighbor):
+                HTTPCommunicator.set_leader(neighbor, neighbor.ip, neighbor.port, False)
+                w_local = (client_local_weights[str(neighbor)], config.N / len(client_neighbors))
+                w_local_list.append(w_local)
+        zero_model = model_utils.zero_init(self.uninet).state_dict()
+        aggregated_model = self.aggregator.aggregate(zero_model, w_local_list)
+        self.uninet.load_state_dict(aggregated_model)
+
+    def receive_leaders_local_weights(self):
+        client_local_weights = {}
+        for neighbor in self.get_neighbors([NodeType.CLIENT]):
+            is_leader = HTTPCommunicator.get_is_leader(neighbor)
+            if is_leader:
+                msg: GlobalWeightMessage = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url,
+                                                         GlobalWeightMessage.MESSAGE_TYPE)
+                client_local_weights[str(neighbor)] = msg.weights[0]
+        return client_local_weights
+
+    def choose_random_leader_per_cluster(self):
+        clusters = defaultdict(list)
+        neighbors = self.get_neighbors([NodeType.CLIENT])
+
+        for neighbor in neighbors:
+            cluster_info = HTTPCommunicator.get_cluster(neighbor)
+            if cluster_info:
+                cluster_id = cluster_info.get('cluster')
+                if cluster_id:
+                    clusters[cluster_id].append(neighbor)
+
+        random_clients = {}
+        for cluster, clients in clusters.items():
+            if clients:
+                random_client = random.choice(clients)
+                random_clients[cluster] = random_client
+                HTTPCommunicator.set_leader(random_client, random_client.ip, random_client.port, True)
+
+        return random_clients

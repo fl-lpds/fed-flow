@@ -1,0 +1,147 @@
+version: '3'
+services:
+  broker:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+      RABBITMQ_MAX_MESSAGE_SIZE: 536870912
+
+  server:
+    image: autlpdslab/fedflow:mega-v0.0.1
+    hostname: server
+    working_dir: /fed-flow/app/rl_training/runner
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py
+      --decentralized True
+      --d2d True
+      --neighbors client2,8082 client1,8081 client4,8084 client3,8083
+      --ip server
+      --port 8080
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/server"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '2G'
+        reservations:
+          cpus: '1'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure
+
+  client1:
+    image: autlpdslab/fedflow:mega-v0.0.1
+    hostname: client1
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      --decentralized True
+      --d2d True
+      --neighbors client2,8082 server,8080
+      --ip client1 --port 8081
+      --cluster cluster1
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client1"
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure
+
+  client2:
+    image: autlpdslab/fedflow:mega-v0.0.1
+    hostname: client2
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      --decentralized True
+      --d2d True
+      --neighbors client1,8081 server,8080
+      --ip client2 --port 8082
+      --cluster cluster1
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client2"
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure
+
+  client3:
+    image: autlpdslab/fedflow:mega-v0.0.1
+    hostname: client3
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      --decentralized True
+      --d2d True
+      --neighbors client4,8084 server,8080
+      --ip client3 --port 8083
+      --cluster cluster2
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client3"
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure
+
+  client4:
+    image: autlpdslab/fedflow:mega-v0.0.1
+    hostname: client4
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      --decentralized True
+      --d2d True
+      --neighbors client3,8083 server,8080
+      --ip client4 --port 8084
+      --cluster cluster2
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client4"
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure

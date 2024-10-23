@@ -89,3 +89,37 @@ class HTTPCommunicator:
         else:
             raise Exception(
                 f"Failed to remove neighbor from node {node_identifier}, status code: {response.status_code}, message: {response.text}")
+
+    @staticmethod
+    def get_cluster(node_identifier: NodeIdentifier) -> dict:
+        HTTPCommunicator._wait_for_neighbor_to_get_ready(node_identifier)
+        request_url = f"http://{node_identifier.ip}:{node_identifier.port}/get-cluster"
+        response = requests.get(request_url)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(
+                f"Failed to get cluster information for node {node_identifier}, status code: {response.status_code}")
+
+    @staticmethod
+    def set_leader(node_identifier: NodeIdentifier, leader_ip: str, leader_port: int, is_leader: bool) -> dict:
+        HTTPCommunicator._wait_for_neighbor_to_get_ready(node_identifier)
+        request_url = f"http://{node_identifier.ip}:{node_identifier.port}/set-leader"
+        payload = {"ip": leader_ip, "port": leader_port, "is_leader": is_leader}  # Added is_leader to payload
+        response = requests.post(request_url, json=payload)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(
+                f"Failed to set leader for node {node_identifier}, status code: {response.status_code}, message: {response.text}")
+
+    @staticmethod
+    def get_is_leader(node_identifier: NodeIdentifier) -> bool:
+        HTTPCommunicator._wait_for_neighbor_to_get_ready(node_identifier)
+        request_url = f"http://{node_identifier.ip}:{node_identifier.port}/get-is-leader"
+        response = requests.get(request_url)
+        if response.status_code == 200:
+            return response.json()['is_leader']
+        else:
+            raise Exception(
+                f"Failed to get is_leader status from node {node_identifier}, status code: {response.status_code}")
