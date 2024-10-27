@@ -1,5 +1,6 @@
 import os
 import sys
+from os import environ
 
 from app.entity.node_coordinate import NodeCoordinate
 from app.entity.node_identifier import NodeIdentifier
@@ -39,7 +40,7 @@ split_layer = [[6, 6]]  # Initial split layers
 model_len = 7
 
 # FL training configration
-R = 2  # FL rounds
+R = int(environ.get("ROUND_COUNT", "2"))  # FL rounds
 learning_rate = 0.01  # Learning rate
 B = 100  # Batch size
 lr_step_size = 20

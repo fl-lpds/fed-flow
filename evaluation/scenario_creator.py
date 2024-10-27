@@ -89,8 +89,9 @@ def render_docker_compose_template(data):
 @click.option('--splitting-method', default='fake_decentralized_splitting',
               prompt='Splitting method (find the list of available methods in the splitting.py file)')
 @click.option('--topology', default=None, callback=topology_prompt)
+@click.option('--round-count', default=2, prompt='Enter number of FL round')
 def create_docker_compose(num_clients, num_edges, decentralized, offloading, splitting_method,
-                          topology):
+                          topology, round_count):
     data = {
         'clients': [],
         'edges': [],
@@ -108,7 +109,8 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             'ip': f'client{i}',
             'node_name': f'client{i}',
             'node_type': 'client',
-            'neighbors': ''
+            'neighbors': '',
+            'round_count': round_count
         }
         data['clients'].append(client)
         current_port += 1
@@ -125,7 +127,8 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             'ip': f'edge{i}',
             'node_name': f'edge{i}',
             'node_type': 'edge',
-            'neighbors': ''
+            'neighbors': '',
+            'round_count': round_count
         }
         data['edges'].append(edge)
         current_port += 1
@@ -147,7 +150,8 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             'ip': f'server',
             'node_name': f'server',
             'node_type': 'server',
-            'neighbors': ''
+            'neighbors': '',
+            'round_count': round_count
         }
         data['servers'].append(server)
         current_port += 1

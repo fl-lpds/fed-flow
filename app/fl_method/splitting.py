@@ -6,7 +6,7 @@ from stable_baselines3 import PPO
 
 from app.config import config
 from app.entity.fed_base_node_interface import FedBaseNodeInterface
-from app.util import model_utils, rl_utils
+from app.util import model_utils, graph_utils
 
 
 def edge_based_energy_aware_rl_splitting(state, labels, **kwargs):

@@ -1,18 +1,15 @@
 import logging
-import sys
 import time
 import warnings
 
+from app.config import config
+from app.config.config import *
+from app.config.logger import fed_logger
 from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_client import FedClient
 from app.entity.node_type import NodeType
-from app.util.mobility_data_utils import start_mobility_simulation_thread
-
-sys.path.append('../../../')
-from app.config import config
-from app.config.config import *
 from app.util import data_utils, energy_estimation
-from app.config.logger import fed_logger
+from app.util.mobility_data_utils import start_mobility_simulation_thread
 
 warnings.filterwarnings('ignore')
 logging.getLogger("requests").setLevel(logging.WARNING)

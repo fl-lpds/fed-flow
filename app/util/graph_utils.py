@@ -1,15 +1,35 @@
 import os
 import random
+import time
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
 import app.util.model_utils as model_utils
+from app.config import config
+from app.config.logger import fed_logger
+from app.entity.node import Node
 
 
-# from tensorforce import Agent
-# from app.model.entity.rl_model import NoSplitting, TRPO, AC, TensorforceAgent, RandomAgent, TF_PPO
+def report_results(node: Node, training_times: list[float], client_bandwidths: list[float],
+                   accuracy: list[float], neighbor_bandwidths: Optional[list[float]] = None):
+    current_time = time.strftime("%Y-%m-%d %H:%M")
+    runtime_config = f'{current_time}'
+    save_path = f"Results/{runtime_config}"
+    rounds_count = config.R
+    draw_graph(10, 5, range(1, rounds_count + 1), training_times, str(node), "FL Rounds", "Training Time (s)",
+               save_path, f"training-time-{str(node)}")
+    draw_graph(10, 5, range(1, rounds_count + 1), client_bandwidths, str(node), "FL Rounds", "Bandwidths (bytes/s)",
+               save_path, f"bandwidth-{str(node)}")
+    draw_graph(10, 5, range(1, rounds_count + 1), accuracy, str(node), "FL Rounds", "Accuracy (%)",
+               save_path, f"accuracy-{str(node)}")
+    if neighbor_bandwidths:
+        draw_graph(10, 5, range(1, rounds_count + 1), neighbor_bandwidths, str(node), "FL Rounds",
+                   "Neighbors Bandwidths (bytes/s)",
+                   save_path, f"neighbor-bandwidths-{str(node)}")
+    fed_logger.info(f"Results created successfully at")
 
 
 def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):

@@ -1,15 +1,12 @@
-import sys
 import time
 
+from app.config import config
+from app.config.logger import fed_logger
 from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_edge_server import FedEdgeServer
 from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_type import NodeType
-from app.util import rl_utils, model_utils
-
-sys.path.append('../../../')
-from app.config import config
-from app.config.logger import fed_logger
+from app.util import graph_utils, model_utils
 
 
 def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
@@ -79,24 +76,7 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(training_time))
-
-    current_time = time.strftime("%Y-%m-%d %H:%M")
-    runtime_config = f'{current_time} offload decentralized'
-    rl_utils.draw_graph(10, 5, rounds, training_times, f"Edge {str(edge_server)} Training time", "FL Rounds",
-                        "Training Time (s)",
-                        f"Graphs/{runtime_config}",
-                        f"trainingTime-{str(edge_server)}", True)
-    rl_utils.draw_graph(10, 5, rounds, client_bw, f"Edge {str(edge_server)} Average clients BW", "FL Rounds",
-                        "clients BW (bytes / s)",
-                        f"Graphs/{runtime_config}",
-                        f"client_bw-{str(edge_server)}", True)
-    rl_utils.draw_graph(10, 5, rounds, edge_bw, f"Edge {str(edge_server)} Average edges BW", "FL Rounds",
-                        "edges BW (bytes / s)",
-                        f"Graphs/{runtime_config}",
-                        f"edge_bw-{str(edge_server)}", True)
-    rl_utils.draw_graph(10, 5, rounds, accuracy, f"Edge {str(edge_server)} Accuracy", "FL Rounds", "accuracy",
-                        f"Graphs/{runtime_config}",
-                        f"accuracy-{str(edge_server)}", True)
+    graph_utils.report_results(edge_server, training_times, client_bw, accuracy, edge_bw)
 
 
 def run_centralized(edge_server: FedEdgeServer, learning_rate):

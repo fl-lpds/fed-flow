@@ -1,12 +1,9 @@
 import argparse
-import sys
 
-
-sys.path.append('../../../')
 from app.entity.communicator import Communicator
-from app.util import input_utils
-from app.fl_training.flow import fed_client_flow, fed_edgeserver_flow, fed_server_flow
 from app.entity.node_type import NodeType
+from app.fl_training.flow import fed_client_flow, fed_edgeserver_flow, fed_server_flow
+from app.util import input_utils
 
 parser = argparse.ArgumentParser()
 options = input_utils.parse_argument(parser)

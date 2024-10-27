@@ -23,7 +23,7 @@ class FedEdgeServer(FedBaseNodeInterface):
 
     def __init__(self, ip: str, port: int, model_name, dataset, offload, aggregator: BaseAggregator,
                  neighbors: list[NodeIdentifier]):
-        super().__init__(ip, port, NodeType.EDGE, neighbors)
+        super().__init__(ip, port, NodeType.EDGE, '', neighbors)
         self._edge_based = None
         self.device = get_available_torch_device()
         self.model_name = model_name
