@@ -13,7 +13,7 @@ template = env.get_template('docker-compose.yml.j2')
 
 def topology_prompt(ctx, param, value):
     if ctx.params.get('decentralized'):
-        return click.prompt('Topology type', type=click.Choice(['star', 'fully_connected']), default='star')
+        return click.prompt('Topology type', type=click.Choice(['ring', 'fully_connected']), default='ring')
     return None
 
 
