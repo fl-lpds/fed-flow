@@ -80,17 +80,18 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
 
 
 def run_centralized(edge_server: FedEdgeServer, learning_rate):
+    edge_server.gather_and_scatter_split_config()
     edge_server.initialize(learning_rate)
     for r in range(config.R):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('==> Round {:} Start'.format(r + 1))
+        fed_logger.info("receiving and sending splitting info")
+        edge_server.gather_and_scatter_split_config()
         fed_logger.info("receiving and sending global weights")
         edge_server.gather_and_scatter_global_weight()
         fed_logger.info("test clients network")
         edge_server.gather_neighbors_network_bandwidth()
-        fed_logger.info("receiving and sending splitting info")
-        edge_server.gather_and_scatter_split_config()
         fed_logger.info("start training")
         edge_server.start_centralized_training()
         fed_logger.info('==> Round {:} End'.format(r + 1))

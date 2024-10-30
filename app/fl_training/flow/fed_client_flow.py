@@ -8,7 +8,7 @@ from app.config.logger import fed_logger
 from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_client import FedClient
 from app.entity.node_type import NodeType
-from app.util import data_utils, energy_estimation
+from app.util import data_utils, energy_estimation, model_utils
 from app.util.mobility_data_utils import start_mobility_simulation_thread
 
 warnings.filterwarnings('ignore')
@@ -20,17 +20,17 @@ def run_client(client: FedClient, learning_rate):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r + 1))
+        fed_logger.info("receiving splitting info")
+        client.gather_split_config()
         fed_logger.info("receiving global weights")
         client.gather_global_weights(NodeType.EDGE)
         fed_logger.info("test network")
         client.scatter_network_speed_to_edges()
-        fed_logger.info("receiving splitting info")
-        client.gather_split_config()
-        client.initialize(learning_rate)
         fed_logger.info("start training")
         client.start_offloading_train()
         fed_logger.info("sending local weights")
         client.scatter_local_weights()
+        model_utils.test(client.uninet, client.train_loader, client.device, client.criterion)
         fed_logger.info('ROUND: {} END'.format(r + 1))
 
 

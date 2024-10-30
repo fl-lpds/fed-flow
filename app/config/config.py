@@ -69,7 +69,7 @@ SERVER_ADDR = 'server'
 SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001}
 
-K = 6  # Number of devices
+K = environ.get("DEVICE_COUNT", 1)  # Number of devices
 G = 1  # Number of groups
 S = 1
 

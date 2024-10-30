@@ -11,6 +11,7 @@ from app.util import graph_utils
 
 def run_centralized(server: FedServer, learning_rate: float, options):
     server.initialize(learning_rate)
+    server.scatter_split_layers()
     training_time = []
     transferred_data = []
     rounds = []
@@ -19,7 +20,8 @@ def run_centralized(server: FedServer, learning_rate: float, options):
         rounds.append(r)
         fed_logger.info('====================================>')
         fed_logger.info('==> Round {:} Start'.format(r + 1))
-
+        fed_logger.info("Scatter split config")
+        server.scatter_split_layers()
         fed_logger.info("sending global weights")
         server.scatter_global_weights()
 
@@ -38,7 +40,6 @@ def run_centralized(server: FedServer, learning_rate: float, options):
 
         fed_logger.info("splitting")
         server.split(bw, options)
-        server.scatter_split_layers()
 
         fed_logger.info("start training")
         server.start_edge_training()

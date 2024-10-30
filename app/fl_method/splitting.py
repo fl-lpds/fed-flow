@@ -6,6 +6,8 @@ from stable_baselines3 import PPO
 
 from app.config import config
 from app.entity.fed_base_node_interface import FedBaseNodeInterface
+from app.entity.http_communicator import HTTPCommunicator
+from app.entity.node_type import NodeType
 from app.util import model_utils, graph_utils
 
 
@@ -64,7 +66,15 @@ def fake(state, labels, **kwargs):
 
 
 def fake_decentralized(state, labels, node: FedBaseNodeInterface):
-    return node.split_layers
+    split_layers = {}
+    if node.is_edge_based:
+        for edge in node.get_neighbors([NodeType.EDGE]):
+            for client in HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT]):
+                split_layers[client] = [len(node.uninet.cfg) - 1, len(node.uninet.cfg) - 1]
+    else:
+        for neighbor in node.get_neighbors([NodeType.CLIENT]):
+            split_layers[neighbor] = len(node.uninet.cfg) - 1
+    return split_layers
 
 
 def no_splitting(state, labels, **kwargs):

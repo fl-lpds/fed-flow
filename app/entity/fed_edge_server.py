@@ -63,13 +63,9 @@ class FedEdgeServer(FedBaseNodeInterface):
         self.optimizers = {}
         self.scheduler = {}
         for neighbor in self.get_neighbors([NodeType.CLIENT]):
-            if neighbor not in self.split_layers:
-                if not self.is_edge_based:
-                    self.split_layers[neighbor] = len(self.uninet.cfg) - 3
-                    split_point = self.split_layers[neighbor]
-                else:
-                    self.split_layers[neighbor] = [len(self.uninet.cfg) - 4, len(self.uninet.cfg) - 2]
-                    split_point = self.split_layers[neighbor][0]
+            split_point = self.split_layers[neighbor]
+            if isinstance(split_point, list):
+                split_point = split_point[0]
             if split_point < len(self.uninet.cfg) - 1:
                 self.nets[neighbor] = model_utils.get_model('Edge', self.split_layers[neighbor], self.device,
                                                             self.is_edge_based)
