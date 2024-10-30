@@ -45,7 +45,7 @@ def select_clients(available_clients, edge_number):
 
 
 def create_edge_neighbors_by_topology(num_edges, topology):
-    if topology == 'star':
+    if topology == 'ring':
         if num_edges == 1:
             return {}
         if num_edges == 2:
@@ -81,6 +81,25 @@ def render_docker_compose_template(data):
         f.write(output)
 
 
+def create_node(port: int, decentralized: bool, offloading: bool, splitting_method: str, node_index: int,
+                node_type: str, round_count: int, device_count: int, neighbors: list[str],
+                scenario_description: str) -> dict:
+    return {
+        'port': port,
+        'decentralized': str(decentralized),
+        'offloading': str(offloading),
+        'splitting_method': splitting_method,
+        'node_index': str(node_index - 1),
+        'ip': f'{node_type}{node_index}',
+        'node_name': f'{node_type}{node_index}',
+        'node_type': f'{node_type}',
+        'neighbors': ' '.join(neighbors),
+        'round_count': round_count,
+        'device_count': device_count,
+        'scenario_description': scenario_description
+    }
+
+
 @click.command()
 @click.option('--num-clients', default=1, prompt='Enter number of clients')
 @click.option('--num-edges', default=1, prompt='Enter number of edges')
@@ -98,38 +117,22 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
         'servers': []
     }
 
+    scenario_description = f'{"Decentralized" if decentralized else "Centralized"} ' + \
+                           f'{topology if decentralized else ""} ' + \
+                           f'{num_edges} {num_clients} ' + \
+                           f'{"Offloading" if offloading else "No Offloading"}'
     current_port = 8080
     for i in range(1, num_clients + 1):
-        client = {
-            'port': current_port,
-            'decentralized': str(decentralized),
-            'offloading': str(offloading),
-            'splitting_method': splitting_method,
-            'node_index': str(i),
-            'ip': f'client{i}',
-            'node_name': f'client{i}',
-            'node_type': 'client',
-            'neighbors': '',
-            'round_count': round_count
-        }
+        client = create_node(current_port, decentralized, offloading, splitting_method, i, 'client', round_count,
+                             num_clients, [], scenario_description)
         data['clients'].append(client)
         current_port += 1
 
     edge_clients = {}
     available_clients = list(range(1, num_clients + 1))
     for i in range(1, num_edges + 1):
-        edge = {
-            'port': current_port,
-            'decentralized': str(decentralized),
-            'offloading': str(offloading),
-            'splitting_method': splitting_method,
-            'node_index': str(i),
-            'ip': f'edge{i}',
-            'node_name': f'edge{i}',
-            'node_type': 'edge',
-            'neighbors': '',
-            'round_count': round_count
-        }
+        edge = create_node(current_port, decentralized, offloading, splitting_method, i, 'edge', round_count,
+                           num_clients, [], scenario_description)
         data['edges'].append(edge)
         current_port += 1
 
@@ -141,25 +144,15 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             available_clients.remove(client)
 
     if not decentralized:
-        server = {
-            'port': current_port,
-            'decentralized': str(decentralized),
-            'offloading': str(offloading),
-            'splitting_method': splitting_method,
-            'node_index': '0',
-            'ip': f'server',
-            'node_name': f'server',
-            'node_type': 'server',
-            'neighbors': '',
-            'round_count': round_count
-        }
+        server = create_node(current_port, decentralized, offloading, splitting_method, 1, 'server', round_count,
+                             num_clients, [], scenario_description)
         data['servers'].append(server)
         current_port += 1
 
     if not decentralized:
         server_neighbors = []
         for edge_index in range(1, num_edges + 1):
-            data['edges'][edge_index - 1]['neighbors'] = f"server,{data['servers'][0]['port']}"
+            data['edges'][edge_index - 1]['neighbors'] = f"server1,{data['servers'][0]['port']}"
             server_neighbors.append(f"edge{edge_index},{data['edges'][edge_index - 1]['port']}")
         data['servers'][0]['neighbors'] = ' '.join(server_neighbors)
     else:

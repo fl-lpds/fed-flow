@@ -11,34 +11,6 @@ from app.entity.node_type import NodeType
 from app.util import model_utils, graph_utils
 
 
-def edge_based_energy_aware_rl_splitting(state, labels, **kwargs):
-    agent = PPO.load(path='/fed-flow/app/agent/38.zip', env=None)
-    floatAction = agent.predict(observation=state, deterministic=True)
-    actions = []
-    for i in range(0, len(floatAction), 2):
-        actions.append([rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[0],
-                        rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[1]])
-
-    return actions
-
-
-def rl_splitting(state, labels, **kwargs):
-    state_dim = 2 * config.G
-    action_dim = config.G
-    agent = None
-    if agent is None:
-        # Initialize trained RL agent
-        agent = PPO.PPO(state_dim, action_dim, config.action_std, config.rl_lr, config.rl_betas, config.rl_gamma,
-                        config.K_epochs, config.eps_clip)
-        agent.policy.load_state_dict(torch.load('/fed-flow/app/agent/PPO_FedAdapt.pth'))
-    action = agent.exploit(state)
-    action = expand_actions(action, config.CLIENTS_LIST, labels)
-
-    result = action_to_layer(action)
-    config.split_layer = result
-    return result
-
-
 def none(state, labels, **kwargs):
     split_layer = []
     for c in config.CLIENTS_LIST:

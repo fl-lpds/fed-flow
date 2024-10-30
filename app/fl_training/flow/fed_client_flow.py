@@ -30,7 +30,6 @@ def run_client(client: FedClient, learning_rate):
         client.start_offloading_train()
         fed_logger.info("sending local weights")
         client.scatter_local_weights()
-        model_utils.test(client.uninet, client.train_loader, client.device, client.criterion)
         fed_logger.info('ROUND: {} END'.format(r + 1))
 
 

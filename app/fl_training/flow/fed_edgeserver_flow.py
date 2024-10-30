@@ -114,4 +114,5 @@ def run(options_ins):
         run_decentralized(edge_server, LR, options_ins)
     else:
         run_centralized(edge_server, LR)
+    time.sleep(10)
     edge_server.stop_server()

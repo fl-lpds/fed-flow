@@ -108,4 +108,5 @@ def run(options_ins):
         run_d2d(fed_server, options_ins)
     else:
         run_centralized(fed_server, learning_rate, options_ins)
+    time.sleep(10)
     fed_server.stop_server()
