@@ -53,10 +53,9 @@ class FedServer(FedBaseNodeInterface):
     def initialize(self, LR):
         self.nets = {}
         self.optimizers = {}
+        self.initialize_split_layers()
         for edge in self.get_neighbors([NodeType.EDGE]):
             for client in HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT]):
-                if client not in self.split_layers:
-                    self.split_layers[client] = [len(self.uninet.cfg) - 1, len(self.uninet.cfg) - 1]
                 split_point = self.split_layers[client][1]
                 if split_point < len(self.uninet.cfg) - 1:
                     self.nets[client] = model_utils.get_model('Server', self.split_layers[client], self.device, True)

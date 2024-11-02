@@ -3,15 +3,14 @@ import time
 from abc import ABC
 
 from app.config import config
-from app.config.logger import fed_logger
 from app.dto.bandwidth import BandWidth
 from app.dto.message import BaseMessage, GlobalWeightMessage, SplitLayerConfigMessage, MessageType, NetworkTestMessage
 from app.dto.received_message import ReceivedMessage
 from app.entity.communicator import Communicator
+from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node import Node
 from app.entity.node_identifier import NodeIdentifier
 from app.entity.node_type import NodeType
-from app.entity.http_communicator import HTTPCommunicator
 from app.util import data_utils
 
 
@@ -84,3 +83,15 @@ class FedBaseNodeInterface(ABC, Node, Communicator):
                 self._edge_based = True
                 break
         return self._edge_based
+
+    def initialize_split_layers(self):
+        self.split_layers = {}
+        if not self.is_edge_based:
+            assert self._node_type == NodeType.EDGE
+            for neighbor in self.get_neighbors([NodeType.CLIENT]):
+                self.split_layers[neighbor] = len(self.uninet.cfg) - 1
+        else:
+            assert self._node_type == NodeType.SERVER
+            for edge in self.get_neighbors([NodeType.EDGE]):
+                for client in HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT]):
+                    self.split_layers[client] = [len(self.uninet.cfg) - 1, len(self.uninet.cfg) - 1]

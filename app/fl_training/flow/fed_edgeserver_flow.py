@@ -11,6 +11,8 @@ from app.util import graph_utils, model_utils
 
 def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
     edge_server.initialize(learning_rate)
+    fed_logger.info(f"Split Config : {edge_server.split_layers}")
+    edge_server.scatter_split_layers([NodeType.CLIENT])
     client_bw, edge_bw = [], []
     training_times = []
     rounds = []
@@ -30,7 +32,7 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         edge_server.gather_neighbors_network_bandwidth()
 
         fed_logger.info("clustering")
-        edge_server.cluster(options)
+        edge_server.clustering(options)
 
         fed_logger.info("getting neighbors bandwidth")
         neighbors_bandwidth = edge_server.get_neighbors_bandwidth()
@@ -42,13 +44,16 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
             neighbors_bandwidth_by_type[neighbor_type].append(bw.bandwidth)
         client_bw.append(
             sum(neighbors_bandwidth_by_type[NodeType.CLIENT]) / len(neighbors_bandwidth_by_type[NodeType.CLIENT]))
-        edge_bw.append(
-            sum(neighbors_bandwidth_by_type[NodeType.EDGE]) / len(neighbors_bandwidth_by_type[NodeType.EDGE]))
+        if NodeType.EDGE in neighbors_bandwidth_by_type:
+            edge_bw.append(
+                sum(neighbors_bandwidth_by_type[NodeType.EDGE]) / len(neighbors_bandwidth_by_type[NodeType.EDGE]))
+        else:
+            edge_bw.append(0)
 
         fed_logger.info("splitting")
         edge_server.split(neighbors_bandwidth_by_type[NodeType.CLIENT], options)
         fed_logger.info(f"Split Config : {edge_server.split_layers}")
-        edge_server.scatter_split_layers()
+        edge_server.scatter_split_layers([NodeType.CLIENT])
 
         fed_logger.info("start training")
         edge_server.start_decentralized_training()

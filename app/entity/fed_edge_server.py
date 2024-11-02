@@ -62,6 +62,8 @@ class FedEdgeServer(FedBaseNodeInterface):
         self.nets = {}
         self.optimizers = {}
         self.scheduler = {}
+        if not self.is_edge_based:
+            self.initialize_split_layers()
         for neighbor in self.get_neighbors([NodeType.CLIENT]):
             split_point = self.split_layers[neighbor]
             if isinstance(split_point, list):
@@ -96,8 +98,8 @@ class FedEdgeServer(FedBaseNodeInterface):
             self.nets[neighbor].load_state_dict(pweights)
         self.scatter_msg(GlobalWeightMessage([weights]), [NodeType.CLIENT])
 
-    def cluster(self, options: dict):
-        self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))()
+    def clustering(self, options: dict):
+        self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))(self)
 
     def get_neighbors_bandwidth(self) -> dict[NodeIdentifier, BandWidth]:
         return self.neighbor_bandwidth
@@ -293,6 +295,8 @@ class FedEdgeServer(FedBaseNodeInterface):
 
     def gossip_with_neighbors(self):
         edge_neighbors = self.get_neighbors([NodeType.EDGE])
+        if len(edge_neighbors) == 0:
+            return
         msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()])
         self.scatter_msg(msg, [NodeType.EDGE])
         gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.EDGE])
