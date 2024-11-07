@@ -113,11 +113,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             if r > 49:
                 LR = config.LR * 0.1
 
-            fed_logger.info("sending global weights")
-            server.edge_offloading_global_weights()
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR)
-
+            fed_logger.info("sending global weights")
+            server.edge_offloading_global_weights()
             # fed_logger.info('==> Reinitialization Finish')
 
             fed_logger.info("start training")
@@ -156,7 +155,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
 
-            # plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
+            plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
         else:
             break
     fed_logger.info(f"{socket.gethostname()} quit")
