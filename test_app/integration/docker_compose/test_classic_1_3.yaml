@@ -11,16 +11,18 @@ services:
       - "51008:51008"
     hostname: server
     deploy:
-      resources:
-        limits:
-          cpus: '3'
-        reservations:
-          cpus: '3'
+#      resources:
+#        limits:
+#          cpus: '3'
+#        reservations:
+#          cpus: '3'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py"
   broker:
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     attach: false
     image: rabbitmq:3.13-management
     ports:

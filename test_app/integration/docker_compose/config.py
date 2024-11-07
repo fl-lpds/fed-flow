@@ -18,7 +18,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 100  # data length
+N = 50000  # data length
 # mq_url = "sparrow.rmq.cloudamqp.com"
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
@@ -32,7 +32,7 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [6, 6, 6]  # Initial split layers
+split_layer = [[6, 6], [6, 6], [6, 6]]  # Initial split layers
 model_len = 7
 
 # FL training configration
