@@ -294,12 +294,18 @@ class FedServer(FedServerInterface):
         return energy_tt_list
 
     def c_local_weights(self, client_ips):
-        cweights = []
-        for i in range(len(client_ips)):
-            msg = self.recv_msg(client_ips[i],
+        cweights = {}
+        for client_ip in client_ips:
+            msg = self.recv_msg(client_ip,
                                 message_utils.local_weights_client_to_server(), True)
-            self.tt_end[client_ips[i]] = time.time()
-            cweights.append(msg[1])
+            self.tt_end[client_ip] = time.time()
+            sp = self.split_layers[config.CLIENTS_CONFIG[client_ip]]
+            if sp != (config.model_len - 1):
+                w_local = model_utils.concat_weights(self.uninet.state_dict(),msg[1],
+                                                     self.nets[client_ip].state_dict())
+            else:
+                w_local = msg[1]
+            cweights[client_ip]=(w_local)
         return cweights
 
     def edge_offloading_global_weights(self):
@@ -393,7 +399,7 @@ class FedServer(FedServerInterface):
         for i in range(len(client_ips)):
             msg = self.recv_msg(client_ips[i],
                                 message_utils.client_quit_client_to_server())
-            attend.update({client_ips[i], msg[1]})
+            attend.update({client_ips[i]: msg[1]})
             msg = [message_utils.client_quit_done(), True]
             self.send_msg(client_ips[i], msg)
 

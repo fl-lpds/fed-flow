@@ -7,12 +7,7 @@ simnet = False
 dataset_name = ''
 home = sys.path[0].split('fed-flow')[0] + 'fed-flow' + "/app"
 dataset_path = home + '/dataset/data/'
-N = 500  # data # length
 
-mq_url = "amqps://unspbyvk:n4ZRJKnuQ2vYn1foWUe_E1UgMEXYZUSX@sparrow.rmq.cloudamqp.com/unspbyvk"
-mq_user = "unspbyvk"
-mq_pass = "n4ZRJKnuQ2vYn1foWUe_E1UgMEXYZUSX"
-cluster= "fed-flow"
 # Model configration
 model_cfg = {
     # (Type, in_channels, out_channels, kernel_size, out_size(c_out*h*w), flops(c_out*h*w*k*k*c_in))
@@ -22,21 +17,33 @@ model_cfg = {
              ('D', 8 * 8 * 64, 128, 1, 64, 128 * 8 * 8 * 64),
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
+
+N = 50000  # data length
+# mq_url = "sparrow.rmq.cloudamqp.com"
+mq_port = 5672
+mq_url = "amqp://user:password@broker:5672/%2F"
+mq_host = "broker"
+mq_user = "user"
+mq_pass = "password"
+mq_vh = "/"
+cluster = "fed-flow"
+current_round = 0
 model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [[6, 6]]  # Initial split layers
+split_layer = [[6, 6], [6, 6], [6, 6]]  # Initial split layers
 model_len = 7
 
 # FL training configration
-R = 2  # FL rounds
+
+R = 100  # FL rounds
 LR = 0.01  # Learning rate
 B = 100  # Batch size
 
 # RL training configration
-max_episodes = 100  # max training episodes
-max_timesteps = 50  # max timesteps in one episode
+max_episodes = 2000  # max training episodes
+max_timesteps = 10  # max timesteps in one episode
 exploration_times = 20  # exploration times without std decay
 n_latent_var = 64  # number of variables in hidden layer
 action_std = 0.5  # constant std for action distribution (Multivariate Normal)
@@ -57,15 +64,16 @@ SERVER_ADDR = 'server'
 SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001}
 
-K = 1  # Number of devices
+K = 3  # Number of devices
 G = 1  # Number of groups
-S = 1
+S = 1  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}
-CLIENTS_CONFIG = {'client1': 0}
+CLIENTS_INDEX = {0: 'client1', 1: 'client2', 2: 'client3'}
+CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 2}
 EDGE_SERVER_LIST = ['edge1']
-EDGE_SERVER_CONFIG = {'edge1': 0}
-CLIENTS_LIST = ['client1']
-EDGE_MAP = {'edge1': ['client1']}
-CLIENT_MAP = {'client1': 'edge1'}
+EDGE_SERVER_CONFIG = {0: 'edge1'}
+CLIENTS_LIST = ['client1', 'client2', 'client3']
+EDGE_MAP = {'edge1': ['client1', 'client2', 'client3']}
+CLIENT_MAP = {'client1': 'edge1', 'client2': 'edge1', 'client3': 'edge1'}

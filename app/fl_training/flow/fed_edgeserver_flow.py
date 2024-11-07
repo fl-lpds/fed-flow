@@ -26,8 +26,6 @@ def run_offload(server: FedEdgeServerInterface, LR):
             config.current_round = r
             fed_logger.info('====================================>')
             fed_logger.info('==> Round {:} Start'.format(config.current_round))
-            fed_logger.info("receiving global weights")
-            server.global_weights(client_ips)
             fed_logger.info("test clients network")
             server.test_client_network(client_ips)
             fed_logger.info("sending clients network")
@@ -38,6 +36,8 @@ def run_offload(server: FedEdgeServerInterface, LR):
             server.get_split_layers_config(client_ips)
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR, client_ips)
+            fed_logger.info("receiving global weights")
+            server.global_weights(client_ips)
             threads = {}
             fed_logger.info("start training")
             for i in range(len(client_ips)):
@@ -100,8 +100,10 @@ def run(options_ins):
     LR = config.LR
     fed_logger.info('Preparing Sever.')
     offload = options_ins.get('offload')
-    if offload:
+    estimate_energy = options_ins.get("energy") == "True"
+    if estimate_energy:
         energy_estimation.init(os.getpid())
+    if offload:
         edge_server_ins = FedEdgeServer(
             options_ins.get('model'),
             options_ins.get('dataset'), offload=offload)

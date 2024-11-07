@@ -239,7 +239,7 @@ class Client(FedClientInterface):
         attend = True
         if remaining_energy < 1:
             attend = False
-        msg = [message_utils.client_quit_client_to_edge() + '_' + socket.gethostname(), attend]
+        msg = [message_utils.client_quit_client_to_edge() + "_" + socket.gethostname(), attend]
         self.send_msg(config.CLIENTS_INDEX[config.index], msg)
         self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.client_quit_done())
         if attend is False:
@@ -249,7 +249,7 @@ class Client(FedClientInterface):
         attend = True
         if remaining_energy < 1:
             attend = False
-        msg = [message_utils.client_quit_client_to_server() + '_' + socket.gethostname(), attend]
+        msg = [message_utils.client_quit_client_to_server(), attend]
         self.send_msg(config.CLIENTS_INDEX[config.index], msg)
         self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.client_quit_done())
         if attend is False:
