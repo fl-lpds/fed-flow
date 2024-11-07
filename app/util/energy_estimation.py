@@ -10,6 +10,7 @@ is_init = False
 
 
 def init(pid):
+    global is_init
     session = requests.session()
     session.trust_env = False
     session.get(url=URL + "/init/" + str(pid) + "/" + str(config.simnet))
@@ -18,6 +19,7 @@ def init(pid):
 
 def set_simnet(simnet):
     """set simulation network bandwidth"""
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -25,6 +27,7 @@ def set_simnet(simnet):
 
 
 def computation_start():
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -32,6 +35,7 @@ def computation_start():
 
 
 def computation_end():
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -39,6 +43,7 @@ def computation_end():
 
 
 def start_transmission():
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -46,6 +51,7 @@ def start_transmission():
 
 
 def end_transmission(bits):
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -53,6 +59,7 @@ def end_transmission(bits):
 
 
 def energy():
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -62,6 +69,7 @@ def energy():
 
 
 def remaining_energy():
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
@@ -71,6 +79,7 @@ def remaining_energy():
 
 
 def energy_and_time_comp_tr():
+    global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False

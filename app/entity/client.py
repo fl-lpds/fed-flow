@@ -20,7 +20,7 @@ torch.manual_seed(0)
 
 class Client(FedClientInterface):
 
-    def initialize(self, split_layer, LR, simnetbw: None):
+    def initialize(self, split_layer, LR, simnetbw: float = None):
 
         self.split_layers = split_layer
         if simnetbw is not None and self.simnet:

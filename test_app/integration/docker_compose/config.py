@@ -2,7 +2,7 @@ import sys
 
 CLIENTS_BANDWIDTH = []
 index = 0
-simnet = False
+simnet = True
 # Dataset configration
 dataset_name = ''
 home = sys.path[0].split('fed-flow')[0] + 'fed-flow' + "/app"
