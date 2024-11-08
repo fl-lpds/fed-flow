@@ -35,7 +35,7 @@ class Communicator(object):
         # self.channel = None
 
     def open_connection(self, url=None):
-        fed_logger.info("connecting")
+        fed_logger.debug("connecting")
         # if url is None:
         #     url = config.mq_host
         url = config.mq_host
@@ -61,7 +61,7 @@ class Communicator(object):
                 continue
         # self.connection = self.connect(url)
         # self.connection.ioloop.start()
-        fed_logger.info("connection established")
+        fed_logger.debug("connection established")
         return channel, connection
 
     def connect(self, url):
@@ -113,7 +113,7 @@ class Communicator(object):
         while True:
             try:
                 channel, connection = self.reconnect(connection, channel)
-                fed_logger.info(Fore.GREEN + f"publishing {config.cluster}.{msg[0]}.{exchange}")
+                fed_logger.debug(Fore.GREEN + f"publishing {config.cluster}.{msg[0]}.{exchange}")
                 channel.basic_publish(exchange=config.cluster + "." + exchange,
                                       routing_key=config.cluster + "." + msg[0] + "." + exchange,
                                       body=bb, mandatory=True, properties=pika.BasicProperties(
@@ -121,7 +121,7 @@ class Communicator(object):
                 self.close_connection(channel, connection)
                 fed_logger.info(Fore.GREEN + f"published {config.cluster}.{msg[0]}.{exchange}")
                 if self.send_bug:
-                    fed_logger.info(Fore.RED + f"published {config.cluster}.{msg[0]}.{exchange}")
+                    fed_logger.debug(Fore.RED + f"published {config.cluster}.{msg[0]}.{exchange}")
                 published = True
                 return
 
@@ -159,7 +159,7 @@ class Communicator(object):
                     channel.queue_delete(queue=config.cluster + "." + expect_msg_type + "." + exchange)
                     self.close_connection(channel, connection)
                     fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-                    fed_logger.info(Fore.CYAN + f"received {config.cluster}.{expect_msg_type}.{exchange}")
+                    fed_logger.debug(Fore.CYAN + f"received {config.cluster}.{expect_msg_type}.{exchange}")
                     return msg
             except Exception as e:
                 fed_logger.exception(Fore.RED + f"{expect_msg_type},{e},{is_weight}")

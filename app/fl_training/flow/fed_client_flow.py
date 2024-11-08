@@ -203,7 +203,6 @@ def run(options_ins):
                             )
         run_no_offload_edge(client_ins, LR)
     elif offload:
-        fed_logger.info(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         client_ins = Client(server=config.SERVER_ADDR,
                             datalen=datalen, model_name=options_ins.get('model'),
                             dataset=options_ins.get('dataset'), train_loader=trainloader, LR=LR, edge_based=edge_based,

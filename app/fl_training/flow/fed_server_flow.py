@@ -155,7 +155,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
 
-            plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
+            # plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
         else:
             break
     fed_logger.info(f"{socket.gethostname()} quit")
@@ -351,7 +351,6 @@ def run(options_ins):
                                options_ins.get('dataset'), offload, edge_based)
         run_edge_based_no_offload(server_ins, LR, options_ins)
     elif offload:
-        fed_logger.info("test>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         server_ins = FedServer(options_ins.get('model'),
                                options_ins.get('dataset'), offload, edge_based)
         run_no_edge_offload(server_ins, LR, options_ins)

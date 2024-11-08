@@ -25,6 +25,7 @@ services:
       - RABBITMQ_DEFAULT_PASS=password
     hostname: broker
   edge1:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: negaranabestani/fed-flow:rabbitmq
@@ -39,6 +40,7 @@ services:
       - server
     entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -s fake_splitting"
   client1:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: negaranabestani/fed-flow:rabbitmq

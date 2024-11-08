@@ -60,7 +60,7 @@ def fake(state, labels):
     """
     a fake splitting list of tuples
     """
-    split_list = [[6, 6], [6, 6], [1, 1]]
+    split_list = [[3, 3], [3, 3], [3, 3]]
     # for i in range(3):
     #     split_list.append([6, 6])
     return split_list

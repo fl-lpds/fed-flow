@@ -63,9 +63,9 @@ class FedServer(FedServerInterface):
                                                                     self.nets[client_ip].state_dict(), [])
                         self.nets[client_ip].load_state_dict(pweights)
 
-                        if len(list(self.nets[client_ip].parameters())) != 0:
-                            self.optimizers[client_ip] = optim.SGD(self.nets[client_ip].parameters(), lr=LR,
-                                                                   momentum=0.9)
+                        # if len(list(self.nets[client_ip].parameters())) != 0:
+                        self.optimizers[client_ip] = optim.SGD(self.nets[client_ip].parameters(), lr=LR,
+                                                               momentum=0.9)
                 else:
                     self.nets[client_ip] = model_utils.get_model('Server', split_layers[client_index], self.device,
                                                                  self.edge_based)
@@ -108,36 +108,39 @@ class FedServer(FedServerInterface):
 
     def _thread_training_offloading(self, client_ip):
         # iteration = int((test_config.N / (test_config.K * test_config.B)))
+        i = 0
         flag = self.recv_msg(client_ip,
-                             message_utils.local_iteration_flag_client_to_server() + "_" + client_ip)[1]
+                             f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")[1]
+        i += 1
         while flag:
             flag = self.recv_msg(client_ip,
-                                 message_utils.local_iteration_flag_client_to_server() + "_" + client_ip)[1]
+                                 f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")[1]
             if not flag:
-                break
+                continue
             # fed_logger.info(client_ip + " receiving local activations")
             msg = self.recv_msg(client_ip,
-                                message_utils.local_activations_client_to_server() + "_" + client_ip, True)
+                                f"{message_utils.local_activations_client_to_server()}_{i}_{client_ip}", True)
             smashed_layers = msg[1]
             labels = msg[2]
             # fed_logger.info(client_ip + " training model")
             inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
-            if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < len(
-                    self.uninet.cfg) - 1:
-                if self.optimizers.keys().__contains__(client_ip):
-                    self.optimizers[client_ip].zero_grad()
+            # if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < len(
+            #         self.uninet.cfg) - 1:
+            # if self.optimizers.keys().__contains__(client_ip):
+            self.optimizers[client_ip].zero_grad()
             outputs = self.nets[client_ip](inputs)
             loss = self.criterion(outputs, targets)
             loss.backward()
-            if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < len(
-                    self.uninet.cfg) - 1:
-                if self.optimizers.keys().__contains__(client_ip):
-                    self.optimizers[client_ip].step()
+            # if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < len(
+            #         self.uninet.cfg) - 1:
+            # if self.optimizers.keys().__contains__(client_ip):
+            self.optimizers[client_ip].step()
 
             # Send gradients to edge
             # fed_logger.info(client_ip + " sending gradients")
-            msg = [message_utils.server_gradients_server_to_client() + str(client_ip), inputs.grad]
+            msg = [f"{message_utils.server_gradients_server_to_client() + str(client_ip)}_{i}", inputs.grad]
             self.send_msg(client_ip, msg, True)
+            i += 1
 
         fed_logger.info(str(client_ip) + 'no edge offloading training end')
         return 'Finish'
@@ -299,13 +302,13 @@ class FedServer(FedServerInterface):
             msg = self.recv_msg(client_ip,
                                 message_utils.local_weights_client_to_server(), True)
             self.tt_end[client_ip] = time.time()
-            sp = self.split_layers[config.CLIENTS_CONFIG[client_ip]]
-            if sp != (config.model_len - 1):
-                w_local = model_utils.concat_weights(self.uninet.state_dict(),msg[1],
-                                                     self.nets[client_ip].state_dict())
-            else:
-                w_local = msg[1]
-            cweights[client_ip]=(w_local)
+            # sp = self.split_layers[config.CLIENTS_CONFIG[client_ip]]
+            # if sp != (config.model_len - 1):
+            #     w_local = model_utils.concat_weights(self.uninet.state_dict(),msg[1],
+            #                                          self.nets[client_ip].state_dict())
+            # else:
+            #     w_local = msg[1]
+            cweights[client_ip] = msg[1]
         return cweights
 
     def edge_offloading_global_weights(self):
