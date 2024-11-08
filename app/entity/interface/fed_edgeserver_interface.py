@@ -28,12 +28,12 @@ class FedEdgeServerInterface(ABC, Communicator):
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
 
-        if offload:
-            model_len = model_utils.get_unit_model_len()
-            self.uninet = model_utils.get_model('Unit', [model_len - 1, model_len - 1], self.device, True)
+        # if offload:
+        model_len = model_utils.get_unit_model_len()
+        self.uninet = model_utils.get_model('Unit', [model_len - 1, model_len - 1], self.device, True)
 
-            self.testset = data_utils.get_testset()
-            self.testloader = data_utils.get_testloader(self.testset, multiprocessing.cpu_count())
+        self.testset = data_utils.get_testset()
+        self.testloader = data_utils.get_testloader(self.testset, multiprocessing.cpu_count())
 
     @abstractmethod
     def test_client_network(self, client_ips):

@@ -30,11 +30,7 @@ def run_edge_based(client: FedClientInterface, LR):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
-
         st = time.time()
-
-        fed_logger.info("receiving global weights")
-        client.get_edge_global_weights()
 
         if not client.simnet:
             fed_logger.info("test network")
@@ -45,15 +41,14 @@ def run_edge_based(client: FedClientInterface, LR):
 
         fed_logger.info("receiving splitting info")
         client.get_split_layers_config_from_edge()
-
         fed_logger.info("initializing client")
         energy_estimation.computation_start()
         client.initialize(client.split_layers, LR, simnetbw=simnet_BW)
         energy_estimation.computation_end()
-
+        fed_logger.info("receiving global weights")
+        client.get_edge_global_weights()
         fed_logger.info("start training")
         client.edge_offloading_train()
-
         fed_logger.info("sending local weights")
         energy_estimation.start_transmission()
         msg = client.send_local_weights_to_edge()
@@ -91,7 +86,7 @@ def run_no_offload_edge(client: FedClientInterface, LR):
     mn: int = int((N / K) * index)
     data_size = mx - mn
     batch_num = data_size / config.B
-
+    client.initialize(split_layer=config.split_layer, LR=LR, simnetbw=None)
     for r in range(config.R):
         config.current_round = r
         fed_logger.info('====================================>')
@@ -124,8 +119,7 @@ def run_no_edge_offload(client: FedClientInterface, LR):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
-        fed_logger.info("receiving global weights")
-        client.get_server_global_weights()
+
         st = time.time()
         fed_logger.info("test_app network")
         energy_estimation.start_transmission()
@@ -135,7 +129,11 @@ def run_no_edge_offload(client: FedClientInterface, LR):
         client.get_split_layers_config()
         energy_estimation.computation_start()
         fed_logger.info("initializing client")
-        client.initialize(client.split_layers, LR)
+        client.initialize(client.split_layers, LR, None)
+
+        fed_logger.info("receiving global weights")
+        client.get_server_global_weights()
+
         fed_logger.info("start training")
         energy_estimation.computation_end()
         client.offloading_train()
@@ -158,6 +156,7 @@ def run_no_edge_offload(client: FedClientInterface, LR):
 
 
 def run_no_edge(client: FedClientInterface, LR):
+    client.initialize(split_layer=config.split_layer, LR=LR, simnetbw=None)
     for r in range(config.R):
         config.current_round = r
         fed_logger.info('====================================>')

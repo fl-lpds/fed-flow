@@ -5,7 +5,7 @@ import threading
 
 from colorama import Fore
 
-from app.util import energy_estimation
+from app.util import message_utils, energy_estimation
 
 sys.path.append('../../../')
 from app.config import config
@@ -28,10 +28,6 @@ def run_offload(server: FedEdgeServerInterface, LR):
             config.current_round = r
             fed_logger.info('====================================>')
             fed_logger.info('==> Round {:} Start'.format(config.current_round))
-
-            fed_logger.info("receiving global weights")
-            server.global_weights(client_ips)
-
             if not server.simnet:
                 fed_logger.info("test clients network")
                 server.test_client_network(client_ips)
@@ -46,13 +42,12 @@ def run_offload(server: FedEdgeServerInterface, LR):
                 server.client_network()
                 # fed_logger.info("sending edge simnet bw to server")
                 # server.send_simnet_bw_to_server(simnetbw)
-
             fed_logger.info("receiving and sending splitting info")
             server.get_split_layers_config(client_ips)
-
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR, client_ips, simnetbw=simnetbw)
-
+            fed_logger.info("receiving global weights")
+            server.global_weights(client_ips)
             threads = {}
             fed_logger.info("start training")
             for i in range(len(client_ips)):
@@ -121,8 +116,10 @@ def run(options_ins):
     fed_logger.info('Preparing Sever.')
     offload = options_ins.get('offload')
     simnet = options_ins.get("simulatebandwidth") == "True"
-    if offload:
+    estimate_energy = options_ins.get("energy") == "True"
+    if estimate_energy:
         energy_estimation.init(os.getpid())
+    if offload:
         edge_server_ins = FedEdgeServer(
             options_ins.get('model'),
             options_ins.get('dataset'), offload=offload, simnet=simnet)

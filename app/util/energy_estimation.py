@@ -65,6 +65,7 @@ def energy():
         session.trust_env = False
         result = session.get(url=URL + "/energy/")
         return result.text
+    return 0
 
 
 def remaining_energy():
@@ -74,6 +75,7 @@ def remaining_energy():
         session.trust_env = False
         result = session.get(url=URL + "/remaining-energy/")
         return result.text
+    return 10
 
 
 def get_transmission_time():

@@ -94,11 +94,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             config.current_round = r
             fed_logger.info('====================================>')
             fed_logger.info('==> Round {:} Start'.format(r))
-
             s_time = time.time()
-            fed_logger.info("sending global weights")
-            server.edge_offloading_global_weights()
-
             if not server.simnet:
                 fed_logger.info("receiving client network info")
                 server.client_network(config.EDGE_SERVER_LIST)
@@ -142,7 +138,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR, simnetbw=simnetbw)
-
+            fed_logger.info("sending global weights")
+            server.edge_offloading_global_weights()
             # fed_logger.info('==> Reinitialization Finish')
 
             fed_logger.info("start training")
@@ -233,8 +230,6 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
             fed_logger.info('====================================>')
             fed_logger.info('==> Round {:} Start'.format(r))
 
-            fed_logger.info("sending global weights")
-            server.no_offloading_global_weights()
             s_time = time.time()
             fed_logger.info("test clients network")
             server.test_network(config.CLIENTS_LIST)
@@ -254,6 +249,9 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR)
 
+            fed_logger.info("sending global weights")
+            server.no_offloading_global_weights()
+
             fed_logger.info("start training")
             server.no_edge_offloading_train(config.CLIENTS_LIST)
             fed_logger.info("receiving local weights")
@@ -269,6 +267,7 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
             res['bandwidth_record'].append(server.bandwith())
             with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
                 pickle.dump(res, f)
+            fed_logger.info("testing accuracy")
             test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
             res['test_acc_record'].append(test_acc)
 
@@ -279,7 +278,7 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
     fed_logger.info(f"{socket.gethostname()} quit")
 
 
-def run_no_edge(server: FedServerInterface, options):
+def run_no_edge(server: FedServerInterface, LR, options):
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     avgEnergy, tt, remainingEnergy = [], [], []
@@ -310,6 +309,7 @@ def run_no_edge(server: FedServerInterface, options):
             res['bandwidth_record'].append(server.bandwith())
             with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
                 pickle.dump(res, f)
+            fed_logger.info("testing accuracy")
             test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
             res['test_acc_record'].append(test_acc)
 
@@ -425,11 +425,11 @@ def run(options_ins):
         server_ins = FedServer(options_ins.get('model'),
                                options_ins.get('dataset'), offload, edge_based)
         run_edge_based_no_offload(server_ins, LR, options_ins)
-    elif offload and not edge_based:
+    elif offload:
         server_ins = FedServer(options_ins.get('model'),
                                options_ins.get('dataset'), offload, edge_based)
         run_no_edge_offload(server_ins, LR, options_ins)
     else:
         server_ins = FedServer(options_ins.get('model'),
                                options_ins.get('dataset'), offload, edge_based)
-        run_no_edge(server_ins, options_ins)
+        run_no_edge(server_ins, LR, options_ins)

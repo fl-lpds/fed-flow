@@ -1,3 +1,4 @@
+version: '3.9'
 services:
   server:
     volumes:
@@ -19,7 +20,7 @@ services:
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
       - broker
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb False -s fake_splitting -e True & python3 /fed-flow/energy/service.py  "
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -s fake_splitting -e True & python3 /fed-flow/energy/service.py  "
 
   broker:
     attach: false
@@ -33,7 +34,6 @@ services:
     hostname: broker
 
   edge1:
-    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
@@ -52,10 +52,9 @@ services:
     depends_on:
       - server
       - broker
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -o True -sb False -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -o True -sb True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
 
   client1:
-    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
@@ -73,10 +72,9 @@ services:
       - server
       - broker
       - edge1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb False -s fake_splitting -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s fake_splitting -en True -e True & wait -n"
 
   client2:
-    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
@@ -94,10 +92,9 @@ services:
       - server
       - broker
       - edge1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb False -s fake_splitting -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -s fake_splitting -en True -e True & wait -n"
 
   client3:
-    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py

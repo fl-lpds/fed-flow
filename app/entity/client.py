@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
+from colorama import Fore
 
 sys.path.append('../../')
 import config
@@ -30,8 +31,8 @@ class Client(FedClientInterface):
         self.net = model_utils.get_model('Client', self.split_layers[config.index], self.device, self.edge_based)
         fed_logger.debug(self.net)
         self.criterion = nn.CrossEntropyLoss()
-        if len(list(self.net.parameters())) != 0:
-            self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9)
+        self.optimizer = optim.SGD(self.net.parameters(), lr=LR,
+                                   momentum=0.9)
 
     def send_local_weights_to_edge(self):
         msg = [message_utils.local_weights_client_to_edge(), self.net.cpu().state_dict()]
@@ -86,9 +87,7 @@ class Client(FedClientInterface):
         """
         receive splitting data
         """
-        self.split_layers = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.split_layers(),
-                                          is_weight=False,
-                                          url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])[1]
+        self.split_layers = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.split_layers())[1]
 
     def get_split_layers_config_from_edge(self):
         """
@@ -119,13 +118,13 @@ class Client(FedClientInterface):
         receive global weights
         """
         weights = \
-            self.recv_msg(exchange=config.CLIENTS_INDEX[config.index],
-                          expect_msg_type=message_utils.initial_global_weights_server_to_client(),
-                          is_weight=True,
-                          url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])[1]
-
-        pweights = model_utils.split_weights_client(weights, self.net.state_dict())
-        self.net.load_state_dict(pweights)
+            self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.initial_global_weights_server_to_client(),
+                          True)[1]
+        if self.split_layers == (model_utils.get_unit_model_len() - 1):
+            self.net.load_state_dict(weights)
+        else:
+            pweights = model_utils.split_weights_client(weights, self.net.state_dict())
+            self.net.load_state_dict(pweights)
 
     def edge_offloading_train(self):
         computation_start()
@@ -151,7 +150,7 @@ class Client(FedClientInterface):
                 self.optimizer.step()
                 computation_end()
 
-        if self.split_layers[config.index][0] < model_utils.get_unit_model_len() - 1:
+        elif self.split_layers[config.index][0] < model_utils.get_unit_model_len() - 1:
             # flag = [message_utils.local_iteration_flag_client_to_edge(), True]
             fed_logger.info(f"offloding training start {self.split_layers}----------------------------")
             flag = [f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{socket.gethostname()}', True]
@@ -209,51 +208,70 @@ class Client(FedClientInterface):
             end_transmission(data_utils.sizeofmessage(flag))
 
     def offloading_train(self):
+
         self.net.to(self.device)
         self.net.train()
-        flag = [message_utils.local_iteration_flag_client_to_server() + '_' + socket.gethostname(), True]
-        start_transmission()
-        self.send_msg(config.CLIENTS_INDEX[config.index], flag,
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
-        end_transmission(data_utils.sizeofmessage(flag))
-        for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
-            flag = [message_utils.local_iteration_flag_client_to_server() + '_' + socket.gethostname(), True]
+        i = 0
+        if self.split_layers[config.index] == model_utils.get_unit_model_len() - 1:
+            fed_logger.info("no offloding training start----------------------------")
+            flag = [f'{message_utils.local_iteration_flag_client_to_server()}_{i}_{socket.gethostname()}', False]
             start_transmission()
-            self.send_msg(config.CLIENTS_INDEX[config.index], flag,
-                          url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+            self.send_msg(config.CLIENTS_INDEX[config.index], flag)
             end_transmission(data_utils.sizeofmessage(flag))
-            computation_start()
-            inputs, targets = inputs.to(self.device), targets.to(self.device)
-            if self.optimizer is not None:
+            i += 1
+            for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
+                computation_start()
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
-            outputs = self.net(inputs)
-            # fed_logger.info("sending local activations")
-            msg = [message_utils.local_activations_client_to_server() + '_' + socket.gethostname(), outputs.cpu(),
-                   targets.cpu()]
-            computation_end()
-            start_transmission()
-            self.send_msg(config.CLIENTS_INDEX[config.index], msg, True,
-                          url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
-            end_transmission(data_utils.sizeofmessage(msg))
-
-            # Wait receiving edge server gradients
-            # fed_logger.info("receiving gradients")
-            msg = self.recv_msg(exchange=config.CLIENTS_INDEX[config.index],
-                                expect_msg_type=message_utils.server_gradients_server_to_client() + socket.gethostname(),
-                                is_weight=True,
-                                url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
-            gradients = msg[1].to(self.device)
-            computation_start()
-            outputs.backward(gradients)
-            if self.optimizer is not None:
+                outputs = self.net(inputs)
+                loss = self.criterion(outputs, targets)
+                loss.backward()
                 self.optimizer.step()
-            computation_end()
+                computation_end()
+        elif self.split_layers[config.index] < model_utils.get_unit_model_len() - 1:
+            flag = [f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{socket.gethostname()}", True]
+            start_transmission()
+            self.send_msg(config.CLIENTS_INDEX[config.index], flag)
+            end_transmission(data_utils.sizeofmessage(flag))
+            i += 1
+            for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
+                flag = [f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{socket.gethostname()}", True]
+                start_transmission()
+                self.send_msg(config.CLIENTS_INDEX[config.index], flag)
+                end_transmission(data_utils.sizeofmessage(flag))
+                computation_start()
+                inputs, targets = inputs.to(self.device), targets.to(self.device)
+                # if self.optimizer is not None:
+                self.optimizer.zero_grad()
+                outputs = self.net(inputs)
+                # fed_logger.info("sending local activations")
+                msg = [f"{message_utils.local_activations_client_to_server()}_{i}_{socket.gethostname()}",
+                       outputs.cpu(),
+                       targets.cpu()]
+                computation_end()
+                start_transmission()
+                self.send_msg(config.CLIENTS_INDEX[config.index], msg, True)
+                end_transmission(data_utils.sizeofmessage(msg))
 
-        flag = [message_utils.local_iteration_flag_client_to_server() + '_' + socket.gethostname(), False]
-        start_transmission()
-        self.send_msg(config.CLIENTS_INDEX[config.index], flag,
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
-        end_transmission(data_utils.sizeofmessage(flag))
+                # Wait receiving edge server gradients
+                # fed_logger.info("receiving gradients")
+                gradients = \
+                    self.recv_msg(config.CLIENTS_INDEX[config.index],
+                                  f"{message_utils.server_gradients_server_to_client() + socket.gethostname()}_{i}",
+                                  True)[
+                        1].to(
+                        self.device)
+                computation_start()
+                outputs.backward(gradients)
+                # if self.optimizer is not None:
+                self.optimizer.step()
+                computation_end()
+                i += 1
+
+            flag = [f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{socket.gethostname()}", False]
+            start_transmission()
+            self.send_msg(config.CLIENTS_INDEX[config.index], flag)
+            end_transmission(data_utils.sizeofmessage(flag))
 
     def no_offloading_train(self):
         self.net.to(self.device)

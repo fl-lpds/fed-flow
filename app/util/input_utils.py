@@ -14,7 +14,7 @@ options = {
     '-ml': ['--modellink', '', 'the link to model  python file'],
     '-i': ['--index', '0', 'the device index'],
     '-sb': ['--simulatebandwidth', 'False', 'the device network bandwidth'],
-    '-en': ['--energy', 'True', 'enable or disable energy estimation'],
+    '-en': ['--energy', 'False', 'enable or disable energy estimation'],
 
 }
 

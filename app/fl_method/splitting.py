@@ -5,6 +5,7 @@ import torch
 from stable_baselines3 import PPO, DDPG
 
 from app.config import config
+from app.config.logger import fed_logger
 # from app.model.entity.rl_model import PPO
 from app.util import model_utils, rl_utils
 
@@ -61,7 +62,7 @@ def none(state, labels):
 def no_edge_fake(state, labels):
     split_list = []
     for i in range(config.K):
-        split_list.append(random.randint(1, config.model_len - 1))
+        split_list.append(6)
     return split_list
 
 
