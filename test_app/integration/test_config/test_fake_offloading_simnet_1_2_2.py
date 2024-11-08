@@ -71,7 +71,6 @@ S = 1  # Number of server connecting devices
 # Unique clients order
 HOST2IP = {}
 EDGE_MQ_MAP = {'edge1': 'broker1', 'edge2': 'broker2'}
-MQ_PORT = {'broker1': 5672, 'broker2': 5673}
 CLIENTS_INDEX = {0: 'client1', 1: 'client2'}
 CLIENTS_CONFIG = {'client1': 0, 'client2': 1}
 EDGE_SERVER_LIST = ['edge1', 'edge2']

@@ -51,29 +51,35 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def forward_propagation(self, client_ip):
         i = 0
-        msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}')
+        msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
+                            url=config.EDGE_SERVER_CONFIG[config.index])
         flag = msg[1]
         if self.split_layers[config.CLIENTS_CONFIG.get(client_ip)][1] < model_utils.get_unit_model_len() - 1:
             flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
-            self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg)
+            self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
+                          url=config.EDGE_SERVER_CONFIG[config.index])
         else:
             flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', False]
-            self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg)
+            self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
+                          url=config.EDGE_SERVER_CONFIG[config.index])
         i += 1
 
         while flag:
             if self.split_layers[config.CLIENTS_CONFIG.get(client_ip)][0] < model_utils.get_unit_model_len() - 1:
-                msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}')
+                msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
+                                    url=config.EDGE_SERVER_CONFIG[config.index])
                 flag = msg[1]
 
                 if not flag:
                     flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
-                    self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg)
+                    self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
+                                  url=config.EDGE_SERVER_CONFIG[config.index])
                     break
                 # fed_logger.info(client_ip + " receiving local activations")
                 msg = self.recv_msg(exchange=client_ip,
                                     expect_msg_type=f'{message_utils.local_activations_client_to_edge()}_{i}_{client_ip}',
-                                    is_weight=True)
+                                    is_weight=True,
+                                    url=config.EDGE_SERVER_CONFIG[config.index])
                 smashed_layers = msg[1]
                 labels = msg[2]
 
@@ -94,14 +100,17 @@ class FedEdgeServer(FedEdgeServerInterface):
                     # fed_logger.info(client_ip + " sending local activations")
                     if self.split_layers[config.CLIENTS_CONFIG[client_ip]][1] < model_utils.get_unit_model_len() - 1:
                         flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
-                        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg)
+                        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
+                                      url=config.EDGE_SERVER_CONFIG[config.index])
                         msg = [f'{message_utils.local_activations_edge_to_server() + "_" + client_ip}_{i}',
                                outputs.cpu(),
                                targets.cpu()]
-                        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True)
+                        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True,
+                                      url=config.EDGE_SERVER_CONFIG[config.index])
                         msg = self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
                                             expect_msg_type=f'{message_utils.server_gradients_server_to_edge() + client_ip}_{i}',
-                                            is_weight=True)
+                                            is_weight=True,
+                                            url=config.EDGE_SERVER_CONFIG[config.index])
                         gradients = msg[1].to(self.device)
                         # fed_logger.info(client_ip + " training model backward")
                         energy_estimation.computation_start()
@@ -111,7 +120,8 @@ class FedEdgeServer(FedEdgeServerInterface):
                                 time.time() - self.start_time_of_computation_each_client[client_ip])
                         energy_estimation.computation_end()
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
-                        self.send_msg(exchange=client_ip, msg=msg, is_weight=True)
+                        self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
+                                      url=config.EDGE_SERVER_CONFIG[config.index])
                     else:
                         energy_estimation.computation_start()
                         self.start_time_of_computation_each_client[client_ip] = time.time()
@@ -124,20 +134,25 @@ class FedEdgeServer(FedEdgeServerInterface):
                                 time.time() - self.start_time_of_computation_each_client[client_ip])
                         energy_estimation.computation_end()
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
-                        self.send_msg(exchange=client_ip, msg=msg, is_weight=True)
+                        self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
+                                      url=config.EDGE_SERVER_CONFIG[config.index])
                 else:
                     flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
-                    self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg)
+                    self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
+                                  url=config.EDGE_SERVER_CONFIG[config.index])
                     msg = [f'{message_utils.local_activations_edge_to_server() + "_" + client_ip}_{i}', inputs.cpu(),
                            targets.cpu()]
-                    self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True)
+                    self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True,
+                                  url=config.EDGE_SERVER_CONFIG[config.index])
                     # fed_logger.info(client_ip + " edge receiving gradients")
                     msg = self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
                                         expect_msg_type=f'{message_utils.server_gradients_server_to_edge() + client_ip}_{i}',
-                                        is_weight=True)
+                                        is_weight=True,
+                                        url=config.EDGE_SERVER_CONFIG[config.index])
                     # fed_logger.info(client_ip + " edge received gradients")
                     msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', msg[1]]
-                    self.send_msg(exchange=client_ip, msg=msg, is_weight=True)
+                    self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
+                                  url=config.EDGE_SERVER_CONFIG[config.index])
             i += 1
         fed_logger.info(str(client_ip) + ' offloading training end')
 
@@ -148,7 +163,6 @@ class FedEdgeServer(FedEdgeServerInterface):
         """
         send message to test_app network speed
         """
-        # Network test_app
         self.net_threads = {}
         for i in range(len(client_ips)):
             self.net_threads[client_ips[i]] = threading.Thread(target=self._thread_client_network_testing,
@@ -161,36 +175,45 @@ class FedEdgeServer(FedEdgeServerInterface):
     def _thread_client_network_testing(self, client_ip):
         network_time_start = time.time()
         msg1 = [message_utils.test_network_edge_to_client(), self.uninet.cpu().state_dict()]
-        self.send_msg(exchange=client_ip, msg=msg1, is_weight=True)
-        msg2 = self.recv_msg(exchange=client_ip, expect_msg_type=message_utils.test_network_client_to_edge(),
-                             is_weight=True)
+        self.send_msg(exchange=client_ip, msg=msg1, is_weight=True,
+                      url=config.EDGE_SERVER_CONFIG[config.index])
+        msg2 = self.recv_msg(exchange=client_ip,
+                             expect_msg_type=message_utils.test_network_client_to_edge(),
+                             is_weight=True,
+                             url=config.EDGE_SERVER_CONFIG[config.index])
         network_time_end = time.time()
         self.client_bandwidth[client_ip] = (data_utils.sizeofmessage(msg1) + data_utils.sizeofmessage(msg2)) / (
-                    network_time_end - network_time_start)
+                network_time_end - network_time_start)
         fed_logger.info(f"Client-Edge BW: {self.client_bandwidth}")
 
     def test_server_network(self):
         msg = self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
-                            expect_msg_type=message_utils.test_server_network_from_server(), is_weight=True)
+                            expect_msg_type=message_utils.test_server_network_from_server(),
+                            is_weight=True,
+                            url=config.EDGE_SERVER_CONFIG[config.index])
         msg = [message_utils.test_server_network_from_connection(), self.uninet.cpu().state_dict()]
-        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True)
+        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True,
+                      url=config.EDGE_SERVER_CONFIG[config.index])
 
     def client_network(self):
         """
         send client network speed to central server
         """
         msg = [message_utils.client_network(), self.client_bandwidth]
-        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg)
+        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg, url=config.EDGE_SERVER_CONFIG[config.index])
 
     def send_simnet_bw_to_server(self, simnetbw):
         msg = [message_utils.simnet_bw_edge_to_server(), simnetbw]
-        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=False)
+        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=False,
+                      url=config.EDGE_SERVER_CONFIG[config.index])
         fed_logger.info("Simnet BW sent")
 
     def get_simnet_client_network(self):
         for clientip in config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]:
-            msg = self.recv_msg(exchange=clientip, expect_msg_type=message_utils.simnet_bw_client_to_edge(),
-                                is_weight=False)
+            msg = self.recv_msg(exchange=clientip,
+                                expect_msg_type=message_utils.simnet_bw_client_to_edge(),
+                                is_weight=False,
+                                url=config.EDGE_SERVER_CONFIG[config.index])
             self.client_bandwidth[clientip] = msg[1]
 
     def get_split_layers_config(self, client_ips):
@@ -198,7 +221,8 @@ class FedEdgeServer(FedEdgeServerInterface):
         receive send splitting data to clients
         """
         msg = self.recv_msg(config.EDGE_SERVER_CONFIG[config.index],
-                            message_utils.split_layers_server_to_edge())
+                            message_utils.split_layers_server_to_edge(),
+                            url=config.EDGE_SERVER_CONFIG[config.index])
         self.split_layers = msg[1]
         fed_logger.info(Fore.LIGHTYELLOW_EX + f"{msg[1]}")
         msg = [message_utils.split_layers_edge_to_client(), self.split_layers]
@@ -207,14 +231,17 @@ class FedEdgeServer(FedEdgeServerInterface):
         #     if client_ips.__contains__(config.CLIENTS_LIST[i]):
         #         client_ip = config.CLIENTS_LIST[i]
         #         msg = [message_utils.split_layers, self.split_layers[i]]
-        #         self.send_msg(self.socks[socket.gethostbyname(client_ip)], msg)
+        #         self.send_msg(self.socks[socket.gethostbyname(client_ip)], msg,
+        #                       url=config.EDGE_SERVER_CONFIG[config.index])
 
     def local_weights(self, client_ip):
         """
         receive and send final weights for aggregation
         """
         cweights = self.recv_msg(client_ip,
-                                 message_utils.local_weights_client_to_edge(), True)[1]
+                                 message_utils.local_weights_client_to_edge(),
+                                 True,
+                                 url=config.EDGE_SERVER_CONFIG[config.index])[1]
         sp = self.split_layers[config.CLIENTS_CONFIG[client_ip]][0]
         if sp != (config.model_len - 1):
             w_local = model_utils.concat_weights(self.uninet.state_dict(), cweights,
@@ -223,24 +250,34 @@ class FedEdgeServer(FedEdgeServerInterface):
             w_local = cweights
             # print("------------------------"+str(eweights[i]))
         msg = [message_utils.local_weights_edge_to_server() + "_" + client_ip, w_local]
-        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg, True)
+        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg, True,
+                      url=config.EDGE_SERVER_CONFIG[config.index])
 
     def energy(self, client_ips):
         energy_tt_list = []
-        edge_tt_list = {}
+
+        energy_tt = {}
+        for client in client_ips:
+            energy_tt[client] = []
+
         for c in config.CLIENTS_CONFIG.keys():
             if client_ips.__contains__(c):
-                ms = self.recv_msg(c, message_utils.energy_client_to_edge() + "_" + c)
+                ms = self.recv_msg(exchange=c,
+                                   expect_msg_type=message_utils.energy_client_to_edge() + "_" + c,
+                                   url=config.EDGE_SERVER_CONFIG[config.index])
                 fed_logger.info(f"client message: {ms}")
                 if self.simnet:
+                    energy_tt[c] = [ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]]
                     energy_tt_list.append([ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]])
                 else:
+                    energy_tt[c] = [ms[1], ms[2], ms[3]]
                     energy_tt_list.append([ms[1], ms[2], ms[3]])
             else:
                 energy_tt_list.append([0, 0, 0, 0])
         # fed_logger.info(f"sending enery tt {socket.gethostname()}")
-        msg = [message_utils.energy_tt_edge_to_server(), energy_tt_list, ]
-        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg)
+        # msg = [message_utils.energy_tt_edge_to_server(), energy_tt_list, ]
+        msg = [message_utils.energy_tt_edge_to_server(), energy_tt, ]
+        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg, url=config.EDGE_SERVER_CONFIG[config.index])
 
     def global_weights(self, client_ips: []):
         """
@@ -248,8 +285,10 @@ class FedEdgeServer(FedEdgeServerInterface):
         """
         # we do not use start and end transmission, because we calculated this time when cloud send global weights to edge
         # and because the broker is at edge, we assume no time need to download weight from broker into edge
-        weights = self.recv_msg(config.EDGE_SERVER_CONFIG[config.index],
-                                message_utils.initial_global_weights_server_to_edge(), True)
+        weights = self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
+                                expect_msg_type=message_utils.initial_global_weights_server_to_edge(),
+                                is_weight=True,
+                                url=config.EDGE_SERVER_CONFIG[config.index])
         weights = weights[1]
         for i in range(len(self.split_layers)):
             if client_ips.__contains__(config.CLIENTS_INDEX[i]):
@@ -263,8 +302,10 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def no_offload_global_weights(self):
         weights = \
-            self.recv_msg(config.EDGE_SERVER_CONFIG[config.index],
-                          message_utils.initial_global_weights_server_to_edge(), True)[1]
+            self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
+                          expect_msg_type=message_utils.initial_global_weights_server_to_edge(),
+                          is_weight=True,
+                          url=config.EDGE_SERVER_CONFIG[config.index])[1]
         msg = [message_utils.initial_global_weights_edge_to_client(), weights]
         self.scatter(msg, True)
 
@@ -279,9 +320,11 @@ class FedEdgeServer(FedEdgeServerInterface):
     def client_attendance(self, client_ips):
         attend = {}
         for client_ip in client_ips:
-            ms = self.recv_msg(client_ip, message_utils.client_quit_client_to_edge() + "_" + client_ip)
+            ms = self.recv_msg(client_ip, message_utils.client_quit_client_to_edge() + "_" + client_ip,
+                               url=config.EDGE_SERVER_CONFIG[config.index])
             msg = [message_utils.client_quit_done(), True]
-            self.send_msg(client_ip, msg)
+            self.send_msg(client_ip, msg,
+                          url=config.EDGE_SERVER_CONFIG[config.index])
             attend[client_ip] = ms[1]
             if ms[1] == False:
                 config.K -= 1
@@ -295,6 +338,8 @@ class FedEdgeServer(FedEdgeServerInterface):
                 config.CLIENTS_LIST.remove(client_ip)
         # fed_logger.info(f"sending enery tt {socket.gethostname()}")
         msg = [message_utils.client_quit_edge_to_server(), attend]
-        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg)
+        self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg,
+                      url=config.EDGE_SERVER_CONFIG[config.index])
         self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
-                      expect_msg_type=message_utils.client_quit_done())
+                      expect_msg_type=message_utils.client_quit_done(),
+                      url=config.EDGE_SERVER_CONFIG[config.index])

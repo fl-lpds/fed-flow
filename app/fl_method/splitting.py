@@ -23,6 +23,13 @@ def edge_based_rl_splitting(state, labels):
 
 
 # def heuristic_splitting(state, label):
+#     # state = [ client's BW, edge's BW, server's BW, client remaining energy]
+#     client_BW = {}
+#     client_RE = {}
+#     for i in range(len(config.CLIENTS_LIST)):
+#         client_BW[f"device{i}"] = state[i]
+#     for i in range(len(config.CLIENTS_LIST) + len(config.EDGE_SERVER_LIST), len(state)):
+#         client_RE[f"device{i}"] = state[i]
 
 
 def rl_splitting(state, labels):
@@ -62,9 +69,10 @@ def fake(state, labels):
     """
     a fake splitting list of tuples
     """
-    split_list = [[1, 2], [2, 3], [2, 3]]
-    # for i in range(3):
-    #     split_list.append([6, 6])
+
+    split_list = []
+    for i in range(config.K):
+        split_list.append([6, 6])
     return split_list
 
 

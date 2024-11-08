@@ -87,7 +87,7 @@ class FedEdgeServerInterface(ABC, Communicator):
 
     def scatter(self, msg, is_weight=False):
         for i in config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]:
-            self.send_msg(i, msg, is_weight)
+            self.send_msg(i, msg, is_weight, url=config.EDGE_SERVER_CONFIG[config.index])
 
     @abstractmethod
     def forward_propagation(self, client_ip):

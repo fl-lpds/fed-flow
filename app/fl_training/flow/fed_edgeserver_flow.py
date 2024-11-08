@@ -44,8 +44,8 @@ def run_offload(server: FedEdgeServerInterface, LR):
                 server.get_simnet_client_network()
                 fed_logger.info("sending clients simnet bw to server")
                 server.client_network()
-                fed_logger.info("sending edge simnet bw to server")
-                server.send_simnet_bw_to_server(simnetbw)
+                # fed_logger.info("sending edge simnet bw to server")
+                # server.send_simnet_bw_to_server(simnetbw)
 
             fed_logger.info("receiving and sending splitting info")
             server.get_split_layers_config(client_ips)

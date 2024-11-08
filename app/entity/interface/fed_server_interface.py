@@ -24,7 +24,7 @@ class FedServerInterface(ABC, Communicator):
         self.split_layers = None
         # self.state = None
         self.client_bandwidth = {}
-        self.client_remaining_energy = []
+        self.client_remaining_energy = {}
         self.edge_bandwidth = {}
         self.dataset = dataset
         self.threads = None
@@ -34,7 +34,7 @@ class FedServerInterface(ABC, Communicator):
         self.tt_end = {}
 
         self.simnet = simnet
-        self.simnetbw = 10 if self.simnet else 0
+        self.simnetbw = {}
         self.client_training_transmissionTime = {}
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
@@ -73,7 +73,7 @@ class FedServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def get_split_layers_config_from_edge(self):
+    def send_split_layers_config(self):
         pass
 
     @abstractmethod
@@ -109,7 +109,7 @@ class FedServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def initialize(self, split_layers, LR,  simnetbw: float = None):
+    def initialize(self, split_layers, LR,  simnetbw: dict = None):
         pass
 
     @abstractmethod
