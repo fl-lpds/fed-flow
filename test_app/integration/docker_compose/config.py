@@ -32,7 +32,7 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [[6, 6], [6, 6], [6, 6]]  # Initial split layers
+split_layer = [3, 3, 3]  # Initial split layers
 model_len = 7
 
 # FL training configration
@@ -62,7 +62,7 @@ random_seed = 0
 SERVER_ADDR = 'server'
 
 SERVER_PORT = 5002
-EDGESERVER_PORT = {'edge1': 5001}
+EDGESERVER_PORT = {}
 
 K = 3  # Number of devices
 G = 1  # Number of groups
@@ -70,11 +70,11 @@ S = 1  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}
-EDGE_MQ_MAP = {'edge1': 'broker1'}
+EDGE_MQ_MAP = {}
 CLIENTS_INDEX = {0: 'client1', 1: 'client2', 2: 'client3'}
 CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 2}
-EDGE_SERVER_LIST = ['edge1']
-EDGE_SERVER_CONFIG = {0: 'edge1'}
+EDGE_SERVER_LIST = []
+EDGE_SERVER_CONFIG = {}
 CLIENTS_LIST = ['client1', 'client2', 'client3']
-EDGE_MAP = {'edge1': ['client1', 'client2', 'client3']}
-CLIENT_MAP = {'client1': 'edge1', 'client2': 'edge1', 'client3': 'edge1'}
+EDGE_MAP = {}
+CLIENT_MAP = {}

@@ -36,10 +36,10 @@ class Communicator(object):
 
     def open_connection(self, url=None):
         fed_logger.debug("connecting")
-        # if url is None:
-        #     url = config.mq_host
-        # else:
-        url = config.EDGE_MQ_MAP[url]
+        if url is None:
+            url = config.mq_host
+        else:
+            url = config.EDGE_MQ_MAP[url]
         # url = config.mq_host
         self.url = url
 

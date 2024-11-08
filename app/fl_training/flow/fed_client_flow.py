@@ -30,6 +30,7 @@ def run_edge_based(client: FedClientInterface, LR):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
+
         st = time.time()
 
         if not client.simnet:
@@ -41,14 +42,18 @@ def run_edge_based(client: FedClientInterface, LR):
 
         fed_logger.info("receiving splitting info")
         client.get_split_layers_config_from_edge()
+
         fed_logger.info("initializing client")
         energy_estimation.computation_start()
         client.initialize(client.split_layers, LR, simnetbw=simnet_BW)
         energy_estimation.computation_end()
+
         fed_logger.info("receiving global weights")
         client.get_edge_global_weights()
+
         fed_logger.info("start training")
         client.edge_offloading_train()
+
         fed_logger.info("sending local weights")
         energy_estimation.start_transmission()
         msg = client.send_local_weights_to_edge()
@@ -121,13 +126,16 @@ def run_no_edge_offload(client: FedClientInterface, LR):
         fed_logger.info('ROUND: {} START'.format(r))
 
         st = time.time()
+
         fed_logger.info("test_app network")
         energy_estimation.start_transmission()
         msg = client.test_network()
         energy_estimation.end_transmission(data_utils.sizeofmessage(msg))
+
         fed_logger.info("receiving splitting info")
         client.get_split_layers_config()
         energy_estimation.computation_start()
+
         fed_logger.info("initializing client")
         client.initialize(client.split_layers, LR, None)
 
@@ -137,10 +145,12 @@ def run_no_edge_offload(client: FedClientInterface, LR):
         fed_logger.info("start training")
         energy_estimation.computation_end()
         client.offloading_train()
+
         fed_logger.info("sending local weights")
         energy_estimation.start_transmission()
         msg = client.send_local_weights_to_server()
         energy_estimation.end_transmission(data_utils.sizeofmessage(msg))
+
         fed_logger.info('ROUND: {} END'.format(r))
         fed_logger.info('==> Waiting for aggregration')
         if r > 49:

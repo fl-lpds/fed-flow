@@ -467,8 +467,7 @@ class FedServer(FedServerInterface):
     def client_attendance(self, client_ips):
         attend = {}
         for i in range(len(client_ips)):
-            msg = self.recv_msg(client_ips[i],
-                                message_utils.client_quit_client_to_server())
+            msg = self.recv_msg(client_ips[i], message_utils.client_quit_client_to_server()+ '_' + client_ips[i])
             attend.update({client_ips[i]: msg[1]})
             msg = [message_utils.client_quit_done(), True]
             self.send_msg(client_ips[i], msg)

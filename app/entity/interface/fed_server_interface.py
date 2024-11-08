@@ -136,7 +136,6 @@ class FedServerInterface(ABC, Communicator):
             list1 = config.EDGE_SERVER_LIST
             for i in list1:
                 self.send_msg(exchange=i, msg=msg, is_weight=is_weight, url=i)
-
         else:
             for i in list1:
                 self.send_msg(exchange=i, msg=msg, is_weight=is_weight)

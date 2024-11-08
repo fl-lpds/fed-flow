@@ -1,30 +1,12 @@
 import sys
 
-# # Network configration
-# SERVER_ADDR = 'server'
-#
-# SERVER_PORT = 51008
-# EDGESERVER_PORT = {'127.0.0.1': 51001}
-#
-# K = 1  # Number of devices
-# G = 1  # Number of groups
-#
-# # Unique clients order
-# HOST2IP = {}
-# CLIENTS_CONFIG = {}
-# EDGE_SERVER_LIST = ['127.0.0.1']
-# CLIENTS_LIST = []
-# EDGE_MAP = {'127.0.0.1': ['127.0.0.1']}
-# CLIENT_MAP = {'127.0.0.1': '127.0.0.1'}
-
 CLIENTS_BANDWIDTH = []
 index = 0
-
+simnet = False
 # Dataset configration
 dataset_name = ''
 home = sys.path[0].split('fed-flow')[0] + 'fed-flow' + "/app"
 dataset_path = home + '/dataset/data/'
-N = 50000  # data length
 
 # Model configration
 model_cfg = {
@@ -35,21 +17,33 @@ model_cfg = {
              ('D', 8 * 8 * 64, 128, 1, 64, 128 * 8 * 8 * 64),
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
+
+N = 50000  # data length
+# mq_url = "sparrow.rmq.cloudamqp.com"
+mq_port = 5672
+mq_url = "amqp://user:password@broker:5672/%2F"
+mq_host = "broker"
+mq_user = "user"
+mq_pass = "password"
+mq_vh = "/"
+cluster = "fed-flow"
+current_round = 0
 model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [6, 6, 6]  # Initial split layers
+split_layer = [6, 6, 5]  # Initial split layers
 model_len = 7
 
 # FL training configration
-R = 2  # FL rounds
+
+R = 100  # FL rounds
 LR = 0.01  # Learning rate
 B = 100  # Batch size
 
 # RL training configration
-max_episodes = 100  # max training episodes
-max_timesteps = 100  # max timesteps in one episode
+max_episodes = 2000  # max training episodes
+max_timesteps = 10  # max timesteps in one episode
 exploration_times = 20  # exploration times without std decay
 n_latent_var = 64  # number of variables in hidden layer
 action_std = 0.5  # constant std for action distribution (Multivariate Normal)
@@ -67,17 +61,20 @@ random_seed = 0
 # Network configration
 SERVER_ADDR = 'server'
 
-SERVER_PORT = 51008
-EDGESERVER_PORT = {'127.0.0.1': 51001}
+SERVER_PORT = 5002
+EDGESERVER_PORT = {}
 
 K = 3  # Number of devices
 G = 1  # Number of groups
-S = 3
+S = 1  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}
-CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 2}
-EDGE_SERVER_LIST = ['127.0.0.1']
+EDGE_MQ_MAP = {}
+CLIENTS_INDEX = {0: 'client1', 1: 'client2', 2: 'client3'}
+CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 3}
+EDGE_SERVER_LIST = []
+EDGE_SERVER_CONFIG = {}
 CLIENTS_LIST = ['client1', 'client2', 'client3']
-EDGE_MAP = {'127.0.0.1': ['127.0.0.1']}
-CLIENT_MAP = {'127.0.0.1': '127.0.0.1'}
+EDGE_MAP = {}
+CLIENT_MAP = {}

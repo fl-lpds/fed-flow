@@ -239,13 +239,16 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("clustering")
             server.cluster(options)
+
             fed_logger.info("getting state")
             ttpi = server.ttpi(config.CLIENTS_LIST)
             state = server.concat_norm(ttpi, server.offloading)
 
             fed_logger.info("splitting")
             server.split(state, options)
+
             server.split_layer()
+
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR)
 
@@ -254,6 +257,7 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("start training")
             server.no_edge_offloading_train(config.CLIENTS_LIST)
+
             fed_logger.info("receiving local weights")
             local_weights = server.c_local_weights(config.CLIENTS_LIST)
             fed_logger.info("aggregating weights")
@@ -297,6 +301,7 @@ def run_no_edge(server: FedServerInterface, LR, options):
             server.no_offloading_train(config.CLIENTS_LIST)
             fed_logger.info("receiving local weights")
             local_weights = server.c_local_weights(config.CLIENTS_LIST)
+
             fed_logger.info("aggregating weights")
             server.call_aggregation(options, local_weights)
             server.client_attendance(config.CLIENTS_LIST)

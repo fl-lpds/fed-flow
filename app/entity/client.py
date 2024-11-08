@@ -41,22 +41,29 @@ class Client(FedClientInterface):
         return msg
 
     def send_local_weights_to_server(self):
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+
         msg = [message_utils.local_weights_client_to_server(), self.net.cpu().state_dict()]
-        self.send_msg(config.CLIENTS_INDEX[config.index], msg, True,
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+        self.send_msg(config.CLIENTS_INDEX[config.index], msg, True, url=url)
         return msg
 
     def test_network(self):
         """
         send message to test network speed
         """
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+
         msg = self.recv_msg(exchange=config.CLIENTS_INDEX[config.index],
                             expect_msg_type=message_utils.test_server_network_from_server(), is_weight=True,
-                            url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])[1]
+                            url=url)[1]
         fed_logger.info("test network received")
         msg = [message_utils.test_server_network_from_connection(), self.uninet.cpu().state_dict()]
         self.send_msg(exchange=config.CLIENTS_INDEX[config.index], msg=msg, is_weight=True,
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+                      url=url)
         fed_logger.info("test network sent")
         return msg
 
@@ -87,7 +94,13 @@ class Client(FedClientInterface):
         """
         receive splitting data
         """
-        self.split_layers = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.split_layers())[1]
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+
+        self.split_layers = self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.split_layers(),
+                                          is_weight=False,
+                                          url=url)[1]
 
     def get_split_layers_config_from_edge(self):
         """
@@ -117,9 +130,13 @@ class Client(FedClientInterface):
         """
         receive global weights
         """
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+
         weights = \
             self.recv_msg(config.CLIENTS_INDEX[config.index], message_utils.initial_global_weights_server_to_client(),
-                          True)[1]
+                          True, url=url)[1]
         if self.split_layers == (model_utils.get_unit_model_len() - 1):
             self.net.load_state_dict(weights)
         else:
@@ -255,12 +272,10 @@ class Client(FedClientInterface):
 
                 # Wait receiving edge server gradients
                 # fed_logger.info("receiving gradients")
-                gradients = \
-                    self.recv_msg(config.CLIENTS_INDEX[config.index],
-                                  f"{message_utils.server_gradients_server_to_client() + socket.gethostname()}_{i}",
-                                  True)[
-                        1].to(
-                        self.device)
+                msg = self.recv_msg(exchange=config.CLIENTS_INDEX[config.index],
+                                    expect_msg_type=message_utils.server_gradients_server_to_client() + socket.gethostname(),
+                                    is_weight=True)
+                gradients = msg[1].to(self.device)
                 computation_start()
                 outputs.backward(gradients)
                 # if self.optimizer is not None:
@@ -306,14 +321,18 @@ class Client(FedClientInterface):
             exit()
 
     def next_round_attendance(self, remaining_energy):
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+
         attend = True
         if remaining_energy < 1:
             attend = False
         msg = [message_utils.client_quit_client_to_server() + '_' + socket.gethostname(), attend]
         self.send_msg(config.CLIENTS_INDEX[config.index], msg,
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+                      url=url)
         self.recv_msg(exchange=config.CLIENTS_INDEX[config.index],
                       expect_msg_type=message_utils.client_quit_done(),
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+                      url=url)
         if attend is False:
             exit()
