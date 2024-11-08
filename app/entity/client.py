@@ -273,7 +273,7 @@ class Client(FedClientInterface):
                 # Wait receiving edge server gradients
                 # fed_logger.info("receiving gradients")
                 msg = self.recv_msg(exchange=config.CLIENTS_INDEX[config.index],
-                                    expect_msg_type=message_utils.server_gradients_server_to_client() + socket.gethostname(),
+                                    expect_msg_type=f"{message_utils.server_gradients_server_to_client()}{socket.gethostname()}_{i}",
                                     is_weight=True)
                 gradients = msg[1].to(self.device)
                 computation_start()
