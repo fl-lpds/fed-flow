@@ -32,7 +32,7 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [[6, 6], [6, 6], [6, 6]]  # Initial split layers
+split_layer = [[6, 6], [6, 6]]  # Initial split layers
 model_len = 7
 
 # FL training configration
@@ -64,7 +64,7 @@ SERVER_ADDR = 'server'
 SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001, 'edge2': 5005}
 
-K = 3  # Number of devices
+K = 2  # Number of devices
 G = 2  # Number of groups
 S = 1  # Number of server connecting devices
 

@@ -34,7 +34,6 @@ class FedServerInterface(ABC, Communicator):
         self.tt_end = {}
 
         self.simnet = simnet
-        self.simnetbw = {}
         self.client_training_transmissionTime = {}
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
@@ -109,7 +108,7 @@ class FedServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def initialize(self, split_layers, LR,  simnetbw: dict = None):
+    def initialize(self, split_layers, LR):
         pass
 
     @abstractmethod

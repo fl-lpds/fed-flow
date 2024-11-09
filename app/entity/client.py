@@ -88,7 +88,6 @@ class Client(FedClientInterface):
         self.send_msg(exchange=config.CLIENTS_INDEX[config.index], msg=msg, is_weight=False,
                       url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
         end_transmission(data_utils.sizeofmessage(msg))
-        fed_logger.info("Simnet BW sent")
 
     def get_split_layers_config(self):
         """

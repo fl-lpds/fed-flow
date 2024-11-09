@@ -24,14 +24,10 @@ torch.manual_seed(0)
 
 class FedServer(FedServerInterface):
 
-    def initialize(self, split_layers, LR, simnetbw: dict = None):
+    def initialize(self, split_layers, LR):
         self.split_layers = split_layers
         self.nets = {}
         self.optimizers = {}
-
-        if simnetbw is not None and self.simnet:
-            self.simnetbw = simnetbw
-            self.edge_bandwidth = simnetbw
 
         for i in range(len(split_layers)):
             client_ip = config.CLIENTS_INDEX[i]
@@ -166,7 +162,7 @@ class FedServer(FedServerInterface):
                             url=config.CLIENT_MAP[client_ip])
         if self.simnet:
             self.client_training_transmissionTime[client_ip] += (
-                    data_utils.sizeofmessage(msg) / self.simnetbw[config.CLIENT_MAP[client_ip]])
+                    data_utils.sizeofmessage(msg) / self.edge_bandwidth[config.CLIENT_MAP[client_ip]])
 
         flag = msg[1]
         i += 1
@@ -184,7 +180,7 @@ class FedServer(FedServerInterface):
                                     url=config.CLIENT_MAP[client_ip])
                 if self.simnet:
                     self.client_training_transmissionTime[client_ip] += (
-                            data_utils.sizeofmessage(msg) / self.simnetbw[config.CLIENT_MAP[client_ip]])
+                            data_utils.sizeofmessage(msg) / self.edge_bandwidth[config.CLIENT_MAP[client_ip]])
                 flag = msg[1]
                 fed_logger.info(Fore.RED + f"{flag}")
                 if not flag:
@@ -194,7 +190,7 @@ class FedServer(FedServerInterface):
                                     url=config.CLIENT_MAP[client_ip])
                 if self.simnet:
                     self.client_training_transmissionTime[client_ip] += (
-                            data_utils.sizeofmessage(msg) / self.simnetbw[config.CLIENT_MAP[client_ip]])
+                            data_utils.sizeofmessage(msg) / self.edge_bandwidth[config.CLIENT_MAP[client_ip]])
 
                 smashed_layers = msg[1]
                 labels = msg[2]
@@ -216,7 +212,7 @@ class FedServer(FedServerInterface):
                 msg = [f'{message_utils.server_gradients_server_to_edge() + str(client_ip)}_{i}', inputs.grad]
                 if self.simnet:
                     self.client_training_transmissionTime[client_ip] += (
-                            data_utils.sizeofmessage(msg) / self.simnetbw[config.CLIENT_MAP[client_ip]])
+                            data_utils.sizeofmessage(msg) / self.edge_bandwidth[config.CLIENT_MAP[client_ip]])
                 self.send_msg(config.CLIENT_MAP[client_ip], msg, True, url=config.CLIENT_MAP[client_ip])
             i += 1
 
@@ -286,10 +282,10 @@ class FedServer(FedServerInterface):
         receive client network speed
         """
 
-        for i in edge_ips:
+        for edge in edge_ips:
             start_transmission()
-            set_simnet(self.simnetbw[i])
-            msg = self.recv_msg(exchange=i, expect_msg_type=message_utils.client_network(), url=i)
+            set_simnet(self.edge_bandwidth[edge])
+            msg = self.recv_msg(exchange=edge, expect_msg_type=message_utils.client_network(), url=edge)
             end_transmission(data_utils.sizeofmessage(msg))
             for k in msg[1].keys():
                 self.client_bandwidth[k] = msg[1][k]
@@ -301,7 +297,7 @@ class FedServer(FedServerInterface):
 
         for edgeIP in config.EDGE_SERVER_LIST:
             start_transmission()
-            set_simnet(self.simnetbw[edgeIP])
+            set_simnet(self.edge_bandwidth[edgeIP])
             msg = self.recv_msg(exchange=edgeIP,
                                 expect_msg_type=message_utils.simnet_bw_edge_to_server(),
                                 is_weight=False,
@@ -325,7 +321,7 @@ class FedServer(FedServerInterface):
         if self.simnet:
             for edge in config.EDGE_SERVER_LIST:
                 start_transmission()
-                set_simnet(self.simnetbw[edge])
+                set_simnet(self.edge_bandwidth[edge])
                 end_transmission(data_utils.sizeofmessage(msg))
         self.scatter(msg)
 
@@ -336,7 +332,7 @@ class FedServer(FedServerInterface):
         eweights = {}
         for i in range(len(client_ips)):
             start_transmission()
-            set_simnet(self.simnetbw[config.CLIENT_MAP[client_ips[i]]])
+            set_simnet(self.edge_bandwidth[config.CLIENT_MAP[client_ips[i]]])
             msg = self.recv_msg(config.CLIENT_MAP[client_ips[i]],
                                 message_utils.local_weights_edge_to_server() + "_" + client_ips[i], True,
                                 config.CLIENT_MAP[client_ips[i]])
@@ -357,7 +353,7 @@ class FedServer(FedServerInterface):
 
         for edge in config.EDGE_SERVER_LIST:
             start_transmission()
-            set_simnet(self.simnetbw[edge])
+            set_simnet(self.edge_bandwidth[edge])
             msg = self.recv_msg(exchange=edge, expect_msg_type=message_utils.energy_tt_edge_to_server(), url=edge)
             end_transmission(data_utils.sizeofmessage(msg))
             for i in range(len(config.EDGE_MAP[edge])):
@@ -398,7 +394,7 @@ class FedServer(FedServerInterface):
         if self.simnet:
             for edgeIP in config.EDGE_SERVER_LIST:
                 start_transmission()
-                set_simnet(self.simnetbw[edgeIP])
+                set_simnet(self.edge_bandwidth[edgeIP])
                 end_transmission(data_utils.sizeofmessage(msg))
         self.scatter(msg, True)
 
@@ -467,7 +463,7 @@ class FedServer(FedServerInterface):
     def client_attendance(self, client_ips):
         attend = {}
         for i in range(len(client_ips)):
-            msg = self.recv_msg(client_ips[i], message_utils.client_quit_client_to_server()+ '_' + client_ips[i])
+            msg = self.recv_msg(client_ips[i], message_utils.client_quit_client_to_server() + '_' + client_ips[i])
             attend.update({client_ips[i]: msg[1]})
             msg = [message_utils.client_quit_done(), True]
             self.send_msg(client_ips[i], msg)

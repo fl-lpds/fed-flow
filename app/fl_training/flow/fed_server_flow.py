@@ -56,11 +56,6 @@ def run_edge_based_no_offload(server: FedServerInterface, LR, options):
 
 
 def run_edge_based_offload(server: FedServerInterface, LR, options):
-    simnetbw = {}
-    for edge in config.EDGE_SERVER_LIST:
-        simnetbw[edge] = 580_000_000
-    server.initialize(config.split_layer, LR, simnetbw=simnetbw)
-
     training_time = 0
     totalIOTNum = len(config.CLIENTS_INDEX.keys())
     totalEdgeNum = len(config.EDGE_MAP.keys())
@@ -81,40 +76,38 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     for edge in config.EDGE_SERVER_LIST:
         edge_server_BW[edge] = []
 
-    # for c in config.CLIENTS_LIST:
-    #     energy_tt_list.append([0, 0])
-
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     fed_logger.info(f"OPTION: {options}")
     for r in range(config.R):
-
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
         if config.K > 0:
+
             config.current_round = r
             fed_logger.info('====================================>')
             fed_logger.info('==> Round {:} Start'.format(r))
+
             s_time = time.time()
+
             if not server.simnet:
                 fed_logger.info("receiving client network info")
                 server.client_network(config.EDGE_SERVER_LIST)
                 fed_logger.info("test edge servers network")
                 server.test_network(config.EDGE_SERVER_LIST)
             else:
+                # setting BW between each edge and sever
+                for edge in config.EDGE_SERVER_LIST:
+                    server.edge_bandwidth[edge] = 100_000_000
                 fed_logger.info("receiving client simnet network info")
                 server.client_network(config.EDGE_SERVER_LIST)
-                for edge in config.EDGE_SERVER_LIST:
-                    simnetbw[edge] = 580_000_000
-                # fed_logger.info("receiving edge simnet network info")
-                # server.get_simnet_edge_network()
 
             for client in server.client_bandwidth.keys():
                 iotBW[client].append(server.client_bandwidth[client])
             for edge_server in server.edge_bandwidth.keys():
                 edge_server_BW[edge_server].append(server.edge_bandwidth[edge_server])
 
-            fed_logger.info("preparing state...")
-            server.offloading = server.get_offloading(server.split_layers)
+            # fed_logger.info("preparing state...")
+            # server.offloading = server.get_offloading(server.split_layers)
 
             fed_logger.info("clustering")
             server.cluster(options)
@@ -137,7 +130,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 LR = config.LR * 0.1
 
             fed_logger.info("initializing server")
-            server.initialize(server.split_layers, LR, simnetbw=simnetbw)
+            server.initialize(server.split_layers, LR)
+
             fed_logger.info("sending global weights")
             server.edge_offloading_global_weights()
             # fed_logger.info('==> Reinitialization Finish')

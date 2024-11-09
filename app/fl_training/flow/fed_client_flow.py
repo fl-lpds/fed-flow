@@ -25,7 +25,7 @@ def run_edge_based(client: FedClientInterface, LR):
     batch_num = data_size / config.B
     # final=[]
     for r in range(config.R):
-        simnet_BW = 190_000_000  # Mbps
+        simnet_BW = 10_000_000  # 10Mbps
 
         config.current_round = r
         fed_logger.info('====================================>')
