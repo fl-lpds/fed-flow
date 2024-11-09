@@ -34,6 +34,7 @@ services:
     hostname: broker
 
   client1:
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: negaranabestani/fed-flow:rabbitmq
@@ -51,39 +52,41 @@ services:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 & wait -n"
-  client2:
-    volumes:
-      - ./config.py:/fed-flow/app/config/config.py
-    image: negaranabestani/fed-flow:rabbitmq
-    depends_on:
-      - server
-      - broker
-    hostname: client2
-    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.5'
-#        reservations:
-#          cpus: '0.5'
-      restart_policy:
-        condition: on-failure
-    working_dir: /fed-flow/app/fl_training/runner
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 & wait -n"
-  client3:
-    volumes:
-      - ./config.py:/fed-flow/app/config/config.py
-    image: negaranabestani/fed-flow:rabbitmq
-    depends_on:
-      - server
-      - broker
-    hostname: client3
-    deploy:
-#      resources:
-#        limits:
-#          cpus: '0.5'
-#        reservations:
-#          cpus: '0.5'
-      restart_policy:
-        condition: on-failure
-    working_dir: /fed-flow/app/fl_training/runner
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 & wait -n"
+#  client2:
+#    attach: false
+#    volumes:
+#      - ./config.py:/fed-flow/app/config/config.py
+#    image: negaranabestani/fed-flow:rabbitmq
+#    depends_on:
+#      - server
+#      - broker
+#    hostname: client2
+#    deploy:
+##      resources:
+##        limits:
+##          cpus: '0.5'
+##        reservations:
+##          cpus: '0.5'
+#      restart_policy:
+#        condition: on-failure
+#    working_dir: /fed-flow/app/fl_training/runner
+#    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 & wait -n"
+#  client3:
+#    attach: false
+#    volumes:
+#      - ./config.py:/fed-flow/app/config/config.py
+#    image: negaranabestani/fed-flow:rabbitmq
+#    depends_on:
+#      - server
+#      - broker
+#    hostname: client3
+#    deploy:
+##      resources:
+##        limits:
+##          cpus: '0.5'
+##        reservations:
+##          cpus: '0.5'
+#      restart_policy:
+#        condition: on-failure
+#    working_dir: /fed-flow/app/fl_training/runner
+#    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 & wait -n"

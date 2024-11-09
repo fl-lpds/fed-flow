@@ -52,7 +52,7 @@ def none(state, labels):
 def no_edge_fake(state, labels):
     split_list = []
     for i in range(config.K):
-        split_list.append(6)
+        split_list.append(3)
     return split_list
 
 

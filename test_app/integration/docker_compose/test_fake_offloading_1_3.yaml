@@ -32,7 +32,7 @@ services:
       - RABBITMQ_DEFAULT_PASS=password
     hostname: broker
   client1:
-#    attach: false
+    attach: false
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: negaranabestani/fed-flow:rabbitmq
@@ -65,20 +65,20 @@ services:
     hostname: client2
     entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -s no_edge_fake_splitting & wait -n"
 
-#  client3:
-#    attach: false
-#    volumes:
-#      - ./config.py:/fed-flow/app/config/config.py
-#    image: negaranabestani/fed-flow:rabbitmq
-#
-#    deploy:
-##      resources:
-##        limits:
-##          cpus: '0.5'
-##        reservations:
-##          cpus: '0.5'
-#      restart_policy:
-#        condition: on-failure
-#    working_dir: /fed-flow/app/fl_training/runner
-#    hostname: client3
-#    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -s no_edge_fake_splitting & wait -n"
+  client3:
+    attach: false
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: negaranabestani/fed-flow:rabbitmq
+
+    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#        reservations:
+#          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    hostname: client3
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -s no_edge_fake_splitting & wait -n"

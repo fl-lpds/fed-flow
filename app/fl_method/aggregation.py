@@ -1,4 +1,3 @@
-
 def fed_avg(zero_model, w_local_list, total_data_size):
     keys = w_local_list[0][0].keys()
 
@@ -9,5 +8,4 @@ def fed_avg(zero_model, w_local_list, total_data_size):
                 zero_model[k] = w[0][k]
             else:
                 zero_model[k] += (w[0][k] * beta)
-
     return zero_model

@@ -6,13 +6,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
-from colorama import Fore
 
 sys.path.append('../../')
 from app.util import message_utils, model_utils, data_utils
 from app.entity.interface.fed_client_interface import FedClientInterface
 from app.config.logger import fed_logger
-from app.config import config
 from app.util.energy_estimation import *
 
 np.random.seed(0)
