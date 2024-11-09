@@ -274,7 +274,8 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
             fed_logger.info("testing accuracy")
             test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
             res['test_acc_record'].append(test_acc)
-
+            rl_utils.draw_graph(10, 5, res['test_acc_record'], "Accuracy", 'Round', 'Accuracy', "/fed-flow/Graphs/1_3",
+                                "Accuracy", True)
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
         else:
