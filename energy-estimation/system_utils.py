@@ -144,5 +144,9 @@ def get_computation_time(process):
     return process.comp_time
 
 
+def reset_transmission_time(process):
+    process.transmission_time = 0
+
+
 def set_simnet(process, simnetbw):
     process.bandwidth = simnetbw

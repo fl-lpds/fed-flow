@@ -158,6 +158,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info(f"Transmission time of each client on server: {server.client_training_transmissionTime}")
             fed_logger.info(f"Aggregation Time Simnet bw : {aggregation_time}")
             fed_logger.info(f"Server Sequential Transmission time: {float(energy_estimation.get_transmission_time())}")
+            energy_estimation.reset_transmission_time()
 
             energy = 0
             for client in energy_tt_list.keys():

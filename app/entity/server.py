@@ -358,10 +358,14 @@ class FedServer(FedServerInterface):
             end_transmission(data_utils.sizeofmessage(msg))
             for i in range(len(config.EDGE_MAP[edge])):
                 # energy_tt_list.append(msg[1][i])
-                energy_tt[config.EDGE_MAP[edge][i]] = msg[1][config.EDGE_MAP[edge][i]]
-                if self.simnet:
+                if msg[1].__contains__(config.EDGE_MAP[edge][i]):
+                    energy_tt[config.EDGE_MAP[edge][i]] = msg[1][config.EDGE_MAP[edge][i]]
                     self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = \
                         msg[1][config.EDGE_MAP[edge][i]][3]
+
+                else:
+                    energy_tt[config.EDGE_MAP[edge][i]] = [0, 0, 0, 0]
+                    self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = 0
 
         self.client_remaining_energy = {}
         for client in energy_tt.keys():

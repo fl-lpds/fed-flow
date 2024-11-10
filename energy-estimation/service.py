@@ -62,9 +62,16 @@ async def end_transmission(bits):
 async def get_transmission_time():
     return system_utils.get_transmission_time(config.process)
 
+
+@app.get("/reset-transmission-time/")
+async def reset_transmission_time():
+    return system_utils.reset_transmission_time(config.process)
+
+
 @app.get("/get-computation-time/")
 async def get_computation_time():
     return system_utils.get_computation_time(config.process)
+
 
 @app.get("/set-simnet/{simnetbw}")
 async def set_simnet(simnetbw):

@@ -87,6 +87,15 @@ def get_transmission_time():
         return result.text
 
 
+def reset_transmission_time():
+    global is_init
+    if is_init:
+        session = requests.session()
+        session.trust_env = False
+        result = session.get(url=URL + "/reset-transmission-time/")
+        return result.text
+
+
 def get_computation_time():
     global is_init
     if is_init:
