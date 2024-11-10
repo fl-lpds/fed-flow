@@ -32,7 +32,7 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [6, 6, 5]  # Initial split layers
+split_layer = [3, 3, 3]  # Initial split layers
 model_len = 7
 
 # FL training configration
@@ -72,7 +72,7 @@ S = 1  # Number of server connecting devices
 HOST2IP = {}
 EDGE_MQ_MAP = {}
 CLIENTS_INDEX = {0: 'client1', 1: 'client2', 2: 'client3'}
-CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 3}
+CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 2}
 EDGE_SERVER_LIST = []
 EDGE_SERVER_CONFIG = {}
 CLIENTS_LIST = ['client1', 'client2', 'client3']

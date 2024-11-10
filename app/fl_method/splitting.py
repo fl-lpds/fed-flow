@@ -73,7 +73,7 @@ def fake(state, labels):
 
     split_list = []
     for i in range(len(config.CLIENTS_INDEX.keys())):
-        split_list.append([3, 3])
+        split_list.append(3)
     return split_list
 
 
