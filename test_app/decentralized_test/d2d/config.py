@@ -90,3 +90,4 @@ SERVER_INDEX_TO_NAME = {0: 'server1'}
 # Topology configration for decentralized mode
 CURRENT_NODE_NEIGHBORS: list[NodeIdentifier] = []  # (ip, port)
 INITIAL_NODE_COORDINATE = NodeCoordinate
+SCENARIO_DESCRIPTION = os.environ.get("SCENARIO_DESCRIPTION", "test")

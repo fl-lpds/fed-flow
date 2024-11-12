@@ -1,6 +1,6 @@
 import torch.nn as nn
 from torch import optim
-from tqdm import tqdm
+import tqdm
 from app.config import config
 from app.config.logger import fed_logger
 from app.dto.message import GlobalWeightMessage, NetworkTestMessage, SplitLayerConfigMessage, IterationFlagMessage
@@ -65,7 +65,7 @@ class FedClient(FedBaseNodeInterface):
             fed_logger.info("no offloding training start----------------------------")
             self.scatter_msg(IterationFlagMessage(False), [NodeType.EDGE])
             i += 1
-            for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
+            for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
                 outputs = self.net(inputs)
@@ -79,7 +79,7 @@ class FedClient(FedBaseNodeInterface):
             self.scatter_msg(IterationFlagMessage(True), [NodeType.EDGE])
             i += 1
 
-            for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
+            for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
 
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 if self.optimizer is not None:

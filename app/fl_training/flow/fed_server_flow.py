@@ -94,7 +94,7 @@ def run_d2d(server: FedServer, options):
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(training_time))
-
+    graph_utils.report_results(server, training_times, [], accuracy)
 
 def run(options_ins):
     learning_rate = config.learning_rate
