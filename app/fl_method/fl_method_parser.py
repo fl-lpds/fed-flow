@@ -14,5 +14,6 @@ fl_methods = {
     "only_server_splitting": splitting.only_server_splitting,
     "random_splitting": splitting.randomSplitting,
     "fedmec_splitting": splitting.FedMec,
-    "edge_base_rl_splitting": splitting.edge_based_rl_splitting
+    "edge_base_rl_splitting": splitting.edge_based_rl_splitting,
+    "edge_based_heuristic": splitting.edge_based_heuristic_splitting
 }

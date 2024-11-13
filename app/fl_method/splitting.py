@@ -1,4 +1,5 @@
 import random
+from math import inf
 
 import numpy as np
 import torch
@@ -23,14 +24,86 @@ def edge_based_rl_splitting(state, labels):
     return actions
 
 
-def heuristic_splitting(state, label):
-    # state = [ client's BW, edge's BW, server's BW, client remaining energy]
-    client_BW = {}
-    client_RE = {}
-    for i in range(len(config.CLIENTS_LIST)):
-        client_BW[f"device{i}"] = state[i]
-    for i in range(len(config.CLIENTS_LIST) + len(config.EDGE_SERVER_LIST), len(state)):
-        client_RE[f"device{i}"] = state[i]
+def edge_based_heuristic_splitting(state: dict, label):
+    # state = [ client's BW, edge-server BW, client remaining energy , client power usage, each layers activation size]
+    client_bw = {}
+    client_utilization = {}
+    edge_server_bw = {}
+    client_remaining_energy = {}
+    client_power_usage = {}
+    client_remaining_runtime = {}
+    previous_action = state['prev_action']
+    activation_size = {}
+    gradient_size = {}
+
+    client_score = {}
+    client_remaining_runtime_score = {}
+    client_bw_score = {}
+
+    for key, value in state.items():
+        if ("client" in key) and ("bw" in key):
+            client_bw[key[:-3]] = value
+        if "utilization" in key:
+            client_utilization[key[:-12]] = value
+        elif "bw" in key:
+            edge_server_bw[key[:-3]] = value
+        elif ("client" in key) and ("re" in key):
+            client_remaining_energy[key[:-3]] = value
+        elif "power" in key:
+            client_power_usage[key[:-6]] = value
+        elif "activation" in key:
+            activation_size = value
+        else:
+            gradient_size = value
+
+    fed_logger.info(f"state: {state}")
+
+    fed_logger.info(f"CLIENT UTILIZATION: {client_utilization}")
+
+    fed_logger.info(f"ACTIVATION KEY: {activation_size.keys()}")
+    fed_logger.info(f"ACTIVATION VALUE: {activation_size.values()}")
+
+    action = [[config.model_len - 1, config.model_len - 1]] * len(client_bw.keys())
+    client_bw_score = normalizer(client_bw)
+
+    fed_logger.info(f"ACTIVATION VALUES: {list(activation_size.values())}")
+
+    for client in client_remaining_energy.keys():
+        if client_remaining_energy[client] != 0:
+            client_remaining_runtime[client] = client_remaining_energy[client] / (
+                    client_power_usage[client][0] * client_utilization[client])
+
+    client_remaining_runtime_score = normalizer(client_remaining_runtime)
+    high_prio_device = {device: score for device, score in client_remaining_runtime_score.items() if score < 0.5}
+    fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_score.items()}")
+    fed_logger.info(f"HIGH PRIO DEVICES: {high_prio_device.items()}")
+
+    for client, score in high_prio_device.items():
+        tt_trans_aprox = inf
+        best_op1 = None
+        batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / 100
+        action[config.CLIENTS_CONFIG[client]] = [max(previous_action[config.CLIENTS_CONFIG[client]][0] - 1, 1), 6]
+        # for op1 in range(config.model_len):
+        # tt_trans = (list(activation_size.values())[op1] * batchNumber) / client_bw[client]
+        # fed_logger.info(f"TRANS TT APPROX: {tt_trans}")
+        # if tt_trans < tt_trans_aprox:
+        #     best_op1 = op1
+        #     fed_logger.info(f"tt_trans < tt_trans_arox: {best_op1}")
+        # action[config.CLIENTS_CONFIG[client]] = [best_op1, min(best_op1 + 1, config.model_len - 1)]
+    return action
+
+
+def normalizer(input_dict):
+    input_list = list(input_dict.values())
+    min_item = min(input_list)
+    max_item = max(input_list)
+    if max_item == min_item:
+        return {client: 0.5 for client in input_dict}
+    normalized = {
+        client: (usage - min_item) / (max_item - min_item)
+        for client, usage in input_dict.items()
+    }
+    return normalized
 
 
 def rl_splitting(state, labels):
@@ -73,7 +146,7 @@ def fake(state, labels):
 
     split_list = []
     for i in range(len(config.CLIENTS_INDEX.keys())):
-        split_list.append(3)
+        split_list.append([3, 3])
     return split_list
 
 

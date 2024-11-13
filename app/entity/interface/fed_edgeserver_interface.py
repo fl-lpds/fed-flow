@@ -117,5 +117,10 @@ class FedEdgeServerInterface(ABC, Communicator):
     def get_simnet_client_network(self):
         pass
 
+    @abstractmethod
     def send_simnet_bw_to_server(self, simnetbw):
+        pass
+
+    @abstractmethod
+    def get_power_and_send_to_server(self):
         pass

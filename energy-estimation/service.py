@@ -15,7 +15,8 @@ from process import Process
 warnings.filterwarnings('ignore')
 
 app = FastAPI()
-config.process = Process(0, config.init_energy)
+config.process = Process(pid=0, init_energy=config.init_energy, comp_power_usage=config.power,
+                         trans_power_usage=config.tx_power)
 
 excluded_endpoints = ["/init/", "/", "/computation-start/", "/computation-end/", "/start-transmission/",
                       "/end-transmission/", "/get-cpu-utilization/"]
@@ -111,6 +112,16 @@ async def energy_and_time_comp_tr():
 @app.get("/get-cpu-utilization/{pid}")
 async def get_cpu_utilization(pid):
     return system_utils.get_cpu_u(pid)
+
+
+@app.get("/get-power")
+async def get_power_usage():
+    return system_utils.get_power_usage(config.process)
+
+
+@app.get("/get-utilization")
+async def get_utilization():
+    return system_utils.get_utilization(config.process)
 
 
 uvicorn.run(app, host="0.0.0.0", port=8023)

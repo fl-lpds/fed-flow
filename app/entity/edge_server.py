@@ -130,8 +130,8 @@ class FedEdgeServer(FedEdgeServerInterface):
                         loss.backward()
                         if self.optimizers.keys().__contains__(client_ip):
                             self.optimizers[client_ip].step()
-                        self.computation_time_of_each_client += (
-                                time.time() - self.start_time_of_computation_each_client[client_ip])
+                        self.computation_time_of_each_client[client_ip] += (
+                                    time.time() - self.start_time_of_computation_each_client[client_ip])
                         energy_estimation.computation_end()
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
                         self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
@@ -254,6 +254,11 @@ class FedEdgeServer(FedEdgeServerInterface):
                       url=config.EDGE_SERVER_CONFIG[config.index])
 
     def energy(self, client_ips):
+        """
+        gets energy, training time, remaining energy and utilization of clients and send them to server
+        :param client_ips:
+        :return:
+        """
         energy_tt_list = []
 
         energy_tt = {}
@@ -267,11 +272,11 @@ class FedEdgeServer(FedEdgeServerInterface):
                                    url=config.EDGE_SERVER_CONFIG[config.index])
                 fed_logger.info(f"client message: {ms}")
                 if self.simnet:
-                    energy_tt[c] = [ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]]
-                    energy_tt_list.append([ms[1], ms[2], ms[3], self.computation_time_of_each_client[c]])
+                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], self.computation_time_of_each_client[c]]
+                    energy_tt_list.append([ms[1], ms[2], ms[3], ms[4], self.computation_time_of_each_client[c]])
                 else:
-                    energy_tt[c] = [ms[1], ms[2], ms[3]]
-                    energy_tt_list.append([ms[1], ms[2], ms[3]])
+                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4]]
+                    energy_tt_list.append([ms[1], ms[2], ms[3], ms[4]])
             else:
                 energy_tt_list.append([0, 0, 0, 0])
         # fed_logger.info(f"sending enery tt {socket.gethostname()}")
@@ -343,3 +348,15 @@ class FedEdgeServer(FedEdgeServerInterface):
         self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
                       expect_msg_type=message_utils.client_quit_done(),
                       url=config.EDGE_SERVER_CONFIG[config.index])
+
+    def get_power_and_send_to_server(self):
+        url = config.EDGE_SERVER_CONFIG[config.index]
+        power_usage = {}
+        for clientIP in config.EDGE_MAP[config.EDGE_SERVER_LIST[config.index]]:
+            msg = self.recv_msg(exchange=clientIP, url=url, expect_msg_type=message_utils.client_power_usage_to_edge())
+            comp_power_usage = msg[1]
+            trans_power_usage = msg[2]
+            power_usage[clientIP] = [comp_power_usage, trans_power_usage]
+
+        msg = [message_utils.client_power_usage_edge_to_server(), power_usage]
+        self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, url=url)

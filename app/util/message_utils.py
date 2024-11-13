@@ -150,3 +150,15 @@ def client_quit_done():
 
 def client_quit_edge_to_server():
     return f'{get_round()}_MSG_CLIENT_QUIT_EDGE_TO_SERVER'
+
+
+def client_power_usage_to_edge():
+    return f'MSG_CLIENT_POWER_USAGE_TO_EDGE'
+
+
+def client_power_usage_edge_to_server():
+    return "MSG_CLIENT_POWER_USAGE_EDGE_TO_SERVER"
+
+
+def client_power_usage_to_server():
+    return "MSG_CLIENT_POWER_USAGE_TO_SERVER"

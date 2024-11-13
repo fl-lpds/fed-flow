@@ -18,8 +18,12 @@ def run_offload(server: FedEdgeServerInterface, LR):
     server.initialize(config.split_layer, LR, config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]], simnetbw=10)
 
     res = {}
-    res['trianing_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
+    res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     client_ips = config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]
+
+    fed_logger.info('Getting power usage from clients and sending to server.')
+    server.get_power_and_send_to_server()
+
     for r in range(config.R):
         fed_logger.info(Fore.LIGHTRED_EX + f" left clients {client_ips}")
         if len(config.CLIENTS_LIST) > 0:
@@ -59,7 +63,7 @@ def run_offload(server: FedEdgeServerInterface, LR):
             for i in range(len(client_ips)):
                 threads[client_ips[i]].join()
 
-            fed_logger.info("receiving Energy, TT, Remaining-energy from clients and sending to server")
+            fed_logger.info("receiving Energy, TT, Remaining-energy, utilization from clients and sending to server")
             server.energy(client_ips)
 
             if r > 49:

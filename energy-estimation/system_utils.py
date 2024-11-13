@@ -20,7 +20,7 @@ def estimate_computation_energy(process):
     cores = int(subprocess.run("nproc", capture_output=True, shell=True, text=True).stdout)
     # energy_logger.info(f"cpus: {cores}")
     utilization = process.cpu_utilization / process.cpu_u_count / 100 / cores
-    # energy_logger.info(Fore.RED+f"{utilization}")
+
     computation_time = process.comp_time
     # energy_logger.info(Fore.LIGHTYELLOW_EX + f"{process.cpu_u_count}")
     return get_power_now() * utilization * computation_time
@@ -41,10 +41,12 @@ def estimate_total_energy(config, process):
 
     cores = int(subprocess.run("nproc", capture_output=True, shell=True, text=True).stdout)
     # energy_logger.info(f"cpus: {cores}")
-    print(f"config.process.cpu_u_count : {config.process.cpu_u_count}")
-    print(f"cores : {cores}")
+    # energy_logger.info(Fore.RED + f"config.process.cpu_u_count : {config.process.cpu_u_count}")
+    # energy_logger.info(Fore.RED + f"cores : {cores}")
+    # energy_logger.info(Fore.RED + f"config.process.cpu_utilization : {config.process.cpu_utilization}")
 
     utilization = config.process.cpu_utilization / config.process.cpu_u_count / 100 / cores
+    # energy_logger.info(Fore.RED + f"utilization : {utilization}")
 
     config.process.comp_time = 0
     config.process.cpu_u_count = 0
@@ -64,7 +66,7 @@ def end_transmission(process, bits):
     # energy_logger.info(Fore.MAGENTA+f"{bits}")
     process.end_tr_time = time.time()
     if process.bandwidth != 0:
-        energy_logger.info(f"Bandwidth : {process.bandwidth}")
+        # energy_logger.info(f"Bandwidth : {process.bandwidth}")
         process.transmission_time += bits / float(process.bandwidth)
     else:
         # b = bits / (process.end_tr_time - process.start_tr_time)
@@ -113,9 +115,13 @@ def computation_start(process):
     process.start_comp_time = time.time()
     # energy_logger.info(f": {process.end_comp}")
     while not process.end_comp:
-        process.cpu_u_count += 1
         # energy_logger.info(f"count: {process.cpu_u_count}")
-        process.cpu_utilization += get_cpu_u(process.pid)
+        cpu_u = get_cpu_u(process.pid)
+        if cpu_u != 0:
+            process.cpu_u_count += 1
+            process.cpu_utilization += cpu_u
+            # energy_logger.info(f"process.cpu_utilization: {cpu_u}")
+
         # process.system_energy += float(get_power_now())
 
 
@@ -150,3 +156,17 @@ def reset_transmission_time(process):
 
 def set_simnet(process, simnetbw):
     process.bandwidth = simnetbw
+
+
+def get_power_usage(process):
+    return process.comp_power_usage, process.trans_power_usage
+
+
+def get_utilization(process):
+    if process.cpu_u_count == 0:
+        return 0
+    # max_energy_per_core = ((process.system_energy) / process.cpu_u_count)
+    cores = int(subprocess.run("nproc", capture_output=True, shell=True, text=True).stdout)
+    # energy_logger.info(f"cpus: {cores}")
+    utilization = process.cpu_utilization / process.cpu_u_count / 100 / cores
+    return utilization

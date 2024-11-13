@@ -25,6 +25,8 @@ class FedServerInterface(ABC, Communicator):
         # self.state = None
         self.client_bandwidth = {}
         self.client_remaining_energy = {}
+        self.power_usage_of_client = {}
+        self.client_utilization = {}
         self.edge_bandwidth = {}
         self.dataset = dataset
         self.threads = None
@@ -44,6 +46,9 @@ class FedServerInterface(ABC, Communicator):
         self.testset = data_utils.get_testset()
         self.testloader = data_utils.get_testloader(self.testset, multiprocessing.cpu_count())
         self.criterion = nn.CrossEntropyLoss()
+
+        self.activation_size = {}
+        self.gradient_size = {}
 
     @abstractmethod
     def edge_offloading_train(self, client_ips):
@@ -203,4 +208,12 @@ class FedServerInterface(ABC, Communicator):
 
     @abstractmethod
     def get_simnet_edge_network(self):
+        pass
+
+    @abstractmethod
+    def calculate_each_layer_activation_gradiant_size(self):
+        pass
+
+    @abstractmethod
+    def get_power_of_client(self):
         pass

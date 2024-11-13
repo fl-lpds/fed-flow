@@ -78,6 +78,15 @@ def remaining_energy():
     return 10
 
 
+def get_utilization():
+    global is_init
+    if is_init:
+        session = requests.session()
+        session.trust_env = False
+        result = session.get(url=URL + "/get-utilization/")
+        return result.text
+
+
 def get_transmission_time():
     global is_init
     if is_init:
@@ -92,8 +101,7 @@ def reset_transmission_time():
     if is_init:
         session = requests.session()
         session.trust_env = False
-        result = session.get(url=URL + "/reset-transmission-time/")
-        return result.text
+        session.get(url=URL + "/reset-transmission-time/")
 
 
 def get_computation_time():
@@ -116,3 +124,15 @@ def energy_and_time_comp_tr():
         comp_time = float(result[2][:])
         tr_time = float(result[3][:len(result[3]) - 1])
         return comp_e, tr_e, comp_time, tr_time
+
+
+def get_power_usage():
+    global is_init
+    if is_init:
+        session = requests.session()
+        session.trust_env = False
+        result = session.get(url=URL + "/get-power").json()
+        comp_power_usage = float(result[0])
+        trans_power_usage = float(result[1])
+
+        return comp_power_usage, trans_power_usage

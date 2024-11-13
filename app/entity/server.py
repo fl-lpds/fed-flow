@@ -343,7 +343,9 @@ class FedServer(FedServerInterface):
 
     def e_energy_tt(self, client_ips) -> dict:
         """
-        Returns: average energy consumption of clients
+        get energy consumption, training time, remaining energy and utilization of clients from edges
+        :param client_ips:
+        :return:
         """
         energy_tt_list = []
 
@@ -361,15 +363,17 @@ class FedServer(FedServerInterface):
                 if msg[1].__contains__(config.EDGE_MAP[edge][i]):
                     energy_tt[config.EDGE_MAP[edge][i]] = msg[1][config.EDGE_MAP[edge][i]]
                     self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = \
-                        msg[1][config.EDGE_MAP[edge][i]][3]
+                        msg[1][config.EDGE_MAP[edge][i]][4]
 
                 else:
-                    energy_tt[config.EDGE_MAP[edge][i]] = [0, 0, 0, 0]
+                    energy_tt[config.EDGE_MAP[edge][i]] = [0, 0, 0, 0, 0]
                     self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = 0
 
         self.client_remaining_energy = {}
+        self.client_utilization = {}
         for client in energy_tt.keys():
             self.client_remaining_energy[client] = energy_tt[client][2]
+            self.client_utilization[client] = energy_tt[client][3]
         # self.client_remaining_energy = []
         # for i in range(len(energy_tt_list)):
         #     self.client_remaining_energy[](energy_tt_list[i][2])
@@ -414,19 +418,28 @@ class FedServer(FedServerInterface):
         fed_logger.info('Next Round OPs: ' + str(self.split_layers))
 
     def edge_based_state(self):
-        state = []
-        for i in self.client_bandwidth:
-            state.append(self.client_bandwidth[i])
+        state = {'activation_size': self.activation_size, 'gradient_size': self.gradient_size,
+                 'prev_action': self.split_layers}
 
-        for i in self.edge_bandwidth:
-            state.append(self.edge_bandwidth[i])
+        for client, power_usage_list in self.power_usage_of_client.items():
+            state[f"{client}_power"] = power_usage_list
+
+        for client, utilization in self.client_utilization.items():
+            state[f"{client}_utilization"] = utilization
+
+        for client, bw in self.client_bandwidth.items():
+            state[f"{client}_bw"] = bw
+
+        for edge, bw in self.edge_bandwidth.items():
+            state[f"{edge}_bw"] = bw
 
         if len(self.client_remaining_energy.keys()) == 0:
-            for i in range(config.K):
-                state.append(0)
+            for i in range(len(config.CLIENTS_CONFIG.keys())):
+                state[f"client{i+1}_re"] = 0
         else:
-            for i in self.client_remaining_energy:
-                state.append(i)
+            for client, remaining_energy in self.client_remaining_energy.items():
+                state[f"{client}_re"] = remaining_energy
+
         return state
 
     def edge_based_reward_function_data(self, energy_tt_list, total_tt):
@@ -481,3 +494,70 @@ class FedServer(FedServerInterface):
             else:
                 temp_list.append(client_ip)
         config.CLIENTS_LIST = temp_list
+
+    def calculate_each_layer_activation_gradiant_size(self):
+        split_layer = [[config.model_len - 1, config.model_len - 1]] * len(config.CLIENTS_CONFIG.keys())
+        model = model_utils.get_model('Client', split_layer[0], self.device, self.edge_based)
+
+        def calculate_size_in_megabits(tensor):
+            num_elements = tensor.numel()
+            size_in_bits = num_elements * 32  # assuming float32
+            return size_in_bits / (1024 * 1024)  # convert to megabits
+
+        activation_sizes = {}
+        gradient_sizes = {}
+
+        # Define hooks for capturing individual layer activations and gradients
+        def forward_hook(module, input, output):
+            activation_size_mb = calculate_size_in_megabits(output)
+            activation_sizes[module] = activation_size_mb
+            print(f"Forward activation size of {module}: {activation_size_mb:.2f} Mb")
+
+        def backward_hook(module, grad_input, grad_output):
+            if grad_output[0] is not None:
+                gradient_size_mb = calculate_size_in_megabits(grad_output[0])
+                gradient_sizes[module] = gradient_size_mb
+                print(f"Backward gradient size of {module}: {gradient_size_mb:.2f} Mb")
+
+        # Register hooks on all modules, not just the top-level Sequential block
+        for layer in model.modules():
+            if isinstance(layer, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU, nn.MaxPool2d, nn.Linear)):
+                layer.register_forward_hook(forward_hook)
+                layer.register_backward_hook(backward_hook)
+
+        # Example input batch with batch size of 100
+        input_data = torch.randn(100, 3, 32, 32)  # Adjust for your model's input shape
+
+        # Perform forward and backward pass
+        output = model(input_data)
+        output.mean().backward()  # dummy loss for backward
+
+        # Print collected sizes
+        print("Activation sizes (in Mb) per layer:")
+        for layer, size in activation_sizes.items():
+            print(f"{layer}: {size:.2f} Mb")
+
+        print("\nGradient sizes (in Mb) per layer:")
+        for layer, size in gradient_sizes.items():
+            print(f"{layer}: {size:.2f} Mb")
+
+        self.activation_size = activation_sizes
+        self.gradient_size = gradient_sizes
+
+    def get_power_of_client(self):
+        power_usage = {}
+        if self.edge_based:
+            for edgeIP in config.EDGE_SERVER_LIST:
+                msg = self.recv_msg(exchange=edgeIP, url=edgeIP,
+                                    expect_msg_type=message_utils.client_power_usage_edge_to_server())
+
+                # each client has comp_power_usage and trans_power_usage
+                for clientIP, power_usage_list in msg[1].items():
+                    power_usage[clientIP] = power_usage_list
+        else:
+            for clientIP in config.CLIENTS_LIST:
+                msg = self.recv_msg(exchange=clientIP, expect_msg_type=message_utils.client_power_usage_to_server())
+                comp_power_usage = msg[1]
+                trans_power_usage = msg[2]
+                power_usage[clientIP] = [comp_power_usage, trans_power_usage]
+        self.power_usage_of_client = power_usage

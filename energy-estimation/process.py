@@ -1,5 +1,5 @@
 class Process:
-    def __init__(self, pid, init_energy):
+    def __init__(self, pid, init_energy, comp_power_usage, trans_power_usage):
         self.remaining_energy = init_energy
         self.pid = pid
         self.start_comp_time = 0
@@ -14,3 +14,5 @@ class Process:
         self.transmission_time = 0
         self.comp_time = 0
         self.bandwidth = 0
+        self.comp_power_usage = comp_power_usage
+        self.trans_power_usage = trans_power_usage

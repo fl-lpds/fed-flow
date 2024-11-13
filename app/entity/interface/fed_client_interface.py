@@ -95,7 +95,7 @@ class FedClientInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def energy_tt(self, remaining_energy, energy, tt):
+    def energy_tt(self, remaining_energy, energy, tt, utilization):
         pass
 
     @abstractmethod
@@ -106,5 +106,10 @@ class FedClientInterface(ABC, Communicator):
     def e_next_round_attendance(self, remaining_energy):
         pass
 
+    @abstractmethod
     def send_simnet_bw_to_edge(self, simnetbw):
+        pass
+
+    @abstractmethod
+    def send_power_to_edge(self):
         pass

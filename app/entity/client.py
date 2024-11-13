@@ -149,7 +149,7 @@ class Client(FedClientInterface):
         computation_end()
         i = 0
         if self.split_layers[config.index][0] == model_utils.get_unit_model_len() - 1:
-            fed_logger.info("no offloding training start----------------------------")
+            fed_logger.info("no offloading training start----------------------------")
             flag = [f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{socket.gethostname()}', False]
             start_transmission()
             self.send_msg(config.CLIENTS_INDEX[config.index], flag,
@@ -168,7 +168,7 @@ class Client(FedClientInterface):
 
         elif self.split_layers[config.index][0] < model_utils.get_unit_model_len() - 1:
             # flag = [message_utils.local_iteration_flag_client_to_edge(), True]
-            fed_logger.info(f"offloding training start {self.split_layers}----------------------------")
+            fed_logger.info(f"offloading training start {self.split_layers}----------------------------")
             flag = [f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{socket.gethostname()}', True]
             start_transmission()
             self.send_msg(config.CLIENTS_INDEX[config.index], flag,
@@ -193,6 +193,8 @@ class Client(FedClientInterface):
 
                 msg = [f'{message_utils.local_activations_client_to_edge()}_{i}_{socket.gethostname()}', outputs.cpu(),
                        targets.cpu()]
+                fed_logger.info(
+                    Fore.RED + f"Split Point: {self.split_layers}, Activation Size(bit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
                 # fed_logger.info(f"{msg[1], msg[2]}")
                 start_transmission()
                 self.send_msg(exchange=config.CLIENTS_INDEX[config.index], msg=msg, is_weight=True,
@@ -206,6 +208,8 @@ class Client(FedClientInterface):
                                     expect_msg_type=f'{message_utils.server_gradients_edge_to_client() + socket.gethostname()}_{i}',
                                     is_weight=True,
                                     url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+                fed_logger.info(
+                    Fore.RED + f"Split Point: {self.split_layers}, Gradient Size(bit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
                 end_transmission(data_utils.sizeofmessage(msg))
 
                 gradients = msg[1].to(self.device)
@@ -300,8 +304,9 @@ class Client(FedClientInterface):
             self.optimizer.step()
             computation_end()
 
-    def energy_tt(self, remaining_energy, energy, tt):
-        msg = [message_utils.energy_client_to_edge() + '_' + socket.gethostname(), energy, tt, remaining_energy]
+    def energy_tt(self, remaining_energy, energy, tt, utilization):
+        msg = [message_utils.energy_client_to_edge() + '_' + socket.gethostname(), energy, tt, remaining_energy,
+               utilization]
         fed_logger.info(f"check message in client: {msg}")
         self.send_msg(config.CLIENTS_INDEX[config.index], msg,
                       url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
@@ -335,3 +340,12 @@ class Client(FedClientInterface):
                       url=url)
         if attend is False:
             exit()
+
+    def send_power_to_edge(self):
+        comp_power_usage, trans_power_usage = get_power_usage()
+        msg = [message_utils.client_power_usage_to_server(), comp_power_usage, trans_power_usage]
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+            msg = [message_utils.client_power_usage_to_edge(), comp_power_usage, trans_power_usage]
+        self.send_msg(exchange=config.CLIENTS_LIST[config.index], msg=msg, url=url)

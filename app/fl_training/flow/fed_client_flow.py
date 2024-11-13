@@ -23,10 +23,12 @@ def run_edge_based(client: FedClientInterface, LR):
     mn: int = int((N / K) * index)
     data_size = mx - mn
     batch_num = data_size / config.B
-    # final=[]
+
+    fed_logger.info('Sending power usage to edge.')
+    client.send_power_to_edge()
+
     for r in range(config.R):
         simnet_BW = 10_000_000  # 10Mbps
-
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
@@ -74,12 +76,14 @@ def run_edge_based(client: FedClientInterface, LR):
             tt = et - st
         fed_logger.info(Fore.MAGENTA + f"Client Real Total time: {et - st}")
 
+        utilization = float(energy_estimation.get_utilization())
         energy = float(energy_estimation.energy())
         remaining_energy = float(energy_estimation.remaining_energy())
 
-        fed_logger.info(Fore.MAGENTA + f"Energy, TT, Remaining-energy: {energy}, {tt}, {remaining_energy}")
-        fed_logger.info("Sending Energy, TT, Remaining-energy to edge.")
-        client.energy_tt(remaining_energy, energy, tt)
+        fed_logger.info(
+            Fore.MAGENTA + f"Energy, TT, Remaining-energy, utilization: {energy}, {tt}, {remaining_energy}, {utilization}")
+        fed_logger.info("Sending Energy, TT, Remaining-energy, utilization to edge.")
+        client.energy_tt(remaining_energy, energy, tt, utilization)
         client.e_next_round_attendance(remaining_energy)
 
         if r > 49:
