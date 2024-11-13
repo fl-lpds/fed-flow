@@ -22,7 +22,8 @@ def report_results(node: Node, training_times: list[float], client_bandwidths: l
     rounds_count = config.R
     draw_graph(10, 5, range(1, rounds_count + 1), training_times, str(node), "FL Rounds", "Training Time (s)",
                save_path, f"training-time-{str(node)}")
-    draw_graph(10, 5, range(1, rounds_count + 1), client_bandwidths, str(node), "FL Rounds", "Bandwidths (bytes/s)",
+    if len(client_bandwidths) is not 0:
+        draw_graph(10, 5, range(1, rounds_count + 1), client_bandwidths, str(node), "FL Rounds", "Bandwidths (bytes/s)",
                save_path, f"bandwidth-{str(node)}")
     draw_graph(10, 5, range(1, rounds_count + 1), accuracy, str(node), "FL Rounds", "Accuracy (%)",
                save_path, f"accuracy-{str(node)}")

@@ -30,6 +30,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./data:/fed-flow/app/dataset/data
+      - ./Results:/fed-flow/Results
     deploy:
       restart_policy:
         condition: on-failure
