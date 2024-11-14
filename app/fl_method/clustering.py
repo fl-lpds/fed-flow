@@ -1,7 +1,9 @@
 from app.config import config
+from app.entity.node import Node
+from app.entity.node_type import NodeType
 
 
-def bandwidth():
+def bandwidth(node: Node):
     # sort bandwidth in test_config.CLIENTS_LIST order
     bandwidth = config.CLIENTS_BANDWIDTH
     bandwidth_order = []
@@ -16,8 +18,8 @@ def bandwidth():
     return labels
 
 
-def none():
+def none(node: Node):
     labels = []
-    for c in config.CLIENTS_LIST:
+    for client in node.get_neighbors([NodeType.CLIENT]):
         labels.append(0)
     return labels

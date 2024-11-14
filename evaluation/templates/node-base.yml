@@ -1,6 +1,6 @@
 node_base: &node_base
     image: autlpdslab/fedflow:latest
-    working_dir: /fed-flow/app/fl_training/runner
+    working_dir: /fed-flow
     depends_on:
       broker:
         condition: service_healthy
@@ -18,9 +18,11 @@ node_base: &node_base
       PORT: "8080"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/"
       NEIGHBORS: ""
-      NODE_TYPE: "CLIENT"
+      NODE_TYPE: ""
+      ROUND_COUNT: ""
+      DEVICE_COUNT: "1"
     entrypoint: >
-      bash -c "python3 /fed-flow/app/fl_training/runner/fed_base_run.py
+      bash -c "python3 /fed-flow/main.py
       --aggregation $$AGGREGATION
       --decentralized $$DECENTRALIZED
       --mobility $$MOBILITY
@@ -35,3 +37,6 @@ node_base: &node_base
       --rabbitmq-url $$RABBITMQ_URL
       --neighbors $$NEIGHBORS
       --node-type $$NODE_TYPE"
+    volumes:
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data

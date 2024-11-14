@@ -1,19 +1,17 @@
-import sys
 import time
 
+from app.config import config
+from app.config.logger import fed_logger
 from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_server import FedServer
 from app.entity.node_type import NodeType
-
-sys.path.append('../../../')
-from app.config import config
 from app.util import model_utils
-from app.config.logger import fed_logger
-from app.util import rl_utils
+from app.util import graph_utils
 
 
 def run_centralized(server: FedServer, learning_rate: float, options):
     server.initialize(learning_rate)
+    server.scatter_split_layers()
     training_time = []
     transferred_data = []
     rounds = []
@@ -22,7 +20,8 @@ def run_centralized(server: FedServer, learning_rate: float, options):
         rounds.append(r)
         fed_logger.info('====================================>')
         fed_logger.info('==> Round {:} Start'.format(r + 1))
-
+        fed_logger.info("Scatter split config")
+        server.scatter_split_layers()
         fed_logger.info("sending global weights")
         server.scatter_global_weights()
 
@@ -41,7 +40,6 @@ def run_centralized(server: FedServer, learning_rate: float, options):
 
         fed_logger.info("splitting")
         server.split(bw, options)
-        server.scatter_split_layers()
 
         fed_logger.info("start training")
         server.start_edge_training()
@@ -65,19 +63,7 @@ def run_centralized(server: FedServer, learning_rate: float, options):
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(elapsed_time))
 
-    current_time = time.strftime("%Y-%m-%d %H:%M")
-    runtime_config = f'{current_time} offload decentralized'
-    rl_utils.draw_graph(10, 5, rounds, training_time, f"Server {str(server)} Training time", "FL Rounds",
-                        "Training Time (s)",
-                        f"Graphs/{runtime_config}",
-                        f"trainingTime-{str(server)}", True)
-    rl_utils.draw_graph(10, 5, rounds, transferred_data, f"Server {str(server)} Average clients BW", "FL Rounds",
-                        "clients BW (bytes / s)",
-                        f"Graphs/{runtime_config}",
-                        f"client_bw-{str(server)}", True)
-    rl_utils.draw_graph(10, 5, rounds, accuracy, f"Server {str(server)} Accuracy", "FL Rounds", "accuracy",
-                        f"Graphs/{runtime_config}",
-                        f"accuracy-{str(server)}", True)
+    graph_utils.report_results(server, training_time, transferred_data, accuracy)
 
 
 def run_d2d(server: FedServer, options):
@@ -122,5 +108,5 @@ def run(options_ins):
         run_d2d(fed_server, options_ins)
     else:
         run_centralized(fed_server, learning_rate, options_ins)
+    time.sleep(10)
     fed_server.stop_server()
-

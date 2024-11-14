@@ -10,8 +10,6 @@ fl_methods = {
     "fake_decentralized_splitting": splitting.fake_decentralized,
     "no_splitting": splitting.no_splitting,
     "no_edge_fake_splitting": splitting.no_edge_fake,
-    "no_edge_rl_splitting": splitting.rl_splitting,
-    "edge_based_energy_aware_rl_splitting": splitting.edge_based_energy_aware_rl_splitting,
     "only_edge_splitting": splitting.only_edge_splitting,
     "only_server_splitting": splitting.only_server_splitting,
     "random_splitting": splitting.randomSplitting,

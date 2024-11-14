@@ -23,7 +23,7 @@ class FedEdgeServer(FedBaseNodeInterface):
 
     def __init__(self, ip: str, port: int, model_name, dataset, offload, aggregator: BaseAggregator,
                  neighbors: list[NodeIdentifier]):
-        super().__init__(ip, port, NodeType.EDGE, neighbors)
+        super().__init__(ip, port, NodeType.EDGE, '', neighbors)
         self._edge_based = None
         self.device = get_available_torch_device()
         self.model_name = model_name
@@ -62,14 +62,12 @@ class FedEdgeServer(FedBaseNodeInterface):
         self.nets = {}
         self.optimizers = {}
         self.scheduler = {}
+        if not self.is_edge_based:
+            self.initialize_split_layers()
         for neighbor in self.get_neighbors([NodeType.CLIENT]):
-            if neighbor not in self.split_layers:
-                if not self.is_edge_based:
-                    self.split_layers[neighbor] = len(self.uninet.cfg) - 3
-                    split_point = self.split_layers[neighbor]
-                else:
-                    self.split_layers[neighbor] = [len(self.uninet.cfg) - 4, len(self.uninet.cfg) - 2]
-                    split_point = self.split_layers[neighbor][0]
+            split_point = self.split_layers[neighbor]
+            if isinstance(split_point, list):
+                split_point = split_point[0]
             if split_point < len(self.uninet.cfg) - 1:
                 self.nets[neighbor] = model_utils.get_model('Edge', self.split_layers[neighbor], self.device,
                                                             self.is_edge_based)
@@ -100,8 +98,8 @@ class FedEdgeServer(FedBaseNodeInterface):
             self.nets[neighbor].load_state_dict(pweights)
         self.scatter_msg(GlobalWeightMessage([weights]), [NodeType.CLIENT])
 
-    def cluster(self, options: dict):
-        self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))()
+    def clustering(self, options: dict):
+        self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))(self)
 
     def get_neighbors_bandwidth(self) -> dict[NodeIdentifier, BandWidth]:
         return self.neighbor_bandwidth
@@ -297,6 +295,8 @@ class FedEdgeServer(FedBaseNodeInterface):
 
     def gossip_with_neighbors(self):
         edge_neighbors = self.get_neighbors([NodeType.EDGE])
+        if len(edge_neighbors) == 0:
+            return
         msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()])
         self.scatter_msg(msg, [NodeType.EDGE])
         gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.EDGE])
