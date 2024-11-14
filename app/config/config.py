@@ -7,7 +7,7 @@ from app.entity.node_identifier import NodeIdentifier
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 CLIENTS_BANDWIDTH = []
-index = int(environ.get("NODE_INDEX", "0"))
+index = 0
 simnet = False
 # Dataset configration
 dataset_name = ''
