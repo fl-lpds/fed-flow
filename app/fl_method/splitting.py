@@ -9,6 +9,7 @@ from app.config import config
 from app.config.logger import fed_logger
 # from app.model.entity.rl_model import PPO
 from app.util import model_utils, rl_utils
+from colorama import Fore
 
 
 def edge_based_rl_splitting(state, labels):
@@ -30,21 +31,27 @@ def edge_based_heuristic_splitting(state: dict, label):
     client_utilization = {}
     edge_server_bw = {}
     client_remaining_energy = {}
+    client_comp_energy = {}
+    client_comm_energy = {}
     client_power_usage = {}
-    client_remaining_runtime = {}
+    client_remaining_runtime_comp = {}
+    client_remaining_runtime_comm = {}
     previous_action = state['prev_action']
+
     activation_size = {}
     gradient_size = {}
-
-    client_score = {}
-    client_remaining_runtime_score = {}
+    total_model_size = state['total_model_size']
     client_bw_score = {}
 
     for key, value in state.items():
         if ("client" in key) and ("bw" in key):
             client_bw[key[:-3]] = value
-        if "utilization" in key:
+        elif "utilization" in key:
             client_utilization[key[:-12]] = value
+        elif "comp_energy" in key:
+            client_comp_energy[key[:-12]] = value
+        elif "comm_energy" in key:
+            client_comm_energy[key[:-12]] = value
         elif "bw" in key:
             edge_server_bw[key[:-3]] = value
         elif ("client" in key) and ("re" in key):
@@ -56,40 +63,96 @@ def edge_based_heuristic_splitting(state: dict, label):
         else:
             gradient_size = value
 
-    fed_logger.info(f"state: {state}")
+    fed_logger.info(Fore.MAGENTA + f"NEW COMP e: {client_comp_energy}")
 
-    fed_logger.info(f"CLIENT UTILIZATION: {client_utilization}")
-
-    fed_logger.info(f"ACTIVATION KEY: {activation_size.keys()}")
-    fed_logger.info(f"ACTIVATION VALUE: {activation_size.values()}")
-
-    action = [[config.model_len - 1, config.model_len - 1]] * len(client_bw.keys())
+    action = previous_action
     client_bw_score = normalizer(client_bw)
 
-    fed_logger.info(f"ACTIVATION VALUES: {list(activation_size.values())}")
+    layer_activation = {}
+    layer_gradient = {}
+    layer_num = 0
+    current = None
+    for num in list(activation_size.values()):
+        if num != current:
+            layer_activation[layer_num] = num
+            layer_num += 1
+            current = num
+        elif num == 13107200 and current == 13107200 and 4 not in layer_activation:
+            # Special case for the second occurrence of 12.5
+            layer_activation[layer_num] = num
+            layer_num += 1
+    layer_gradient = layer_activation
+    batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / config.B
 
     for client in client_remaining_energy.keys():
+        client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
         if client_remaining_energy[client] != 0:
-            client_remaining_runtime[client] = client_remaining_energy[client] / (
-                    client_power_usage[client][0] * client_utilization[client])
+            client_remaining_runtime_comp[client] = client_remaining_energy[client] / (
+                    client_comp_energy[client][client_op1] + (
+                    (((layer_activation[client_op1] + layer_gradient[client_op1]) * batchNumber) / client_bw[client]) *
+                    client_power_usage[client][1]))
 
-    client_remaining_runtime_score = normalizer(client_remaining_runtime)
-    high_prio_device = {device: score for device, score in client_remaining_runtime_score.items() if score < 0.5}
-    fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_score.items()}")
+    client_remaining_runtime_comp_score = normalizer(client_remaining_runtime_comp)
+    # client_remaining_runtime_comm_score = normalizer(client_remaining_runtime_comm)
+    client_score = {}
+    for client, score in client_remaining_runtime_comp_score.items():
+        client_score[client] = client_remaining_runtime_comp_score[client]
+
+    high_prio_device = {device: score for device, score in client_score.items() if score < 0.5}
+    fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_comp_score.items()}")
     fed_logger.info(f"HIGH PRIO DEVICES: {high_prio_device.items()}")
 
     for client, score in high_prio_device.items():
-        tt_trans_aprox = inf
-        best_op1 = None
-        batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / 100
-        action[config.CLIENTS_CONFIG[client]] = [max(previous_action[config.CLIENTS_CONFIG[client]][0] - 1, 1), 6]
-        # for op1 in range(config.model_len):
-        # tt_trans = (list(activation_size.values())[op1] * batchNumber) / client_bw[client]
-        # fed_logger.info(f"TRANS TT APPROX: {tt_trans}")
-        # if tt_trans < tt_trans_aprox:
-        #     best_op1 = op1
-        #     fed_logger.info(f"tt_trans < tt_trans_arox: {best_op1}")
-        # action[config.CLIENTS_CONFIG[client]] = [best_op1, min(best_op1 + 1, config.model_len - 1)]
+        client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
+        best_op1 = client_op1
+        if client_op1 != config.model_len - 1:
+            tt_trans_now = (2 * (layer_activation[client_op1]) * batchNumber) / client_bw[client]
+        else:
+            tt_trans_now = total_model_size / client_bw[client]
+
+        comm_energy = tt_trans_now * client_power_usage[client][1]
+        client_comm_energy_ratio = comm_energy / (comm_energy + client_comp_energy[client][client_op1])
+        client_comp_energy_ratio = 1 - client_comm_energy_ratio
+
+        fed_logger.info(Fore.GREEN + f"Activation Layer : {layer_activation}")
+        fed_logger.info(Fore.GREEN + f"APPROXIMATED TT : {tt_trans_now}")
+        fed_logger.info(Fore.GREEN + f"APPROXIMATED COMM E : {comm_energy}")
+        fed_logger.info(Fore.GREEN + f"COMP E : {client_comp_energy[client][client_op1]}")
+        fed_logger.info(Fore.GREEN + f"COMP E RATIO : {client_comp_energy_ratio}")
+        fed_logger.info(Fore.GREEN + f"COMM E RATIO: {client_comm_energy_ratio}")
+
+        if client_comm_energy_ratio > client_comp_energy_ratio * 1.5:
+            condidate_op1 = int(min(layer_activation, key=layer_activation.get))
+            tt_trans = (2 * (layer_activation[condidate_op1]) * batchNumber) / client_bw[client]
+            comm_energy = tt_trans * client_power_usage[client][1]
+            if condidate_op1 in client_comp_energy[client]:
+                comp_energy = client_comp_energy[client][condidate_op1]
+                if (comp_energy + comm_energy) < (tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]):
+                    best_op1 = condidate_op1
+                else:
+                    best_op1 = client_op1
+            else:
+                best_op1 = condidate_op1
+        elif client_comp_energy_ratio > client_comm_energy_ratio * 1.5:
+            filtered = {k: v for k, v in layer_activation.items() if 0 <= k < client_op1}
+            if len(filtered.values()) == 0:
+                best_op1 = 0
+            else:
+                for layer, activation_size in filtered.items():
+                    condidate_op1 = layer
+                    tt_trans = (2 * (activation_size) * batchNumber) / client_bw[client]
+                    comm_energy = tt_trans * client_power_usage[client][1]
+                    if condidate_op1 in client_comp_energy[client]:
+                        comp_energy = client_comp_energy[client][condidate_op1]
+                        if (comp_energy + comm_energy) < (
+                                tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]):
+                            best_op1 = condidate_op1
+                        else:
+                            best_op1 = client_op1
+                    else:
+                        best_op1 = condidate_op1
+
+        action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
     return action
 
 

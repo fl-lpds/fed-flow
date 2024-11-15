@@ -304,12 +304,16 @@ class Client(FedClientInterface):
             self.optimizer.step()
             computation_end()
 
-    def energy_tt(self, remaining_energy, energy, tt, utilization):
-        msg = [message_utils.energy_client_to_edge() + '_' + socket.gethostname(), energy, tt, remaining_energy,
-               utilization]
+    def energy_tt(self, remaining_energy, comp_energy, comm_energy, tt, utilization):
+        url = None
+        if self.edge_based:
+            url = config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]]
+
+        msg = [message_utils.energy_client_to_edge() + '_' + socket.gethostname(), comp_energy, comm_energy, tt,
+               remaining_energy, utilization]
         fed_logger.info(f"check message in client: {msg}")
-        self.send_msg(config.CLIENTS_INDEX[config.index], msg,
-                      url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+
+        self.send_msg(config.CLIENTS_INDEX[config.index], msg, url=url)
 
     def e_next_round_attendance(self, remaining_energy):
         attend = True

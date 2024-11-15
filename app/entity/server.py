@@ -363,17 +363,22 @@ class FedServer(FedServerInterface):
                 if msg[1].__contains__(config.EDGE_MAP[edge][i]):
                     energy_tt[config.EDGE_MAP[edge][i]] = msg[1][config.EDGE_MAP[edge][i]]
                     self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = \
-                        msg[1][config.EDGE_MAP[edge][i]][4]
+                        msg[1][config.EDGE_MAP[edge][i]][5]
 
                 else:
-                    energy_tt[config.EDGE_MAP[edge][i]] = [0, 0, 0, 0, 0]
+                    energy_tt[config.EDGE_MAP[edge][i]] = [0, 0, 0, 0, 0, 0]
                     self.computation_time_of_each_client_on_edges[config.EDGE_MAP[edge][i]] = 0
 
         self.client_remaining_energy = {}
         self.client_utilization = {}
+        self.client_energy = {}
+        self.client_comm_energy = {}
         for client in energy_tt.keys():
-            self.client_remaining_energy[client] = energy_tt[client][2]
-            self.client_utilization[client] = energy_tt[client][3]
+            self.client_energy[client] = (energy_tt[client][0] + energy_tt[client][1])
+            self.client_comp_energy[client][self.split_layers[config.CLIENTS_CONFIG[client]][0]] = energy_tt[client][0]
+            self.client_comm_energy[client] = energy_tt[client][1]
+            self.client_remaining_energy[client] = energy_tt[client][3]
+            self.client_utilization[client] = energy_tt[client][4]
         # self.client_remaining_energy = []
         # for i in range(len(energy_tt_list)):
         #     self.client_remaining_energy[](energy_tt_list[i][2])
@@ -419,7 +424,14 @@ class FedServer(FedServerInterface):
 
     def edge_based_state(self):
         state = {'activation_size': self.activation_size, 'gradient_size': self.gradient_size,
-                 'prev_action': self.split_layers}
+                 'total_model_size': self.total_model_size, 'prev_action': self.split_layers}
+
+
+        for client, comp_energy_per_splitting in self.client_comp_energy.items():
+            state[f"{client}_comp_energy"] = comp_energy_per_splitting
+
+        for client, comm_energy in self.client_comm_energy.items():
+            state[f"{client}_comm_energy"] = comm_energy
 
         for client, power_usage_list in self.power_usage_of_client.items():
             state[f"{client}_power"] = power_usage_list
@@ -435,7 +447,7 @@ class FedServer(FedServerInterface):
 
         if len(self.client_remaining_energy.keys()) == 0:
             for i in range(len(config.CLIENTS_CONFIG.keys())):
-                state[f"client{i+1}_re"] = 0
+                state[f"client{i + 1}_re"] = 0
         else:
             for client, remaining_energy in self.client_remaining_energy.items():
                 state[f"{client}_re"] = remaining_energy
@@ -499,47 +511,40 @@ class FedServer(FedServerInterface):
         split_layer = [[config.model_len - 1, config.model_len - 1]] * len(config.CLIENTS_CONFIG.keys())
         model = model_utils.get_model('Client', split_layer[0], self.device, self.edge_based)
 
+        total_bits = 0
+        for param_name, param in model.cpu().state_dict().items():
+            num_elements = param.numel()
+            bits = num_elements * 32
+            total_bits += bits
+        fed_logger.info(Fore.MAGENTA + f"Total Model Size (bit): {total_bits}")
+        self.total_model_size = total_bits
+
         def calculate_size_in_megabits(tensor):
             num_elements = tensor.numel()
             size_in_bits = num_elements * 32  # assuming float32
-            return size_in_bits / (1024 * 1024)  # convert to megabits
+            return size_in_bits
 
         activation_sizes = {}
         gradient_sizes = {}
 
-        # Define hooks for capturing individual layer activations and gradients
         def forward_hook(module, input, output):
-            activation_size_mb = calculate_size_in_megabits(output)
-            activation_sizes[module] = activation_size_mb
-            print(f"Forward activation size of {module}: {activation_size_mb:.2f} Mb")
+            activation_size = calculate_size_in_megabits(output)
+            activation_sizes[module] = activation_size
 
         def backward_hook(module, grad_input, grad_output):
             if grad_output[0] is not None:
                 gradient_size_mb = calculate_size_in_megabits(grad_output[0])
                 gradient_sizes[module] = gradient_size_mb
-                print(f"Backward gradient size of {module}: {gradient_size_mb:.2f} Mb")
 
-        # Register hooks on all modules, not just the top-level Sequential block
         for layer in model.modules():
             if isinstance(layer, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU, nn.MaxPool2d, nn.Linear)):
                 layer.register_forward_hook(forward_hook)
                 layer.register_backward_hook(backward_hook)
 
-        # Example input batch with batch size of 100
-        input_data = torch.randn(100, 3, 32, 32)  # Adjust for your model's input shape
+        input_data = torch.randn(config.B, 3, 32, 32)
 
-        # Perform forward and backward pass
         output = model(input_data)
-        output.mean().backward()  # dummy loss for backward
-
-        # Print collected sizes
-        print("Activation sizes (in Mb) per layer:")
-        for layer, size in activation_sizes.items():
-            print(f"{layer}: {size:.2f} Mb")
-
-        print("\nGradient sizes (in Mb) per layer:")
-        for layer, size in gradient_sizes.items():
-            print(f"{layer}: {size:.2f} Mb")
+        output.mean().backward()
 
         self.activation_size = activation_sizes
         self.gradient_size = gradient_sizes

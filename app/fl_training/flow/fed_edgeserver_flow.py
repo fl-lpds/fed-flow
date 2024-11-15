@@ -63,7 +63,8 @@ def run_offload(server: FedEdgeServerInterface, LR):
             for i in range(len(client_ips)):
                 threads[client_ips[i]].join()
 
-            fed_logger.info("receiving Energy, TT, Remaining-energy, utilization from clients and sending to server")
+            fed_logger.info(
+                "receiving Comp Energy, Comm Energy, TT, Remaining-energy, utilization from clients and sending to server")
             server.energy(client_ips)
 
             if r > 49:

@@ -55,7 +55,7 @@ def estimate_total_energy(config, process):
     config.process.transmission_time = 0
     config.process.remaining_energy -= ene
 
-    return ene
+    return comp, tr
 
 
 def start_transmission(process):

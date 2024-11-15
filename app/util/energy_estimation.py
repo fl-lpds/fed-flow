@@ -63,8 +63,10 @@ def energy():
     if is_init:
         session = requests.session()
         session.trust_env = False
-        result = session.get(url=URL + "/energy/")
-        return result.text
+        result = session.get(url=URL + "/energy/").json()
+        computation_energy = float(result[0])
+        communication_energy = float(result[1])
+        return computation_energy, communication_energy
     return 0
 
 

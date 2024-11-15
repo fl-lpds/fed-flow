@@ -28,7 +28,18 @@ def run_edge_based(client: FedClientInterface, LR):
     client.send_power_to_edge()
 
     for r in range(config.R):
-        simnet_BW = 10_000_000  # 10Mbps
+        simnet_BW = 10_000_000
+        if config.index == 1:
+            if r < 30:
+                simnet_BW = 100_000_000
+            else:
+                simnet_BW = 10_000_000
+        else:
+            if r < 30:
+                simnet_BW = 10_000_000
+            else:
+                simnet_BW = 100_000_000
+
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
@@ -77,13 +88,14 @@ def run_edge_based(client: FedClientInterface, LR):
         fed_logger.info(Fore.MAGENTA + f"Client Real Total time: {et - st}")
 
         utilization = float(energy_estimation.get_utilization())
-        energy = float(energy_estimation.energy())
+        comp_energy, comm_energy = energy_estimation.energy()
         remaining_energy = float(energy_estimation.remaining_energy())
 
         fed_logger.info(
-            Fore.MAGENTA + f"Energy, TT, Remaining-energy, utilization: {energy}, {tt}, {remaining_energy}, {utilization}")
-        fed_logger.info("Sending Energy, TT, Remaining-energy, utilization to edge.")
-        client.energy_tt(remaining_energy, energy, tt, utilization)
+            Fore.MAGENTA + f"Comp Energy, Comm Energy TT, Remaining-energy, utilization: {comp_energy}, {comm_energy}, {tt},"
+                           f" {remaining_energy}, {utilization}")
+        fed_logger.info("Sending Comp Energy, Comm Energy, TT, Remaining-energy, utilization to edge.")
+        client.energy_tt(remaining_energy, comp_energy, comm_energy, tt, utilization)
         client.e_next_round_attendance(remaining_energy)
 
         if r > 49:
@@ -115,7 +127,7 @@ def run_no_offload_edge(client: FedClientInterface, LR):
             LR = config.LR * 0.1
         et = time.time()
         tt = et - st
-        energy = float(energy_estimation.energy())
+        comp_energy, comm_energy = energy_estimation.energy()
         # energy /= batch_num
         fed_logger.info(Fore.CYAN + f"Energy_tt : {energy}, {tt}")
         remaining_energy = float(energy_estimation.remaining_energy())

@@ -94,7 +94,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '2.0'
 #        reservations:
 #          cpus: '0.5'
       restart_policy:
