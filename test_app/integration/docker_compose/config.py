@@ -38,8 +38,12 @@ model_len = 7
 
 # FL training configration
 
-R = 2
-es = 2000  # max training episodes
+R = 200  # FL rounds
+LR = 0.01  # Learning rate
+B = 100  # Batch size
+
+# RL training configration
+max_episodes = 2000  # max training episodes
 max_timesteps = 10  # max timesteps in one episode
 exploration_times = 20  # exploration times without std decay
 n_latent_var = 64  # number of variables in hidden layer
