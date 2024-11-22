@@ -233,11 +233,15 @@ class FedServer(FedServerInterface):
                         model_utils.concat_weights(self.uninet.state_dict(), eweights[client],
                                                    self.nets[client].state_dict()),
                         config.N / config.K)
-                    w_local_list.append(w_local)
+                    # w_local_list.append(w_local)
                 else:
                     w_local = (eweights[client], config.N / config.K)
             else:
                 w_local = (eweights[client], config.N / config.K)
+            # test_model = model_utils.get_model('Unit', None, self.device, self.edge_based)
+            # acc = model_utils.test(test_model, self.testloader, self.device, self.criterion)
+            # fed_logger.info(Fore.MAGENTA + f"mini accuracy: {acc}")
+
             w_local_list.append(w_local)
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = aggregate_method(zero_model, w_local_list, config.N)

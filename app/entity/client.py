@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
-from colorama import Fore
 
 sys.path.append('../../')
 import config
