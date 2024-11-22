@@ -204,7 +204,7 @@ class FedServer(FedServerInterface):
                         model_utils.concat_weights(self.uninet.state_dict(), eweights[client],
                                                    self.nets[client].state_dict()),
                         config.N / config.K)
-                    w_local_list.append(w_local)
+                    # w_local_list.append(w_local)
                 else:
                     w_local = (eweights[client], config.N / config.K)
             else:
