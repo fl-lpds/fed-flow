@@ -75,11 +75,10 @@ class FedServer(FedServerInterface):
         self.criterion = nn.CrossEntropyLoss()
 
     def edge_offloading_train(self, client_ips):
-        totalIOTNum = len(config.CLIENTS_INDEX.keys())
         if self.simnet:
-            for i in range(totalIOTNum):
-                self.computation_time_of_each_client[list(config.CLIENTS_INDEX.values())[i]] = 0
-                self.client_training_transmissionTime[list(config.CLIENTS_INDEX.values())[i]] = 0
+            for client, index in config.CLIENTS_CONFIG.items():
+                self.computation_time_of_each_client[client] = 0
+                self.client_training_transmissionTime[client] = 0
 
         self.threads = {}
         for i in range(len(client_ips)):
@@ -422,35 +421,32 @@ class FedServer(FedServerInterface):
         self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels)
         fed_logger.info('Next Round OPs: ' + str(self.split_layers))
 
+    @property
     def edge_based_state(self):
-        state = {'activation_size': self.activation_size, 'gradient_size': self.gradient_size,
-                 'total_model_size': self.total_model_size, 'prev_action': self.split_layers}
 
-
-        for client, comp_energy_per_splitting in self.client_comp_energy.items():
-            state[f"{client}_comp_energy"] = comp_energy_per_splitting
-
-        for client, comm_energy in self.client_comm_energy.items():
-            state[f"{client}_comm_energy"] = comm_energy
-
-        for client, power_usage_list in self.power_usage_of_client.items():
-            state[f"{client}_power"] = power_usage_list
-
-        for client, utilization in self.client_utilization.items():
-            state[f"{client}_utilization"] = utilization
-
-        for client, bw in self.client_bandwidth.items():
-            state[f"{client}_bw"] = bw
-
-        for edge, bw in self.edge_bandwidth.items():
-            state[f"{edge}_bw"] = bw
-
+        client_remaining_energy = {}
         if len(self.client_remaining_energy.keys()) == 0:
-            for i in range(len(config.CLIENTS_CONFIG.keys())):
-                state[f"client{i + 1}_re"] = 0
+            for client, index  in config.CLIENTS_CONFIG.items():
+                client_remaining_energy[client] = 0
         else:
-            for client, remaining_energy in self.client_remaining_energy.items():
-                state[f"{client}_re"] = remaining_energy
+            for client, re in self.client_remaining_energy.items():
+                client_remaining_energy[client] = re
+
+        state = {'activation_size': self.activation_size,
+                 'gradient_size': self.gradient_size,
+                 'total_model_size': self.total_model_size,
+                 'prev_action': self.split_layers,
+                 'comp_time_of_each_client_on_edge': self.computation_time_of_each_client_on_edges,
+                 'comp_time_of_each_client_on_server': self.computation_time_of_each_client,
+                 "client_comp_energy": self.client_comp_energy,
+                 "client_comm_energy": self.client_comm_energy,
+                 "client_power": self.power_usage_of_client,
+                 "client_utilization": self.client_utilization,
+                 "client_bw": self.client_bandwidth,
+                 "edge_bw": self.edge_bandwidth,
+                 "client_remaining_energy": client_remaining_energy,
+                 "flops_of_each_layer": self.model_flops_per_layer
+                 }
 
         return state
 
@@ -546,8 +542,136 @@ class FedServer(FedServerInterface):
         output = model(input_data)
         output.mean().backward()
 
-        self.activation_size = activation_sizes
+        layer_activation = {}
+        layer_gradient = {}
+        layer_num = 0
+        current = None
+        for num in list(activation_sizes.values()):
+            if num != current:
+                layer_activation[layer_num] = num
+                layer_num += 1
+                current = num
+            elif num == 13107200 and current == 13107200 and 4 not in layer_activation:
+                # Special case for the second occurrence of 12.5
+                layer_activation[layer_num] = num
+                layer_num += 1
+        self.activation_size = layer_activation
         self.gradient_size = gradient_sizes
+
+    def calculate_each_layer_FLOP(self):
+        def count_relu_flops(input_shape) -> int:
+            """Calculate FLOPS for ReLU layer."""
+            batch_size, channels, height, width = input_shape
+            # One comparison operation per element
+            return batch_size * channels * height * width
+
+        def count_linear_layer_flops(layer: nn.Linear) -> int:
+            """Calculate FLOPS for a linear layer."""
+            input_size, output_size = layer.weight.shape
+            # Multiply + Add operations per neuron
+            flops_per_neuron = 2 * input_size
+            return flops_per_neuron * output_size
+
+        def count_conv2d_layer_flops(layer: nn.Conv2d, input_shape) -> int:
+            """Calculate FLOPS for a convolutional layer."""
+            batch_size, in_channels, height, width = input_shape
+            out_channels, kernel_height, kernel_width = layer.out_channels, layer.kernel_size[0], layer.kernel_size[1]
+
+            # Convolution FLOPS calculation
+            conv_flops = batch_size * out_channels * height * width * (in_channels * kernel_height * kernel_width)
+
+            # Bias addition FLOPS
+            bias_flops = batch_size * out_channels * height * width if layer.bias is not None else 0
+
+            return conv_flops + bias_flops
+
+        def count_batchnorm2d_flops(layer: nn.BatchNorm2d, input_shape) -> int:
+            """Calculate FLOPS for a BatchNorm2d layer."""
+            batch_size, channels, height, width = input_shape
+
+            # Per-channel operations: scale, shift, normalization
+            per_pixel_ops = 4  # multiply, divide, subtract mean, add epsilon
+            return batch_size * channels * height * width * per_pixel_ops
+
+        def count_maxpool_flops(layer: nn.MaxPool2d, input_shape) -> int:
+            """Calculate FLOPS for a MaxPool layer."""
+            batch_size, channels, height, width = input_shape
+            kernel_height, kernel_width = layer.kernel_size, layer.kernel_size
+
+            # Compare operations within each pooling window
+            compare_ops_per_pixel = kernel_height * kernel_width - 1
+            return batch_size * channels * height * width * compare_ops_per_pixel
+
+        def analyze_model_flops(model: nn.Module, input_shape: tuple):
+            """Analyze total FLOPS for a neural network model."""
+            total_flops = 0
+            layer_flops = {}
+            current_shape = input_shape
+
+            for name, module in model.named_modules():
+                if isinstance(module, nn.Conv2d):
+                    flops = count_conv2d_layer_flops(module, current_shape)
+                    layer_flops[module] = flops
+                    total_flops += flops
+                    # Update input shape for next layer
+                    batch_size, _, height, width = current_shape
+                    current_shape = (batch_size, module.out_channels,
+                                     height // module.stride[0],
+                                     width // module.stride[1])
+
+                elif isinstance(module, nn.ReLU):
+                    flops = count_relu_flops(current_shape)
+                    layer_flops[module] = flops
+                    total_flops += flops
+
+                elif isinstance(module, nn.BatchNorm2d):
+                    flops = count_batchnorm2d_flops(module, current_shape)
+                    layer_flops[module] = flops
+                    total_flops += flops
+
+                elif isinstance(module, nn.MaxPool2d):
+                    flops = count_maxpool_flops(module, current_shape)
+                    layer_flops[module] = flops
+                    total_flops += flops
+                    # Update input shape for next layer
+                    batch_size, channels, height, width = current_shape
+                    current_shape = (batch_size, channels,
+                                     height // module.kernel_size,
+                                     width // module.kernel_size)
+
+                elif isinstance(module, nn.Linear):
+                    flops = count_linear_layer_flops(module)
+                    layer_flops[module] = flops
+                    total_flops += flops
+
+            return layer_flops, total_flops
+
+        split_layer = [[config.model_len - 1, config.model_len - 1]] * len(config.CLIENTS_CONFIG.keys())
+        model: nn.Module = model_utils.get_model('Client', split_layer[0], self.device, self.edge_based)
+        input_data = (config.B, 3, 32, 32)
+        layer_flops, total_flops = analyze_model_flops(model, input_data)
+
+        flops_per_layer = {}
+        for i in range(config.model_len):
+            flops_per_layer[i] = 0
+        layer_num = -1
+        convLayerDependency = 2
+        for name, module in model.named_modules():
+            if (isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear) or
+                    isinstance(module, nn.MaxPool2d) or isinstance(module, nn.BatchNorm2d) or
+                    isinstance(module, nn.ReLU)):
+                if isinstance(module, nn.Conv2d):
+                    layer_num += 1
+                    flops_per_layer[layer_num] += layer_flops[module]
+                    convLayerDependency = 2
+                elif convLayerDependency != 0:
+                    flops_per_layer[layer_num] += layer_flops[module]
+                    convLayerDependency -= 1
+                elif convLayerDependency == 0:
+                    layer_num += 1
+                    flops_per_layer[layer_num] += layer_flops[module]
+        fed_logger.info(Fore.MAGENTA + f"FLOPS PER LAYER: {flops_per_layer}")
+        self.model_flops_per_layer = flops_per_layer
 
     def get_power_of_client(self):
         power_usage = {}

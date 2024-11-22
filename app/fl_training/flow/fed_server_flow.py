@@ -90,6 +90,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's activation and gradient size started on server")
     server.calculate_each_layer_activation_gradiant_size()
+    fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's FLOP started on server")
+    server.calculate_each_layer_FLOP()
 
     fed_logger.info('Getting power usage from edge servers')
     server.get_power_of_client()
