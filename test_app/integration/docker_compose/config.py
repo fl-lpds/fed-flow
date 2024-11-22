@@ -32,18 +32,14 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [6]# Initial split layers
+split_layer = [6,6,6]  # Initial split layers
 # split_layer = [[6, 6], [6, 6], [6, 6]]
 model_len = 7
 
 # FL training configration
 
-R = 100  # FL rounds
-LR = 0.01  # Learning rate
-B = 100  # Batch size
-
-# RL training configration
-max_episodes = 2000  # max training episodes
+R = 2
+es = 2000  # max training episodes
 max_timesteps = 10  # max timesteps in one episode
 exploration_times = 20  # exploration times without std decay
 n_latent_var = 64  # number of variables in hidden layer
@@ -65,16 +61,16 @@ SERVER_ADDR = 'server'
 SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001}
 
-K = 1  # Number of devices
+K = 3  # Number of devices
 G = 1  # Number of groups
-S = 1  # Number of server connecting devices
+S = 3  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}
-CLIENTS_INDEX = {0: 'client1'}
-CLIENTS_CONFIG = {'client1': 0}
+CLIENTS_INDEX = {0: 'client1', 1: 'client2', 2: 'client3'}
+CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 2}
 EDGE_SERVER_LIST = ['edge1']
 EDGE_SERVER_CONFIG = {0: 'edge1'}
-CLIENTS_LIST = ['client1']
+CLIENTS_LIST = ['client1', 'client2', 'client3']
 EDGE_MAP = {'edge1': ['client1', 'client2', 'client3']}
 CLIENT_MAP = {'client1': 'edge1', 'client2': 'edge1', 'client3': 'edge1'}

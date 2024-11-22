@@ -17,7 +17,7 @@ services:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     hostname: server
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -s no_edge_fake_splitting"
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -s no_edge_fake_splitting"
 
   broker:
     volumes:
@@ -46,7 +46,7 @@ services:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     hostname: client1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -s no_edge_fake_splitting & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -s no_edge_fake_splitting & wait -n"
 
   client2:
     attach: false
@@ -63,7 +63,7 @@ services:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     hostname: client2
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -s no_edge_fake_splitting & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -s no_edge_fake_splitting & wait -n"
 
   client3:
     attach: false
@@ -81,4 +81,4 @@ services:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     hostname: client3
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -s no_edge_fake_splitting & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -s no_edge_fake_splitting & wait -n"
