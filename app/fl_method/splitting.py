@@ -37,6 +37,9 @@ def edge_based_heuristic_splitting(state: dict, label):
     activation_size = state['activation_size']
     gradient_size = state['gradient_size']
     flops_of_each_layer = state['flops_of_each_layer']
+    flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
+    flops_of_each_layer = list(flops_of_each_layer.values())
+    fed_logger.info(Fore.MAGENTA + f"Total flops: {flops_of_each_layer}")
 
     client_bw = state['client_bw']
     edge_server_bw = state['edge_bw']
@@ -61,14 +64,14 @@ def edge_based_heuristic_splitting(state: dict, label):
             op1 = clientAction[0]
             op2 = clientAction[1]
 
-            total_time_on_each_edge[edgeIP] += comp_time_of_each_client_on_edges[edgeIP][clientIP]
+            total_time_on_each_edge[edgeIP] += comp_time_of_each_client_on_edges[clientIP]
 
             # offloading on client, edge and server
             if op1 < op2 < config.model_len - 1:
                 edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
                 server_flops += sum(flops_of_each_layer[op2 + 1:])
-            # offloading on client and edge
-            elif (op1 < op2) and op2 < config.model_len - 1:
+            # offloading on client and edge 
+            elif (op1 < op2) and op2 == config.model_len - 1:
                 edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
             # offloading on client and server
             elif (op1 == op2) and op1 < config.model_len - 1:
@@ -77,7 +80,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     # edge device and server computation power approximation
     for edgeIP, _ in edge_flops.items():
         edge_flops[edgeIP] = (edge_flops[edgeIP] / (total_time_on_each_edge[edgeIP] + 1))
-    server_flops = (server_flops / (total_time_on_server + 1))
+    server_flops /= (total_time_on_server + 1)
 
     for client in client_remaining_energy.keys():
         client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
@@ -111,12 +114,15 @@ def edge_based_heuristic_splitting(state: dict, label):
         client_comm_energy_ratio = comm_energy / (comm_energy + client_comp_energy[client][client_op1])
         client_comp_energy_ratio = 1 - client_comm_energy_ratio
 
+        fed_logger.info(Fore.GREEN + f"====================================================")
+        fed_logger.info(Fore.GREEN + f"CLIENT : {client}")
         fed_logger.info(Fore.GREEN + f"Activation Layer : {activation_size}")
-        fed_logger.info(Fore.GREEN + f"APPROXIMATED TT : {tt_trans_now}")
-        fed_logger.info(Fore.GREEN + f"APPROXIMATED COMM E : {comm_energy}")
-        fed_logger.info(Fore.GREEN + f"COMP E : {client_comp_energy[client][client_op1]}")
-        fed_logger.info(Fore.GREEN + f"COMP E RATIO : {client_comp_energy_ratio}")
-        fed_logger.info(Fore.GREEN + f"COMM E RATIO: {client_comm_energy_ratio}")
+        fed_logger.info(Fore.GREEN + f"BW : {client_bw[client]}")
+        fed_logger.info(Fore.GREEN + f"Approx. transmission time : {tt_trans_now}")
+        fed_logger.info(Fore.GREEN + f"Approx. communication energy : {comm_energy}")
+        fed_logger.info(Fore.GREEN + f"Computation energy : {client_comp_energy[client][client_op1]}")
+        fed_logger.info(Fore.GREEN + f"Computation energy RATIO : {client_comp_energy_ratio}")
+        fed_logger.info(Fore.GREEN + f"Communication Energy RATIO: {client_comm_energy_ratio}")
 
         if client_comm_energy_ratio > client_comp_energy_ratio:
             condidate_op1 = int(min(activation_size, key=activation_size.get))
@@ -133,13 +139,14 @@ def edge_based_heuristic_splitting(state: dict, label):
                 best_op1 = condidate_op1
         elif client_comp_energy_ratio > client_comm_energy_ratio:
             filtered = {k: v for k, v in activation_size.items() if 0 <= k < client_op1}
+
             if len(filtered.values()) == 0:
                 best_op1 = 0
             else:
                 min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
-                for layer, activation_size in filtered.items():
+                for layer, size in filtered.items():
                     condidate_op1 = layer
-                    tt_trans = (2 * (activation_size) * batchNumber) / client_bw[client]
+                    tt_trans = (2 * size * batchNumber) / client_bw[client]
                     comm_energy = tt_trans * client_power_usage[client][1]
                     if condidate_op1 in client_comp_energy[client]:
                         comp_energy = client_comp_energy[client][condidate_op1]
@@ -150,9 +157,10 @@ def edge_based_heuristic_splitting(state: dict, label):
                         best_op1 = condidate_op1
 
         action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
-        # until now we decide best op1 splitting for worst devices to reduce their energy consumption
+        # until now, we decide best op1 splitting for worst devices to reduce their energy consumption
         # now we want to check the threshold for training time
-        fed_logger.info(Fore.GREEN + f"")
+    fed_logger.info(Fore.GREEN + f"EDGE FLOPS: {edge_flops}")
+    fed_logger.info(Fore.GREEN + f"SERVER FLOPS: {server_flops}")
 
     return action
 

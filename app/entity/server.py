@@ -425,12 +425,11 @@ class FedServer(FedServerInterface):
         self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels)
         fed_logger.info('Next Round OPs: ' + str(self.split_layers))
 
-    @property
-    def edge_based_state(self):
+    def edge_based_state(self) -> dict:
 
         client_remaining_energy = {}
         if len(self.client_remaining_energy.keys()) == 0:
-            for client, index  in config.CLIENTS_CONFIG.items():
+            for client, index in config.CLIENTS_CONFIG.items():
                 client_remaining_energy[client] = 0
         else:
             for client, re in self.client_remaining_energy.items():
