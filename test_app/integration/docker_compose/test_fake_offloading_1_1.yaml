@@ -1,0 +1,53 @@
+services:
+  server:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./../../../Graphs:/fed-flow/Graphs
+      - ./../../../app/logs:/fed-flow/app/logs
+    image: autlpdslab/fedflow:rabbitmq
+    ports:
+      - "5002:5002"
+    hostname: server
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+        reservations:
+          cpus: '1'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - broker
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -s fake_splitting -e False & python3 /fed-flow/energy/service.py"
+
+  broker:
+    attach: false
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+    hostname: broker
+
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    hostname: client1
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+        reservations:
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s fake_splitting -en True -e False & wait -n"

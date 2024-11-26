@@ -1,0 +1,51 @@
+version: '3'
+services:
+  server:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    ports:
+      - "5002:5002"
+    hostname: server
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -s fake_splitting -e True"
+
+  edge1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    ports:
+      - "5001:5001"
+    hostname: edge1
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -s fake_splitting -e True"
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    hostname: client1
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - edge1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -s fake_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+

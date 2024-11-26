@@ -1,0 +1,66 @@
+version: '3'
+services:
+  server:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    ports:
+      - "51008:51008"
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+        reservations:
+          cpus: '3'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    hostname: server
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -s no_edge_rl_splitting"
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+        reservations:
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    hostname: client1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -s no_edge_rl_splitting"
+
+  client2:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+        reservations:
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    hostname: client2
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -s no_edge_rl_splitting"
+
+  client3:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: fed-flow:test
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+        reservations:
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    hostname: client3
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -s no_edge_rl_splitting"

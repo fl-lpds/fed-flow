@@ -1,0 +1,63 @@
+version: '3.9'
+services:
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    networks:
+      - fedflow_net
+    hostname: client1
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+        reservations:
+          cpus: '1'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s fake_splitting -en True -e False & wait -n"
+
+  client2:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    networks:
+      - fedflow_net
+    hostname: client2
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+        reservations:
+          cpus: '1'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -s fake_splitting -en True -e False & wait -n"
+
+  client3:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    networks:
+      - fedflow_net
+    hostname: client3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+        reservations:
+          cpus: '1'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb True -s fake_splitting -en True -e False & wait -n"
+
+networks:
+  fedflow_net:
+    driver: overlay
+    attachable: true
