@@ -188,7 +188,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 clientRemainingEnergy[client].append(energy_tt_list[client][3])
                 clientUtilization[client].append(energy_tt_list[client][4])
                 energy += (energy_tt_list[client][0] + energy_tt_list[client][1])
-            avgEnergy.append(energy / int(config.K))
+
+            if config.K != 0:
+                avgEnergy.append(energy / int(config.K))
+            else:
+                avgEnergy.append(0)
 
             server.e_client_attendance(config.CLIENTS_LIST)
 
