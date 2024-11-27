@@ -90,6 +90,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's activation and gradient size started on server")
     server.calculate_each_layer_activation_gradiant_size()
+    fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's FLOP started on server")
+    server.calculate_each_layer_FLOP()
 
     fed_logger.info('Getting power usage from edge servers')
     server.get_power_of_client()
@@ -133,7 +135,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             state = server.edge_based_state()
             fed_logger.info(Fore.RED + f"STATE: {str(state)}")
 
-            if r > 10:
+            if r > 1:
                 fed_logger.info("splitting")
                 server.split(state, options)
                 fed_logger.info(f"Action : {server.split_layers}")
@@ -168,13 +170,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info("receiving Energy, TT, Remaining-energy, Utilization")
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
             fed_logger.info(f"Comp Energy, Comm Energy, TT, Remaining-energy, Utilization :{energy_tt_list}")
+            server.e_client_attendance(config.CLIENTS_LIST)
 
             fed_logger.info(f"computation time of each client on server: {server.computation_time_of_each_client}")
             fed_logger.info(
                 f"computation time of each client on edge: {server.computation_time_of_each_client_on_edges}")
             fed_logger.info(f"Transmission time of each client on server: {server.client_training_transmissionTime}")
             fed_logger.info(f"Aggregation Time Simnet bw : {aggregation_time}")
-
             server_sequential_transmission_time = float(energy_estimation.get_transmission_time())
             fed_logger.info(f"Server Sequential Transmission time: {server_sequential_transmission_time}")
             energy_estimation.reset_transmission_time()
@@ -193,8 +195,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 avgEnergy.append(energy / int(config.K))
             else:
                 avgEnergy.append(0)
-
-            server.e_client_attendance(config.CLIENTS_LIST)
 
             e_time = time.time()
 
@@ -234,9 +234,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
             #     pickle.dump(res, f)
 
-            # fed_logger.info("testing accuracy")
-            # test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
-            # res['test_acc_record'].append(test_acc)
+            fed_logger.info("testing accuracy")
+            test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
+            res['test_acc_record'].append(test_acc)
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))

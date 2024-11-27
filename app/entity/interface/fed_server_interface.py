@@ -45,6 +45,8 @@ class FedServerInterface(ABC, Communicator):
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
         self.computation_time_of_each_client_on_edges = {}
+        self.edge_flops = {}
+        self.server_flops = {}
         self.aggregation_time = 0
 
         self.uninet = model_utils.get_model('Unit', None, self.device, self.edge_based)
@@ -55,6 +57,7 @@ class FedServerInterface(ABC, Communicator):
         self.total_model_size = 0
         self.activation_size = {}
         self.gradient_size = {}
+        self.model_flops_per_layer = {}
 
     @abstractmethod
     def edge_offloading_train(self, client_ips):
@@ -218,6 +221,10 @@ class FedServerInterface(ABC, Communicator):
 
     @abstractmethod
     def calculate_each_layer_activation_gradiant_size(self):
+        pass
+
+    @abstractmethod
+    def calculate_each_layer_FLOP(self):
         pass
 
     @abstractmethod

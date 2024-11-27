@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tqdm
-from colorama import Fore
 
 sys.path.append('../../')
 import config
@@ -14,6 +13,7 @@ from app.util import message_utils, model_utils, data_utils
 from app.entity.interface.fed_client_interface import FedClientInterface
 from app.config.logger import fed_logger
 from app.util.energy_estimation import *
+from colorama import Fore
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -194,7 +194,7 @@ class Client(FedClientInterface):
                 msg = [f'{message_utils.local_activations_client_to_edge()}_{i}_{socket.gethostname()}', outputs.cpu(),
                        targets.cpu()]
                 fed_logger.info(
-                    Fore.RED + f"Split Point: {self.split_layers}, Activation Size(bit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
+                    Fore.RED + f"Split Point: {self.split_layers}, Activation Size(Mbit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
                 # fed_logger.info(f"{msg[1], msg[2]}")
                 start_transmission()
                 self.send_msg(exchange=config.CLIENTS_INDEX[config.index], msg=msg, is_weight=True,
@@ -209,7 +209,7 @@ class Client(FedClientInterface):
                                     is_weight=True,
                                     url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
                 fed_logger.info(
-                    Fore.RED + f"Split Point: {self.split_layers}, Gradient Size(bit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
+                    Fore.RED + f"Split Point: {self.split_layers}, Gradient Size(Mbit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
                 end_transmission(data_utils.sizeofmessage(msg))
 
                 gradients = msg[1].to(self.device)

@@ -121,7 +121,7 @@ class Communicator(object):
                                       body=bb, mandatory=True, properties=pika.BasicProperties(
                         delivery_mode=pika.DeliveryMode.Transient))
                 self.close_connection(channel, connection)
-                fed_logger.info(Fore.GREEN + f"published {config.cluster}.{msg[0]}.{exchange}")
+                fed_logger.debug(Fore.GREEN + f"published {config.cluster}.{msg[0]}.{exchange}")
                 if self.send_bug:
                     fed_logger.debug(Fore.RED + f"published {config.cluster}.{msg[0]}.{exchange}")
                 published = True
@@ -148,7 +148,7 @@ class Communicator(object):
                 channel.queue_bind(exchange=config.cluster + "." + exchange,
                                    queue=config.cluster + "." + expect_msg_type + "." + exchange,
                                    routing_key=config.cluster + "." + expect_msg_type + "." + exchange)
-                fed_logger.info(Fore.YELLOW + f"receiving loop {config.cluster}.{expect_msg_type}.{exchange}")
+                fed_logger.debug(Fore.YELLOW + f"receiving loop {config.cluster}.{expect_msg_type}.{exchange}")
                 for method_frame, properties, body in channel.consume(queue=
                                                                       config.cluster + "." + expect_msg_type + "." + exchange
                                                                       ):

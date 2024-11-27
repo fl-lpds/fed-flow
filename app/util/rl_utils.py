@@ -1,11 +1,11 @@
 import os
 import random
 
-import gymnasium as gym
+# import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
-from gymnasium import spaces
+# from gymnasium import spaces
 
 import app.util.model_utils as model_utils
 from app.config.config import K, G
@@ -14,32 +14,32 @@ from app.config.config import K, G
 # from tensorforce import Agent
 # from app.model.entity.rl_model import NoSplitting, TRPO, AC, TensorforceAgent, RandomAgent, TF_PPO
 
-class CustomEnv(gym.Env):
-    """Custom Environment that follows gym interface."""
-
-    def __init__(self):
-        super().__init__()
-
-        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * K,), dtype=np.float32, seed=None)
-
-        # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
-        # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
-        # self.observation_space = spaces.MultiDiscrete(observation_spec)
-        self.observation_space = spaces.Box(low=0.0, high=20,
-                                            shape=((2 * K) + G,),
-                                            dtype=np.float32, seed=None)
-
-    def rewardFun(self, action):
-        pass
-
-    def step(self, action):
-        pass
-
-    def reset(self, seed=None, options=None):
-        pass
-
-    def render(self):
-        pass
+# class CustomEnv(gym.Env):
+#     """Custom Environment that follows gym interface."""
+#
+#     def __init__(self):
+#         super().__init__()
+#
+#         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2 * K,), dtype=np.float32, seed=None)
+#
+#         # bandwidths : 0% fluctuation, 10% fluctuation, 20% fluctuation,..., 90% fluctuation.
+#         # observation_spec = [10] * (self.iotDeviceNum + self.edgeDeviceNum)
+#         # self.observation_space = spaces.MultiDiscrete(observation_spec)
+#         self.observation_space = spaces.Box(low=0.0, high=20,
+#                                             shape=((2 * K) + G,),
+#                                             dtype=np.float32, seed=None)
+#
+#     def rewardFun(self, action):
+#         pass
+#
+#     def step(self, action):
+#         pass
+#
+#     def reset(self, seed=None, options=None):
+#         pass
+#
+#     def render(self):
+#         pass
 
 
 def draw_graph(figSizeX, figSizeY, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):

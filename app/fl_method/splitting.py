@@ -1,99 +1,99 @@
 import random
-from math import inf
 
 import numpy as np
-import torch
-from stable_baselines3 import PPO, DDPG
+from colorama import Fore
 
 from app.config import config
 from app.config.logger import fed_logger
 # from app.model.entity.rl_model import PPO
-from app.util import model_utils, rl_utils
-from colorama import Fore
+from app.util import model_utils
 
 
-def edge_based_rl_splitting(state, labels):
-    env = rl_utils.CustomEnv()
-    agent = DDPG.load('/fed-flow/app/agent/160.zip', env=env,
-                      custom_objects={'observation_space': env.observation_space, 'action_space': env.action_space})
-    floatAction, _ = agent.predict(observation=state, deterministic=True)
-    actions = []
-    for i in range(0, len(floatAction), 2):
-        actions.append([rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[0],
-                        rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[1]])
+# from stable_baselines3 import PPO, DDPG
 
-    return actions
+
+# def edge_based_rl_splitting(state, labels):
+#     env = rl_utils.CustomEnv()
+#     agent = DDPG.load('/fed-flow/app/agent/160.zip', env=env,
+#                       custom_objects={'observation_space': env.observation_space, 'action_space': env.action_space})
+#     floatAction, _ = agent.predict(observation=state, deterministic=True)
+#     actions = []
+#     for i in range(0, len(floatAction), 2):
+#         actions.append([rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[0],
+#                         rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[1]])
+#
+#     return actions
 
 
 def edge_based_heuristic_splitting(state: dict, label):
-    # state = [ client's BW, edge-server BW, client remaining energy , client power usage, each layers activation size]
-    client_bw = {}
-    client_utilization = {}
-    edge_server_bw = {}
-    client_remaining_energy = {}
-    client_comp_energy = {}
-    client_comm_energy = {}
-    client_power_usage = {}
-    client_remaining_runtime_comp = {}
-    client_remaining_runtime_comm = {}
+    fed_logger.info(Fore.MAGENTA + f"Heuristic Splitting algorithm =======================")
+
+    client_remaining_runtime = {}
+    edge_flops = {edgeIP: 0.0 for edgeIP in config.EDGE_SERVER_LIST}
+    server_flops = 0
     previous_action = state['prev_action']
 
-    activation_size = {}
-    gradient_size = {}
     total_model_size = state['total_model_size']
-    client_bw_score = {}
+    activation_size = state['activation_size']
+    gradient_size = state['gradient_size']
+    flops_of_each_layer = state['flops_of_each_layer']
+    flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
+    flops_of_each_layer = list(flops_of_each_layer.values())
+    fed_logger.info(Fore.MAGENTA + f"Total flops: {flops_of_each_layer}")
 
-    for key, value in state.items():
-        if ("client" in key) and ("bw" in key):
-            client_bw[key[:-3]] = value
-        elif "utilization" in key:
-            client_utilization[key[:-12]] = value
-        elif "comp_energy" in key:
-            client_comp_energy[key[:-12]] = value
-        elif "comm_energy" in key:
-            client_comm_energy[key[:-12]] = value
-        elif "bw" in key:
-            edge_server_bw[key[:-3]] = value
-        elif ("client" in key) and ("re" in key):
-            client_remaining_energy[key[:-3]] = value
-        elif "power" in key:
-            client_power_usage[key[:-6]] = value
-        elif "activation" in key:
-            activation_size = value
-        else:
-            gradient_size = value
+    client_bw = state['client_bw']
+    edge_server_bw = state['edge_bw']
 
-    fed_logger.info(Fore.MAGENTA + f"NEW COMP e: {client_comp_energy}")
+    client_comp_energy = state['client_comp_energy']
+    client_comm_energy = state['client_comm_energy']
+    client_utilization = state['client_utilization']
+    client_remaining_energy = state['client_remaining_energy']
+    client_power_usage = state['client_power']
 
+    comp_time_of_each_client_on_edges = state['comp_time_of_each_client_on_edge']
+    comp_time_of_each_client_on_server = state['comp_time_of_each_client_on_server']
+    total_time_on_each_edge = {edgeIP: 0 for edgeIP in config.EDGE_SERVER_LIST}
+    total_time_on_server = sum(comp_time_of_each_client_on_server.values())
     action = previous_action
-    client_bw_score = normalizer(client_bw)
 
-    layer_activation = {}
-    layer_gradient = {}
-    layer_num = 0
-    current = None
-    for num in list(activation_size.values()):
-        if num != current:
-            layer_activation[layer_num] = num
-            layer_num += 1
-            current = num
-        elif num == 13107200 and current == 13107200 and 4 not in layer_activation:
-            # Special case for the second occurrence of 12.5
-            layer_activation[layer_num] = num
-            layer_num += 1
-    layer_gradient = layer_activation
     batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / config.B
+
+    for edgeIP in config.EDGE_SERVER_LIST:
+        for clientIP in config.EDGE_MAP[edgeIP]:
+            clientAction = previous_action[config.CLIENTS_CONFIG[clientIP]]
+            op1 = clientAction[0]
+            op2 = clientAction[1]
+
+            total_time_on_each_edge[edgeIP] += comp_time_of_each_client_on_edges[clientIP]
+
+            # offloading on client, edge and server
+            if op1 < op2 < config.model_len - 1:
+                edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                server_flops += sum(flops_of_each_layer[op2 + 1:])
+            # offloading on client and edge 
+            elif (op1 < op2) and op2 == config.model_len - 1:
+                edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+            # offloading on client and server
+            elif (op1 == op2) and op1 < config.model_len - 1:
+                server_flops += sum(flops_of_each_layer[op2 + 1:])
+
+    # edge device and server computation power approximation
+    for edgeIP, _ in edge_flops.items():
+        edge_flops[edgeIP] = (edge_flops[edgeIP] / (total_time_on_each_edge[edgeIP] + 1))
+    server_flops /= (total_time_on_server + 1)
 
     for client in client_remaining_energy.keys():
         client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
+        tt_trans = 0
         if client_remaining_energy[client] != 0:
-            client_remaining_runtime_comp[client] = client_remaining_energy[client] / (
-                    client_comp_energy[client][client_op1] + (
-                    (((layer_activation[client_op1] + layer_gradient[client_op1]) * batchNumber) / client_bw[client]) *
-                    client_power_usage[client][1]))
+            if client_op1 != config.model_len - 1:
+                tt_trans = (2 * (activation_size[client_op1]) * batchNumber) / client_bw[client]
+            else:
+                tt_trans = total_model_size / client_bw[client]
+            client_remaining_runtime[client] = client_remaining_energy[client] / (
+                    client_comp_energy[client][client_op1] + (tt_trans * client_power_usage[client][1]))
 
-    client_remaining_runtime_comp_score = normalizer(client_remaining_runtime_comp)
-    # client_remaining_runtime_comm_score = normalizer(client_remaining_runtime_comm)
+    client_remaining_runtime_comp_score = normalizer(client_remaining_runtime)
     client_score = {}
     for client, score in client_remaining_runtime_comp_score.items():
         client_score[client] = client_remaining_runtime_comp_score[client]
@@ -106,7 +106,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
         best_op1 = client_op1
         if client_op1 != config.model_len - 1:
-            tt_trans_now = (2 * (layer_activation[client_op1]) * batchNumber) / client_bw[client]
+            tt_trans_now = (2 * (activation_size[client_op1]) * batchNumber) / client_bw[client]
         else:
             tt_trans_now = total_model_size / client_bw[client]
 
@@ -114,16 +114,19 @@ def edge_based_heuristic_splitting(state: dict, label):
         client_comm_energy_ratio = comm_energy / (comm_energy + client_comp_energy[client][client_op1])
         client_comp_energy_ratio = 1 - client_comm_energy_ratio
 
-        fed_logger.info(Fore.GREEN + f"Activation Layer : {layer_activation}")
-        fed_logger.info(Fore.GREEN + f"APPROXIMATED TT : {tt_trans_now}")
-        fed_logger.info(Fore.GREEN + f"APPROXIMATED COMM E : {comm_energy}")
-        fed_logger.info(Fore.GREEN + f"COMP E : {client_comp_energy[client][client_op1]}")
-        fed_logger.info(Fore.GREEN + f"COMP E RATIO : {client_comp_energy_ratio}")
-        fed_logger.info(Fore.GREEN + f"COMM E RATIO: {client_comm_energy_ratio}")
+        fed_logger.info(Fore.GREEN + f"====================================================")
+        fed_logger.info(Fore.GREEN + f"CLIENT : {client}")
+        fed_logger.info(Fore.GREEN + f"Activation Layer : {activation_size}")
+        fed_logger.info(Fore.GREEN + f"BW : {client_bw[client]}")
+        fed_logger.info(Fore.GREEN + f"Approx. transmission time : {tt_trans_now}")
+        fed_logger.info(Fore.GREEN + f"Approx. communication energy : {comm_energy}")
+        fed_logger.info(Fore.GREEN + f"Computation energy : {client_comp_energy[client][client_op1]}")
+        fed_logger.info(Fore.GREEN + f"Computation energy RATIO : {client_comp_energy_ratio}")
+        fed_logger.info(Fore.GREEN + f"Communication Energy RATIO: {client_comm_energy_ratio}")
 
         if client_comm_energy_ratio > client_comp_energy_ratio:
-            condidate_op1 = int(min(layer_activation, key=layer_activation.get))
-            tt_trans = (2 * (layer_activation[condidate_op1]) * batchNumber) / client_bw[client]
+            condidate_op1 = int(min(activation_size, key=activation_size.get))
+            tt_trans = (2 * (activation_size[condidate_op1]) * batchNumber) / client_bw[client]
             comm_energy = tt_trans * client_power_usage[client][1]
             if condidate_op1 in client_comp_energy[client]:
                 comp_energy = client_comp_energy[client][condidate_op1]
@@ -135,14 +138,15 @@ def edge_based_heuristic_splitting(state: dict, label):
             else:
                 best_op1 = condidate_op1
         elif client_comp_energy_ratio > client_comm_energy_ratio:
-            filtered = {k: v for k, v in layer_activation.items() if 0 <= k < client_op1}
+            filtered = {k: v for k, v in activation_size.items() if 0 <= k < client_op1}
+
             if len(filtered.values()) == 0:
                 best_op1 = 0
             else:
                 min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
-                for layer, activation_size in filtered.items():
+                for layer, size in filtered.items():
                     condidate_op1 = layer
-                    tt_trans = (2 * (activation_size) * batchNumber) / client_bw[client]
+                    tt_trans = (2 * size * batchNumber) / client_bw[client]
                     comm_energy = tt_trans * client_power_usage[client][1]
                     if condidate_op1 in client_comp_energy[client]:
                         comp_energy = client_comp_energy[client][condidate_op1]
@@ -153,8 +157,10 @@ def edge_based_heuristic_splitting(state: dict, label):
                         best_op1 = condidate_op1
 
         action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
-        # until now we decide best op1 splitting for worst devices to reduce their energy consumption
+        # until now, we decide best op1 splitting for worst devices to reduce their energy consumption
         # now we want to check the threshold for training time
+    fed_logger.info(Fore.GREEN + f"EDGE FLOPS: {edge_flops}")
+    fed_logger.info(Fore.GREEN + f"SERVER FLOPS: {server_flops}")
 
     return action
 
@@ -172,21 +178,21 @@ def normalizer(input_dict):
     return normalized
 
 
-def rl_splitting(state, labels):
-    state_dim = 2 * config.G
-    action_dim = config.G
-    agent = None
-    if agent is None:
-        # Initialize trained RL agent
-        agent = PPO.PPO(state_dim, action_dim, config.action_std, config.rl_lr, config.rl_betas, config.rl_gamma,
-                        config.K_epochs, config.eps_clip)
-        agent.policy.load_state_dict(torch.load('/fed-flow/app/agent/PPO_FedAdapt.pth'))
-    action = agent.exploit(state)
-    action = expand_actions(action, config.CLIENTS_LIST, labels)
-
-    result = action_to_layer(action)
-    config.split_layer = result
-    return result
+# def rl_splitting(state, labels):
+#     state_dim = 2 * config.G
+#     action_dim = config.G
+#     agent = None
+#     if agent is None:
+#         # Initialize trained RL agent
+#         agent = PPO.PPO(state_dim, action_dim, config.action_std, config.rl_lr, config.rl_betas, config.rl_gamma,
+#                         config.K_epochs, config.eps_clip)
+#         agent.policy.load_state_dict(torch.load('/fed-flow/app/agent/PPO_FedAdapt.pth'))
+#     action = agent.exploit(state)
+#     action = expand_actions(action, config.CLIENTS_LIST, labels)
+#
+#     result = action_to_layer(action)
+#     config.split_layer = result
+#     return result
 
 
 def none(state, labels):
@@ -201,7 +207,7 @@ def none(state, labels):
 def no_edge_fake(state, labels):
     split_list = []
     for i in range(config.K):
-        split_list.append(6)
+        split_list.append(3)
     return split_list
 
 

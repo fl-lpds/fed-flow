@@ -275,10 +275,10 @@ class FedEdgeServer(FedEdgeServerInterface):
                     energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c]]
                     energy_tt_list.append([ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c]])
                 else:
-                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5]]
+                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c]]
                     energy_tt_list.append([ms[1], ms[2], ms[3], ms[4], ms[5]])
             else:
-                energy_tt_list.append([0, 0, 0, 0, 0])
+                energy_tt_list.append([0, 0, 0, 0, 0, 0])
         # fed_logger.info(f"sending enery tt {socket.gethostname()}")
         # msg = [message_utils.energy_tt_edge_to_server(), energy_tt_list, ]
         msg = [message_utils.energy_tt_edge_to_server(), energy_tt]
