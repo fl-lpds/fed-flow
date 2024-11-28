@@ -482,11 +482,11 @@ class FedServer(FedServerInterface):
         temp_list = []
         for client_ip in client_ips:
             if not attend[client_ip]:
-                config.CLIENTS_LIST.remove(client_ip)
+                # config.CLIENTS_LIST.remove(client_ip)
                 config.K -= 1
-        #     else:
-        #         temp_list.append(client_ip)
-        # config.CLIENTS_LIST = temp_list
+            else:
+                temp_list.append(client_ip)
+        config.CLIENTS_LIST = temp_list
 
     def client_attendance(self, client_ips):
         attend = {}

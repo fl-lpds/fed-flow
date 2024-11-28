@@ -129,7 +129,7 @@ def run_no_offload_edge(client: FedClientInterface, LR):
         tt = et - st
         comp_energy, comm_energy = energy_estimation.energy()
         # energy /= batch_num
-        fed_logger.info(Fore.CYAN + f"Energy_tt : {energy}, {tt}")
+        fed_logger.info(Fore.CYAN + f"Comp energy, Comm energy, tt : {comp_energy}, {comm_energy}, {tt}")
         remaining_energy = float(energy_estimation.remaining_energy())
         fed_logger.info(Fore.MAGENTA + f"remaining energy: {remaining_energy}")
         client.e_next_round_attendance(remaining_energy)
@@ -223,7 +223,18 @@ def run(options_ins):
     cpu_count = multiprocessing.cpu_count()
     indices = list(range(N))
     part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
-    trainloader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, cpu_count)
+
+    dataset = data_utils.get_trainset()
+    labels = [dataset[i][1] for i in range(len(dataset))]  # Get all labels
+    sorted_indices = sorted(range(len(labels)), key=lambda i: labels[i])  # Sort indices by label
+    client_id = index  # Change this to create subsets for other clients
+    num_clients = config.K
+    subset_size = len(dataset) // num_clients
+    start_idx = subset_size * client_id
+    end_idx = start_idx + subset_size
+    client_indices = sorted_indices[start_idx:end_idx]
+    trainloader = data_utils.get_trainloader(dataset, client_indices, cpu_count)
+    # trainloader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, cpu_count)
     estimate_energy = options_ins.get("energy") == "True"
     simnet = options_ins.get("simulatebandwidth") == "True"
     if estimate_energy:
