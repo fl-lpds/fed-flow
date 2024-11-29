@@ -173,26 +173,32 @@ class FedServer(FedBaseNodeInterface):
     def get_neighbors_bandwidth(self) -> dict[str, BandWidth]:
         return self.neighbors_bandwidth
 
-    def d2d_aggregate(self, client_local_weights: dict[str, BaseModel]) -> None:
+    def d2d_aggregate(self, client_local_weights: dict[str, tuple[BaseModel, int]]) -> None:
         w_local_list = []
         client_neighbors = self.get_neighbors([NodeType.CLIENT])
+
+        total_data_size = sum([client_local_weights[str(neighbor)][1] for neighbor in client_neighbors if
+                               HTTPCommunicator.get_is_leader(neighbor)])
+
         for neighbor in client_neighbors:
             if HTTPCommunicator.get_is_leader(neighbor):
                 HTTPCommunicator.set_leader(neighbor, neighbor.ip, neighbor.port, False)
-                w_local = (client_local_weights[str(neighbor)], config.N / len(client_neighbors))
-                w_local_list.append(w_local)
+                weights, dataset_size = client_local_weights[str(neighbor)]
+                weight_ratio = dataset_size / total_data_size
+                w_local_list.append((weights, weight_ratio))
+
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, w_local_list)
         self.uninet.load_state_dict(aggregated_model)
 
-    def receive_leaders_local_weights(self):
+    def receive_leaders_local_weights(self) -> dict[str, tuple[BaseModel, int]]:
         client_local_weights = {}
         for neighbor in self.get_neighbors([NodeType.CLIENT]):
             is_leader = HTTPCommunicator.get_is_leader(neighbor)
             if is_leader:
                 msg: GlobalWeightMessage = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url,
                                                          GlobalWeightMessage.MESSAGE_TYPE)
-                client_local_weights[str(neighbor)] = msg.weights[0]
+                client_local_weights[str(neighbor)] = (msg.weights[0], msg.dataset_len)
         return client_local_weights
 
     def choose_random_leader_per_cluster(self):

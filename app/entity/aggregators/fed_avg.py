@@ -1,3 +1,4 @@
+from app.config.logger import fed_logger
 from app.entity.aggregators.base_aggregator import BaseAggregator
 from app.dto.base_model import BaseModel
 
@@ -10,7 +11,7 @@ class FedAvg(BaseAggregator):
         keys = gathered_models[0][0].keys()
         for k in keys:
             for w in gathered_models:
-                beta = float(w[1]) / float(self.total_data_size)
+                beta = float(w[1])
                 if 'num_batches_tracked' in k:
                     base_model[k] = w[0][k]
                 else:
