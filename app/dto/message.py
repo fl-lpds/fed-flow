@@ -36,10 +36,12 @@ class BaseMessage(ABC):
 
 class GlobalWeightMessage(BaseMessage):
     weights: list[dict]
+    dataset_len: int
     MESSAGE_TYPE = MessageType('GlobalWeightMessage')
 
-    def __init__(self, weights: list[dict]):
+    def __init__(self, weights: list[dict], dataset_len: int = None):
         self.weights = weights
+        self.dataset_len = dataset_len
 
     def serialize(self) -> bytes:
         ll = []
@@ -48,15 +50,16 @@ class GlobalWeightMessage(BaseMessage):
             torch.save(o, to_send, _use_new_zipfile_serialization=False)
             to_send.seek(0)
             ll.append(bytes(to_send.read()))
-        return pickle.dumps(ll)
+        return pickle.dumps(ll, self.dataset_len)
 
     @staticmethod
     def deserialize(data: bytes, msg_type: MessageType) -> 'GlobalWeightMessage':
+        # Deserialize weights and dataset_len
+        ll, dataset_len = pickle.loads(data)
         fl: list[dict] = []
-        ll = pickle.loads(data)
         for o in ll:
             fl.append(torch.load(io.BytesIO(o)))
-        return GlobalWeightMessage(fl)
+        return GlobalWeightMessage(fl, dataset_len)
 
     def get_message_type(self) -> MessageType:
         return self.MESSAGE_TYPE
@@ -122,3 +125,12 @@ class SplitLayerConfigMessage(JsonMessage):
     def deserialize(data: bytes, msg_type: MessageType) -> 'JsonMessage':
         msg = JsonMessage.deserialize(data, msg_type)
         return SplitLayerConfigMessage(msg.data)
+
+
+class DataSizeMessage(JsonMessage):
+    MESSAGE_TYPE = MessageType('DataSizeMessage')
+
+    @staticmethod
+    def deserialize(data: bytes, msg_type: MessageType) -> 'JsonMessage':
+        msg = JsonMessage.deserialize(data, msg_type)
+        return DataSizeMessage(msg.data)
