@@ -221,20 +221,22 @@ def run(options_ins):
     fed_logger.info('Preparing Client')
     fed_logger.info('Preparing Data.')
     cpu_count = multiprocessing.cpu_count()
-    indices = list(range(N))
-    part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
 
     dataset = data_utils.get_trainset()
-    labels = [dataset[i][1] for i in range(len(dataset))]  # Get all labels
-    sorted_indices = sorted(range(len(labels)), key=lambda i: labels[i])  # Sort indices by label
-    client_id = index  # Change this to create subsets for other clients
-    num_clients = config.K
-    subset_size = len(dataset) // num_clients
-    start_idx = subset_size * client_id
-    end_idx = start_idx + subset_size
-    client_indices = sorted_indices[start_idx:end_idx]
-    trainloader = data_utils.get_trainloader(dataset, client_indices, cpu_count)
-    # trainloader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, cpu_count)
+
+    indices = list(range(N))
+    if options_ins.get("iid"):
+        part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
+        trainloader = data_utils.get_trainloader(dataset, part_tr, cpu_count)
+    else:
+        labels = [dataset[i][1] for i in range(len(dataset))]
+        sorted_indices = sorted(range(len(labels)), key=lambda i: labels[i])
+        subset_size = len(dataset) // config.K
+        start_idx = subset_size * index
+        end_idx = start_idx + subset_size
+        client_indices = sorted_indices[start_idx:end_idx]
+        trainloader = data_utils.get_trainloader(dataset, client_indices, cpu_count)
+
     estimate_energy = options_ins.get("energy") == "True"
     simnet = options_ins.get("simulatebandwidth") == "True"
     if estimate_energy:

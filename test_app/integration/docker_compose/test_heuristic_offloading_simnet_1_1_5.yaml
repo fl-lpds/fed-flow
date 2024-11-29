@@ -67,7 +67,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s edge_based_heuristic -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s edge_based_heuristic -en True -e True -iid True & wait -n"
 
   client2:
     volumes:
@@ -86,7 +86,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -s edge_based_heuristic -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -s edge_based_heuristic -en True -e True -iid True & wait -n"
 
   client3:
     volumes:
@@ -104,7 +104,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb True -s edge_based_heuristic -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb True -s edge_based_heuristic -en True -e True -iid True & wait -n"
 
   client4:
     volumes:
@@ -123,7 +123,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 3 -o True -sb True -s edge_based_heuristic -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 3 -o True -sb True -s edge_based_heuristic -en True -e True -iid True & wait -n"
 
   client5:
     volumes:
@@ -142,4 +142,4 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 4 -o True -sb True -s edge_based_heuristic -en True -e True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 4 -o True -sb True -s edge_based_heuristic -en True -e True -iid True & wait -n"

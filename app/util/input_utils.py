@@ -15,6 +15,7 @@ options = {
     '-i': ['--index', '0', 'the device index'],
     '-sb': ['--simulatebandwidth', 'False', 'the device network bandwidth'],
     '-en': ['--energy', 'False', 'enable or disable energy estimation'],
+    '-iid': ['--iid', 'True', 'IID or Non-IID data distribution']
 
 }
 
@@ -42,6 +43,12 @@ def parse_argument(parser: argparse.ArgumentParser()):
         option["offload"] = True
     else:
         option["offload"] = False
+
+    if option.get("iid") == 'True':
+        option["iid"] = True
+    else:
+        option["iid"] = False
+
     config.dataset_name = option.get('dataset')
     config.model_name = option.get('model')
     config.index = int(option.get('index'))
