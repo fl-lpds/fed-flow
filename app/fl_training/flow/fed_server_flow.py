@@ -72,6 +72,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     clientUtilization = {}
     clientTT = {}
 
+    flop_on_each_edge = {}
+    time_on_each_edge = {}
+    flop_on_server = []
+
     for client in config.CLIENTS_LIST:
         iotBW[client] = []
         clientRemainingEnergy[client] = []
@@ -83,6 +87,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     for edge in config.EDGE_SERVER_LIST:
         edge_server_BW[edge] = []
+        flop_on_each_edge[edge] = []
+        time_on_each_edge[edge] = []
 
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
@@ -229,6 +235,34 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info(f"Training Time using time.time(): {training_time}")
 
+            server_flops = 0
+            flops_of_each_layer = server.model_flops_per_layer
+            flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
+            flops_of_each_layer = list(flops_of_each_layer.values())
+            for edgeIP in config.EDGE_SERVER_LIST:
+                edge_flops = 0
+                total_time_on_each_edge = []
+                for clientIP in config.EDGE_MAP[edgeIP]:
+                    clientAction = server.split_layers[config.CLIENTS_CONFIG[clientIP]]
+                    op1 = clientAction[0]
+                    op2 = clientAction[1]
+
+                    total_time_on_each_edge.append(server.computation_time_of_each_client_on_edges[clientIP])
+
+                    # offloading on client, edge and server
+                    if op1 < op2 < config.model_len - 1:
+                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                        server_flops += sum(flops_of_each_layer[op2 + 1:])
+                    # offloading on client and edge
+                    elif (op1 < op2) and op2 == config.model_len - 1:
+                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                    # offloading on client and server
+                    elif (op1 == op2) and op1 < config.model_len - 1:
+                        server_flops += sum(flops_of_each_layer[op2 + 1:])
+                flop_on_each_edge[edgeIP].append(edge_flops)
+                time_on_each_edge[edgeIP].append(max(total_time_on_each_edge))
+            flop_on_server.append(server_flops)
+
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())
             # with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
@@ -241,7 +275,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
             plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
-                       clientRemainingEnergy, iotBW, edge_server_BW, clientUtilization, res['test_acc_record'])
+                       clientRemainingEnergy, iotBW, edge_server_BW, clientUtilization, res['test_acc_record'],
+                       flop_on_each_edge, time_on_each_edge)
         else:
             break
 
@@ -359,7 +394,7 @@ def run_no_edge(server: FedServerInterface, LR, options):
 
 def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=None, clientCompEnergy=None,
                clientCommEnergy=None, clientTT=None, remainingEnergy=None, iotBW=None, edge_serverBW=None,
-               clientUtilization=None, accuracy=None):
+               clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None):
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -507,6 +542,44 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.legend()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"edge_serverBW"))
         plt.close()
+
+    # if flop_on_each_edge:
+    #     plt.figure(figsize=(int(25), int(5)))
+    #     for k in flop_on_each_edge.keys():
+    #         edgeDevice_K = flop_on_each_edge[k]
+    #         r = random.random()
+    #         b = random.random()
+    #         g = random.random()
+    #         color = (r, g, b)
+    #         plt.title(f"FLOP on edge devices")
+    #         plt.xlabel("Round")
+    #         plt.ylabel("Workload(FLOP)")
+    #         plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
+    #     plt.legend()
+    #     plt.savefig(os.path.join("/fed-flow/Graphs", f"edge flop"))
+    #     plt.close()
+    #
+    # if time_on_each_edge:
+    #     plt.figure(figsize=(int(25), int(5)))
+    #     for k in time_on_each_edge.keys():
+    #         edgeDevice_K = time_on_each_edge[k]
+    #         r = random.random()
+    #         b = random.random()
+    #         g = random.random()
+    #         color = (r, g, b)
+    #         plt.title(f"Total computation time on edge devices")
+    #         plt.xlabel("Round")
+    #         plt.ylabel("Computation time (second)")
+    #         plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
+    #     plt.legend()
+    #     plt.savefig(os.path.join("/fed-flow/Graphs", f"total computation time on edge"))
+    #     plt.close()
+
+    if flop_on_each_edge:
+        for edge in flop_on_each_edge.keys():
+            rl_utils.draw_scatter(time_on_each_edge[edge], flop_on_each_edge[edge], "FLOP-Time",
+                                  "Total time", "FLOP", "/fed-flow/Graphs",
+                                  f"FLOP-Time Scatter-{edge}", True)
 
 
 def run(options_ins):
