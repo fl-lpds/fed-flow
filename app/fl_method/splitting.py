@@ -124,37 +124,54 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.GREEN + f"Computation energy RATIO : {client_comp_energy_ratio}")
         fed_logger.info(Fore.GREEN + f"Communication Energy RATIO: {client_comm_energy_ratio}")
 
-        if client_comm_energy_ratio > client_comp_energy_ratio:
-            condidate_op1 = int(min(activation_size, key=activation_size.get))
-            tt_trans = (2 * (activation_size[condidate_op1]) * batchNumber) / client_bw[client]
+        min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
+        for layer, size in activation_size.items():
+            candidate_op1 = layer
+            if layer != config.model_len - 1:
+                tt_trans = (2 * size * batchNumber) / client_bw[client]
+            else:
+                tt_trans = total_model_size / client_bw[client]
             comm_energy = tt_trans * client_power_usage[client][1]
-            if condidate_op1 in client_comp_energy[client]:
-                comp_energy = client_comp_energy[client][condidate_op1]
-                if (comp_energy + comm_energy) < (
-                        tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]):
-                    best_op1 = condidate_op1
-                else:
-                    best_op1 = client_op1
+            if candidate_op1 in client_comp_energy[client]:
+                comp_energy = client_comp_energy[client][candidate_op1]
+                if (comp_energy + comm_energy) < min_total_energy:
+                    min_total_energy = comp_energy + comm_energy
+                    best_op1 = candidate_op1
             else:
-                best_op1 = condidate_op1
-        elif client_comp_energy_ratio > client_comm_energy_ratio:
-            filtered = {k: v for k, v in activation_size.items() if 0 <= k < client_op1}
+                best_op1 = candidate_op1
+                break
 
-            if len(filtered.values()) == 0:
-                best_op1 = 0
-            else:
-                min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
-                for layer, size in filtered.items():
-                    condidate_op1 = layer
-                    tt_trans = (2 * size * batchNumber) / client_bw[client]
-                    comm_energy = tt_trans * client_power_usage[client][1]
-                    if condidate_op1 in client_comp_energy[client]:
-                        comp_energy = client_comp_energy[client][condidate_op1]
-                        if (comp_energy + comm_energy) < min_total_energy:
-                            min_total_energy = comp_energy + comm_energy
-                            best_op1 = condidate_op1
-                    else:
-                        best_op1 = condidate_op1
+        # if client_comm_energy_ratio > client_comp_energy_ratio:
+        #     condidate_op1 = int(min(activation_size, key=activation_size.get))
+        #     tt_trans = (2 * (activation_size[condidate_op1]) * batchNumber) / client_bw[client]
+        #     comm_energy = tt_trans * client_power_usage[client][1]
+        #     if condidate_op1 in client_comp_energy[client]:
+        #         comp_energy = client_comp_energy[client][condidate_op1]
+        #         if (comp_energy + comm_energy) < (
+        #                 tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]):
+        #             best_op1 = condidate_op1
+        #         else:
+        #             best_op1 = client_op1
+        #     else:
+        #         best_op1 = condidate_op1
+        # elif client_comp_energy_ratio > client_comm_energy_ratio:
+        #     filtered = {k: v for k, v in activation_size.items() if 0 <= k < client_op1}
+        #
+        #     if len(filtered.values()) == 0:
+        #         best_op1 = 0
+        #     else:
+        #         min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
+        #         for layer, size in filtered.items():
+        #             condidate_op1 = layer
+        #             tt_trans = (2 * size * batchNumber) / client_bw[client]
+        #             comm_energy = tt_trans * client_power_usage[client][1]
+        #             if condidate_op1 in client_comp_energy[client]:
+        #                 comp_energy = client_comp_energy[client][condidate_op1]
+        #                 if (comp_energy + comm_energy) < min_total_energy:
+        #                     min_total_energy = comp_energy + comm_energy
+        #                     best_op1 = condidate_op1
+        #             else:
+        #                 best_op1 = condidate_op1
 
         action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
         # until now, we decide best op1 splitting for worst devices to reduce their energy consumption
