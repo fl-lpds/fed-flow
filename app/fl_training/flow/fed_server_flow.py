@@ -101,6 +101,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     fed_logger.info('Getting power usage from edge servers')
     server.get_power_of_client()
+    i = 6
+    j = 0
+    server.split_layers = [[i] * 2 for _ in range(config.K)]
 
     for r in range(config.R):
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
@@ -141,12 +144,21 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             state = server.edge_based_state()
             fed_logger.info(Fore.RED + f"STATE: {str(state)}")
 
-            if r > 1:
+            if r > 100:
                 fed_logger.info("splitting")
                 server.split(state, options)
                 fed_logger.info(f"Action : {server.split_layers}")
             else:
-                server.split_layers = [[6, 6]] * len(config.CLIENTS_CONFIG.keys())
+                splitting = server.split_layers
+                if i != -1:
+                    splitting[j][0] = i
+                    i -= 1
+                else:
+                    i = 6
+                    if j != 5:
+                        j += 1
+                    splitting[j][0] = i
+                server.split_layers = splitting
 
             fed_logger.info("Scattering splitting info to edges.")
             server.send_split_layers_config()
