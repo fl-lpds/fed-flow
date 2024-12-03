@@ -101,7 +101,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     fed_logger.info('Getting power usage from edge servers')
     server.get_power_of_client()
-    i = 6
+    i = config.model_len - 1
     j = 0
     server.split_layers = [[i] * 2 for _ in range(config.K)]
 
@@ -154,8 +154,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                     splitting[j][0] = i
                     i -= 1
                 else:
-                    i = 6
-                    if j != 5:
+                    i = config.model_len - 1
+                    if j != len(config.CLIENTS_CONFIG.keys()) - 1:
                         j += 1
                     splitting[j][0] = i
                 server.split_layers = splitting
@@ -587,11 +587,32 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
     #     plt.savefig(os.path.join("/fed-flow/Graphs", f"total computation time on edge"))
     #     plt.close()
 
+    flops_of_each_edge = {}
+    for edge in flops_of_each_edge.keys():
+        flops_of_each_edge[edge] = []
     if flop_on_each_edge:
         for edge in flop_on_each_edge.keys():
             rl_utils.draw_scatter(time_on_each_edge[edge], flop_on_each_edge[edge], "FLOP-Time",
                                   "Total time", "FLOP", "/fed-flow/Graphs",
                                   f"FLOP-Time Scatter-{edge}", True)
+            flops_of_each_edge[edge] = [w / t if t != 0 else float('inf') for w, t in
+                                        zip(flop_on_each_edge[edge], time_on_each_edge[edge])]
+
+    if flops_of_each_edge:
+        plt.figure(figsize=(int(25), int(5)))
+        for k in flops_of_each_edge.keys():
+            edgeDevice_K = flops_of_each_edge[k]
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            plt.title(f"Flops of edge devices")
+            plt.xlabel("round")
+            plt.ylabel("FLOPS")
+            plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
+        plt.legend()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
+        plt.close()
 
 
 def run(options_ins):
