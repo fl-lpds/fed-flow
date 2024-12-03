@@ -72,6 +72,7 @@ def draw_hist(x, title, xlabel, savePath, pictureName, saveFig=True):
 
 
 def draw_scatter(x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=True):
+    plt.figure(figsize=(10, 15))
     plt.scatter(x, y)
     plt.title(title)
     plt.xlabel(xlabel)
