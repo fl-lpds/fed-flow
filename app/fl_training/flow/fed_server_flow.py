@@ -17,6 +17,7 @@ from app.util import energy_estimation
 import matplotlib.pyplot as plt
 import random
 import os
+import csv
 
 
 def run_edge_based_no_offload(server: FedServerInterface, LR, options):
@@ -613,6 +614,14 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.legend()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
         plt.close()
+
+        with open('/fed-flow/Graphs/flop-time.csv', 'w', newline='') as file:
+            array = [['edgeName', 'flop', 'time']]
+            for edge in flop_on_each_edge.keys():
+                for flop, timeTaken in zip(flop_on_each_edge[edge], time_on_each_edge[edge]):
+                    array.append([edge, flop, timeTaken])
+            writer = csv.writer(file)
+            writer.writerows(array)
 
 
 def run(options_ins):
