@@ -18,3 +18,4 @@ torchvision==0.17.2
 tqdm==4.65.2
 uvicorn==0.32.0
 pyrabbit==1.1.0
+scikit-learn

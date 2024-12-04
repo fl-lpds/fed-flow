@@ -18,7 +18,11 @@ import matplotlib.pyplot as plt
 import random
 import os
 import csv
-
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import make_pipeline
 
 def run_edge_based_no_offload(server: FedServerInterface, LR, options):
     res = {}
@@ -622,6 +626,73 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                     array.append([edge, flop, timeTaken])
             writer = csv.writer(file)
             writer.writerows(array)
+
+        # Step 1: Load the data
+        file_path = '/fed-flow/Graphs/flop-time.csv'  # Replace with your file path
+        data = pd.read_csv(file_path)
+
+        # Step 2: Filter out rows where time is zero
+        filtered_data = data[data['time'] > 0]
+        if len(filtered_data) > 0:
+            # Step 3: Prepare data for modeling
+            X = filtered_data['flop'].values.reshape(-1, 1)  # Workload (FLO)
+            y = filtered_data['time'].values  # Time (seconds)
+
+            # Step 4: Fit a linear regression model
+            model = LinearRegression()
+            model.fit(X, y)
+
+            # Step 5: Generate predictions for visualization
+            workload_range = np.linspace(X.min(), X.max(), 1000).reshape(-1, 1)  # Range of workloads
+            predicted_times = model.predict(workload_range)
+
+            # Step 6: Plot the data and the regression line
+            plt.figure(figsize=(10, 6))
+            plt.scatter(X, y, color='blue', label='Original Data', alpha=0.6)
+
+            # Line plot of the regression model
+            plt.plot(workload_range, predicted_times, color='red', label='Linear Regression Model')
+
+            # Add labels, legend, and title
+            plt.xlabel('Workload (FLOP)')
+            plt.ylabel('Time Taken (seconds)')
+            plt.title('Workload vs Time with Regression Model')
+            plt.legend()
+            plt.grid(True)
+            if not os.path.exists('/fed-flow/Graphs'):
+                os.makedirs('/fed-flow/Graphs')
+            plt.savefig(os.path.join('/fed-flow/Graphs', 'LinearPrediction'))
+            plt.close()
+
+            # Step 1: Create a polynomial regression model
+            degree = 2  # Change this to a higher degree for more complexity
+            poly_model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
+
+            # Step 2: Fit the model
+            poly_model.fit(X, y)
+
+            # Step 3: Generate predictions
+            predicted_times_poly = poly_model.predict(workload_range)
+
+            # Step 4: Plot the polynomial model
+            plt.figure(figsize=(10, 6))
+
+            # Scatter plot of original data
+            plt.scatter(X, y, color='blue', label='Original Data', alpha=0.6)
+
+            # Line plot of the polynomial regression model
+            plt.plot(workload_range, predicted_times_poly, color='green', label=f'Polynomial Model (Degree {degree})')
+
+            # Add labels, legend, and title
+            plt.xlabel('Workload (FLOP)')
+            plt.ylabel('Time Taken (seconds)')
+            plt.title('Workload vs Time with Polynomial Regression')
+            plt.legend()
+            plt.grid(True)
+            if not os.path.exists('/fed-flow/Graphs'):
+                os.makedirs('/fed-flow/Graphs')
+            plt.savefig(os.path.join('/fed-flow/Graphs', 'PolyPrediction'))
+            plt.close()
 
 
 def run(options_ins):
