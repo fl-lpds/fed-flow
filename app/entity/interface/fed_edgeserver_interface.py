@@ -25,8 +25,12 @@ class FedEdgeServerInterface(ABC, Communicator):
         self.net_threads = None
         self.central_server_communicator = Communicator()
         self.transmissionTimes = 0
+
+        self.total_computation_time_on_edge = 0
+        self.start_time_of_communication_each_client = {}
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
+        self.communication_time_of_each_client = {}
 
         # if offload:
         model_len = model_utils.get_unit_model_len()

@@ -2,10 +2,11 @@ import os
 import socket
 import sys
 import threading
+import time
 
 from colorama import Fore
 
-from app.util import message_utils, energy_estimation
+from app.util import energy_estimation
 
 sys.path.append('../../../')
 from app.config import config
@@ -54,14 +55,23 @@ def run_offload(server: FedEdgeServerInterface, LR):
             server.global_weights(client_ips)
             threads = {}
             fed_logger.info("start training")
+
+            start_training = time.perf_counter()
             for i in range(len(client_ips)):
-                server.computation_time_of_each_client[client_ips[i]] = 0
                 threads[client_ips[i]] = threading.Thread(target=server.thread_offload_training,
                                                           args=(client_ips[i],), name=client_ips[i])
                 threads[client_ips[i]].start()
 
             for i in range(len(client_ips)):
                 threads[client_ips[i]].join()
+
+            total_training_time = time.perf_counter() - start_training
+
+            fed_logger.info(Fore.RED + f"Total training time: {total_training_time}")
+            server.total_computation_time_on_edge = max(server.computation_time_of_each_client.values())
+            fed_logger.info(Fore.RED + f"each client communication time: {server.communication_time_of_each_client}")
+            fed_logger.info(Fore.RED + f"computation time of each client: {server.computation_time_of_each_client}")
+            fed_logger.info(Fore.RED + f"Total computation time: {server.total_computation_time_on_edge}")
 
             fed_logger.info(
                 "receiving Comp Energy, Comm Energy, TT, Remaining-energy, utilization from clients and sending to server")

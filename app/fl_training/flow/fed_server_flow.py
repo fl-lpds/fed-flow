@@ -24,6 +24,7 @@ import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
+
 def run_edge_based_no_offload(server: FedServerInterface, LR, options):
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
@@ -179,7 +180,16 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # fed_logger.info('==> Reinitialization Finish')
 
             fed_logger.info("start training")
+            start_training_time = time.perf_counter()
+
             server.edge_offloading_train(config.CLIENTS_LIST)
+
+            total_training_time = time.perf_counter() - start_training_time
+            server.total_computation_time = max(server.computation_time_of_each_client.values())
+            fed_logger.info(Fore.RED + f"Total time: {total_training_time}")
+            fed_logger.info(Fore.RED + f"Total computation time: {server.total_computation_time}")
+            fed_logger.info(Fore.RED + f"each client communication time: {server.real_communication_time_of_each_client}")
+            fed_logger.info(Fore.RED + f"each client computation time: {server.computation_time_of_each_client}")
 
             fed_logger.info("receiving local weights")
             local_weights = server.e_local_weights(config.CLIENTS_LIST)
@@ -198,6 +208,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info(f"computation time of each client on server: {server.computation_time_of_each_client}")
             fed_logger.info(
                 f"computation time of each client on edge: {server.computation_time_of_each_client_on_edges}")
+            fed_logger.info(f"Total computation time on each edge: {server.total_computation_time_of_each_edge}")
             fed_logger.info(f"Transmission time of each client on server: {server.client_training_transmissionTime}")
             fed_logger.info(f"Aggregation Time Simnet bw : {aggregation_time}")
             server_sequential_transmission_time = float(energy_estimation.get_transmission_time())
@@ -226,25 +237,25 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             tt.append(training_time)
 
             if server.simnet:
-                total_computation_time_for_each_client = {}
+                total_time_for_each_client = {}
                 if len(config.CLIENTS_LIST) > 0:
 
                     for clientip in config.CLIENTS_LIST:
-                        total_computation_time_for_each_client[clientip] = \
+                        total_time_for_each_client[clientip] = \
                             server.computation_time_of_each_client_on_edges[clientip] + \
                             server.computation_time_of_each_client[clientip] + \
-                            energy_tt_list[clientip][1] + \
+                            energy_tt_list[clientip][2] + \
                             server.client_training_transmissionTime[clientip]
 
-                    # trainingTime_simnetBW = float(energy_estimation.get_transmission_time()) + \
-                    #                         max(total_computation_time_for_each_client.values()) + \
-                    #                         aggregation_time
-
-                    trainingTime_simnetBW = max(list(server.computation_time_of_each_client_on_edges.values())) + \
-                                            max(list(server.computation_time_of_each_client.values())) + \
-                                            max(list(map(lambda x: x[-1], list(clientTT.values())))) + \
+                    trainingTime_simnetBW = max(total_time_for_each_client.values()) + \
                                             aggregation_time + \
                                             server_sequential_transmission_time
+
+                    # trainingTime_simnetBW = max(server.total_computation_time_of_each_edge.values()) + \
+                    #                         max(server.computation_time_of_each_client.values()) + \
+                    #                         max(list(map(lambda x: x[-1], clientTT.values()))) + \
+                    #                         aggregation_time + \
+                    #                         server_sequential_transmission_time
                     simnet_tt.append(trainingTime_simnetBW)
                     fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
                 else:
@@ -620,78 +631,71 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.close()
 
         with open('/fed-flow/Graphs/flop-time.csv', 'w', newline='') as file:
-            array = [['edgeName', 'flop', 'time']]
-            for edge in flop_on_each_edge.keys():
+            # array = [['edgeIndex', 'flop', 'time']]
+            array = []
+            for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
+                edge = config.EDGE_SERVER_CONFIG[edgeIndex]
                 for flop, timeTaken in zip(flop_on_each_edge[edge], time_on_each_edge[edge]):
-                    array.append([edge, flop, timeTaken])
+                    array.append([edgeIndex, flop, timeTaken])
             writer = csv.writer(file)
             writer.writerows(array)
 
-        # Step 1: Load the data
+        # Step 1: Load the new data
         file_path = '/fed-flow/Graphs/flop-time.csv'  # Replace with your file path
-        data = pd.read_csv(file_path)
+        data = pd.read_csv(file_path, names=['edgeIndex', 'flop', 'time'])
+        fed_logger.info(Fore.MAGENTA + f"FLOP and Time in csv: {data['time']}, {data['flop']}")
+        data['time'] = pd.to_numeric(data['time'], errors='coerce')  # Non-numeric values will become NaN
+        data['flop'] = pd.to_numeric(data['flop'], errors='coerce')  # Non-numeric values will become NaN
 
-        # Step 2: Filter out rows where time is zero
-        filtered_data = data[data['time'] > 0]
+        # Step 2: Filter out invalid rows (where time <= 0)
+        filtered_data = data[(data['time'] > 0) & (data['flop'].notna())]
+
         if len(filtered_data) > 0:
-            # Step 3: Prepare data for modeling
-            X = filtered_data['flop'].values.reshape(-1, 1)  # Workload (FLO)
-            y = filtered_data['time'].values  # Time (seconds)
 
-            # Step 4: Fit a linear regression model
-            model = LinearRegression()
-            model.fit(X, y)
+            # Step 3: Extract features (X) and target (Y)
+            X = filtered_data[['edgeIndex', 'flop']].values  # Features: edgeIndex and flop
+            y = filtered_data['time'].values  # Target: time
 
-            # Step 5: Generate predictions for visualization
-            workload_range = np.linspace(X.min(), X.max(), 1000).reshape(-1, 1)  # Range of workloads
-            predicted_times = model.predict(workload_range)
+            # Step 4: Fit a Linear Regression model
+            linear_model = LinearRegression()
+            linear_model.fit(X, y)
 
-            # Step 6: Plot the data and the regression line
-            plt.figure(figsize=(10, 6))
-            plt.scatter(X, y, color='blue', label='Original Data', alpha=0.6)
-
-            # Line plot of the regression model
-            plt.plot(workload_range, predicted_times, color='red', label='Linear Regression Model')
-
-            # Add labels, legend, and title
-            plt.xlabel('Workload (FLOP)')
-            plt.ylabel('Time Taken (seconds)')
-            plt.title('Workload vs Time with Regression Model')
-            plt.legend()
-            plt.grid(True)
-            if not os.path.exists('/fed-flow/Graphs'):
-                os.makedirs('/fed-flow/Graphs')
-            plt.savefig(os.path.join('/fed-flow/Graphs', 'LinearPrediction'))
-            plt.close()
-
-            # Step 1: Create a polynomial regression model
-            degree = 2  # Change this to a higher degree for more complexity
+            # Step 5: Fit a Polynomial Regression model
+            degree = 2  # Change the degree for more complex models
             poly_model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
-
-            # Step 2: Fit the model
             poly_model.fit(X, y)
 
-            # Step 3: Generate predictions
-            predicted_times_poly = poly_model.predict(workload_range)
+            # Step 6: Generate predictions for visualization
+            flop_range = np.linspace(filtered_data['flop'].min(), filtered_data['flop'].max(), 1000)
+            index_mean = filtered_data['edgeIndex'].mean()  # Use average index for 2D plot
 
-            # Step 4: Plot the polynomial model
-            plt.figure(figsize=(10, 6))
+            # Predict for linear regression
+            linear_predictions = linear_model.predict(np.c_[np.full_like(flop_range, index_mean), flop_range])
+
+            # Predict for polynomial regression
+            poly_predictions = poly_model.predict(np.c_[np.full_like(flop_range, index_mean), flop_range])
+
+            # Step 7: Plot the results
+            plt.figure(figsize=(12, 8))
 
             # Scatter plot of original data
-            plt.scatter(X, y, color='blue', label='Original Data', alpha=0.6)
+            plt.scatter(filtered_data['flop'], filtered_data['time'], color='blue', label='Original Data', alpha=0.6)
 
-            # Line plot of the polynomial regression model
-            plt.plot(workload_range, predicted_times_poly, color='green', label=f'Polynomial Model (Degree {degree})')
+            # Linear regression predictions
+            plt.plot(flop_range, linear_predictions, color='green', label='Linear Regression Model')
+
+            # Polynomial regression predictions
+            plt.plot(flop_range, poly_predictions, color='red', label=f'Polynomial Regression Model (Degree {degree})')
 
             # Add labels, legend, and title
             plt.xlabel('Workload (FLOP)')
             plt.ylabel('Time Taken (seconds)')
-            plt.title('Workload vs Time with Polynomial Regression')
+            plt.title('Workload vs Time with Linear and Polynomial Regression')
             plt.legend()
             plt.grid(True)
             if not os.path.exists('/fed-flow/Graphs'):
                 os.makedirs('/fed-flow/Graphs')
-            plt.savefig(os.path.join('/fed-flow/Graphs', 'PolyPrediction'))
+            plt.savefig(os.path.join('/fed-flow/Graphs', 'Prediction'))
             plt.close()
 
 

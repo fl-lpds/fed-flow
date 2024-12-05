@@ -14,6 +14,8 @@ from app.entity.interface.fed_edgeserver_interface import FedEdgeServerInterface
 from app.util import message_utils, model_utils, energy_estimation, data_utils
 from app.util.energy_estimation import *
 
+lock = threading.Lock()
+
 
 class FedEdgeServer(FedEdgeServerInterface):
     def initialize(self, split_layers, LR, client_ips, simnetbw: float = None):
@@ -51,6 +53,10 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def forward_propagation(self, client_ip):
         i = 0
+        communication_time = 0
+
+        start_time = time.perf_counter()
+
         msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
                             url=config.EDGE_SERVER_CONFIG[config.index])
         flag = msg[1]
@@ -64,8 +70,15 @@ class FedEdgeServer(FedEdgeServerInterface):
                           url=config.EDGE_SERVER_CONFIG[config.index])
         i += 1
 
+        communication_time += (time.perf_counter() - start_time)
+
+        fed_logger.info(
+            Fore.MAGENTA + f"current computation time -> {client_ip}: {self.communication_time_of_each_client[client_ip]}")
+
         while flag:
             if self.split_layers[config.CLIENTS_CONFIG.get(client_ip)][0] < model_utils.get_unit_model_len() - 1:
+                start_time = time.perf_counter()
+
                 msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
                                     url=config.EDGE_SERVER_CONFIG[config.index])
                 flag = msg[1]
@@ -75,7 +88,7 @@ class FedEdgeServer(FedEdgeServerInterface):
                     self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
                                   url=config.EDGE_SERVER_CONFIG[config.index])
                     break
-                # fed_logger.info(client_ip + " receiving local activations")
+
                 msg = self.recv_msg(exchange=client_ip,
                                     expect_msg_type=f'{message_utils.local_activations_client_to_edge()}_{i}_{client_ip}',
                                     is_weight=True,
@@ -83,22 +96,23 @@ class FedEdgeServer(FedEdgeServerInterface):
                 smashed_layers = msg[1]
                 labels = msg[2]
 
-                # fed_logger.info(client_ip + " training model forward")
+                communication_time += (time.perf_counter() - start_time)
 
                 inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
                 if self.split_layers[config.CLIENTS_CONFIG[client_ip]][0] < \
                         self.split_layers[config.CLIENTS_CONFIG[client_ip]][1]:
+
                     energy_estimation.computation_start()
-                    self.start_time_of_computation_each_client[client_ip] = time.time()
+
                     if self.optimizers.keys().__contains__(client_ip):
                         self.optimizers[client_ip].zero_grad()
                     outputs = self.nets[client_ip](inputs)
-                    self.computation_time_of_each_client[client_ip] += (time.time() - \
-                                                                        self.start_time_of_computation_each_client[
-                                                                            client_ip])
+
                     energy_estimation.computation_end()
-                    # fed_logger.info(client_ip + " sending local activations")
+
                     if self.split_layers[config.CLIENTS_CONFIG[client_ip]][1] < model_utils.get_unit_model_len() - 1:
+                        start_time = time.perf_counter()
+
                         flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
                         self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
                                       url=config.EDGE_SERVER_CONFIG[config.index])
@@ -112,31 +126,42 @@ class FedEdgeServer(FedEdgeServerInterface):
                                             is_weight=True,
                                             url=config.EDGE_SERVER_CONFIG[config.index])
                         gradients = msg[1].to(self.device)
-                        # fed_logger.info(client_ip + " training model backward")
+
                         energy_estimation.computation_start()
-                        self.start_time_of_computation_each_client[client_ip] = time.time()
+                        communication_time += (time.perf_counter() - start_time)
+
                         outputs.backward(gradients)
-                        self.computation_time_of_each_client[client_ip] += (
-                                time.time() - self.start_time_of_computation_each_client[client_ip])
+
                         energy_estimation.computation_end()
+                        start_time = time.perf_counter()
+
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
                         self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
                                       url=config.EDGE_SERVER_CONFIG[config.index])
+
+                        communication_time += (time.perf_counter() - start_time)
                     else:
                         energy_estimation.computation_start()
-                        self.start_time_of_computation_each_client[client_ip] = time.time()
+
                         outputs = self.nets[client_ip](inputs)
                         loss = self.criterion(outputs, targets)
                         loss.backward()
                         if self.optimizers.keys().__contains__(client_ip):
                             self.optimizers[client_ip].step()
-                        self.computation_time_of_each_client[client_ip] += (
-                                time.time() - self.start_time_of_computation_each_client[client_ip])
+
                         energy_estimation.computation_end()
+
+                        start_time = time.perf_counter()
+
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
                         self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
                                       url=config.EDGE_SERVER_CONFIG[config.index])
+
+                        communication_time += (time.perf_counter() - start_time)
+
                 else:
+                    start_time = time.perf_counter()
+
                     flmsg = [f'{message_utils.local_iteration_flag_edge_to_server()}_{i}_{client_ip}', flag]
                     self.send_msg(config.EDGE_SERVER_CONFIG[config.index], flmsg,
                                   url=config.EDGE_SERVER_CONFIG[config.index])
@@ -144,17 +169,21 @@ class FedEdgeServer(FedEdgeServerInterface):
                            targets.cpu()]
                     self.send_msg(exchange=config.EDGE_SERVER_CONFIG[config.index], msg=msg, is_weight=True,
                                   url=config.EDGE_SERVER_CONFIG[config.index])
-                    # fed_logger.info(client_ip + " edge receiving gradients")
                     msg = self.recv_msg(exchange=config.EDGE_SERVER_CONFIG[config.index],
                                         expect_msg_type=f'{message_utils.server_gradients_server_to_edge() + client_ip}_{i}',
                                         is_weight=True,
                                         url=config.EDGE_SERVER_CONFIG[config.index])
-                    # fed_logger.info(client_ip + " edge received gradients")
+
                     msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', msg[1]]
                     self.send_msg(exchange=client_ip, msg=msg, is_weight=True,
                                   url=config.EDGE_SERVER_CONFIG[config.index])
+
+                    communication_time += (time.perf_counter() - start_time)
+
             i += 1
         fed_logger.info(str(client_ip) + ' offloading training end')
+        with lock:
+            self.communication_time_of_each_client[client_ip] = communication_time
 
     def backward_propagation(self, outputs, client_ip, inputs):
         pass
@@ -238,6 +267,7 @@ class FedEdgeServer(FedEdgeServerInterface):
         """
         receive and send final weights for aggregation
         """
+        start_time = time.perf_counter()
         cweights = self.recv_msg(client_ip,
                                  message_utils.local_weights_client_to_edge(),
                                  True,
@@ -250,8 +280,15 @@ class FedEdgeServer(FedEdgeServerInterface):
             w_local = cweights
             # print("------------------------"+str(eweights[i]))
         msg = [message_utils.local_weights_edge_to_server() + "_" + client_ip, w_local]
+
         self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg, True,
                       url=config.EDGE_SERVER_CONFIG[config.index])
+
+        communication_time = (time.perf_counter() - start_time)
+        with lock:
+            self.communication_time_of_each_client[client_ip] += communication_time
+        fed_logger.info(
+            Fore.MAGENTA + f"current commutation time -> {client_ip}: {self.communication_time_of_each_client[client_ip]}")
 
     def energy(self, client_ips):
         """
@@ -272,10 +309,14 @@ class FedEdgeServer(FedEdgeServerInterface):
                                    url=config.EDGE_SERVER_CONFIG[config.index])
                 fed_logger.info(f"client message: {ms}")
                 if self.simnet:
-                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c]]
-                    energy_tt_list.append([ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c]])
+                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c],
+                                    self.total_computation_time_on_edge]
+                    energy_tt_list.append(
+                        [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c],
+                         self.total_computation_time_on_edge])
                 else:
-                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c]]
+                    energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c],
+                                    self.total_computation_time_on_edge]
                     energy_tt_list.append([ms[1], ms[2], ms[3], ms[4], ms[5]])
             else:
                 energy_tt_list.append([0, 0, 0, 0, 0, 0])
@@ -315,9 +356,18 @@ class FedEdgeServer(FedEdgeServerInterface):
         self.scatter(msg, True)
 
     def thread_offload_training(self, client_ip):
+        start_time = time.perf_counter()
+        with lock:
+            self.communication_time_of_each_client[client_ip] = 0
+            self.start_time_of_computation_each_client[client_ip] = time.perf_counter()
+
         self.forward_propagation(client_ip)
         self.local_weights(client_ip)
-        # self.energy(client_ip)
+
+        with lock:
+            self.computation_time_of_each_client[client_ip] = (time.perf_counter() - self.start_time_of_computation_each_client[
+                client_ip]) - self.communication_time_of_each_client[client_ip]
+        fed_logger.info(Fore.MAGENTA + f"Tread {client_ip} exe time: {time.perf_counter() - start_time}")
 
     def thread_no_offload_training(self, client_ip):
         self.local_weights(client_ip)

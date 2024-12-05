@@ -42,9 +42,15 @@ class FedServerInterface(ABC, Communicator):
 
         self.simnet = simnet
         self.client_training_transmissionTime = {}
+
+        self.start_time_of_communication_each_client = {}
+        self.real_communication_time_of_each_client = {}
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
+
         self.computation_time_of_each_client_on_edges = {}
+        self.total_computation_time_of_each_edge = {}
+        self.total_computation_time = 0
         self.edge_flops = {}
         self.server_flops = {}
         self.aggregation_time = 0
