@@ -18,11 +18,6 @@ import matplotlib.pyplot as plt
 import random
 import os
 import csv
-import pandas as pd
-from sklearn.linear_model import LinearRegression
-import numpy as np
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.pipeline import make_pipeline
 
 
 def run_edge_based_no_offload(server: FedServerInterface, LR, options):
@@ -81,6 +76,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     flop_on_each_edge = {}
     time_on_each_edge = {}
     flop_on_server = []
+    time_on_server = []
 
     for client in config.CLIENTS_LIST:
         iotBW[client] = []
@@ -188,7 +184,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             server.total_computation_time = max(server.computation_time_of_each_client.values())
             fed_logger.info(Fore.RED + f"Total time: {total_training_time}")
             fed_logger.info(Fore.RED + f"Total computation time: {server.total_computation_time}")
-            fed_logger.info(Fore.RED + f"each client communication time: {server.real_communication_time_of_each_client}")
+            fed_logger.info(
+                Fore.RED + f"each client communication time: {server.real_communication_time_of_each_client}")
             fed_logger.info(Fore.RED + f"each client computation time: {server.computation_time_of_each_client}")
 
             fed_logger.info("receiving local weights")
@@ -237,59 +234,18 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             tt.append(training_time)
 
             if server.simnet:
-                total_time_for_each_client = {}
-                if len(config.CLIENTS_LIST) > 0:
-
-                    for clientip in config.CLIENTS_LIST:
-                        total_time_for_each_client[clientip] = \
-                            server.computation_time_of_each_client_on_edges[clientip] + \
-                            server.computation_time_of_each_client[clientip] + \
-                            energy_tt_list[clientip][2] + \
-                            server.client_training_transmissionTime[clientip]
-
-                    trainingTime_simnetBW = max(total_time_for_each_client.values()) + \
-                                            aggregation_time + \
-                                            server_sequential_transmission_time
-
-                    # trainingTime_simnetBW = max(server.total_computation_time_of_each_edge.values()) + \
-                    #                         max(server.computation_time_of_each_client.values()) + \
-                    #                         max(list(map(lambda x: x[-1], clientTT.values()))) + \
-                    #                         aggregation_time + \
-                    #                         server_sequential_transmission_time
-                    simnet_tt.append(trainingTime_simnetBW)
-                    fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
-                else:
-                    fed_logger.info("All Clients had been Turned off.")
+                simnet_tt.append(server.simnetTrainingTimeCalculation(aggregation_time,
+                                                                      server_sequential_transmission_time,
+                                                                      energy_tt_list))
 
             fed_logger.info(f"Training Time using time.time(): {training_time}")
-
-            server_flops = 0
-            flops_of_each_layer = server.model_flops_per_layer
-            flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
-            flops_of_each_layer = list(flops_of_each_layer.values())
-            for edgeIP in config.EDGE_SERVER_LIST:
-                edge_flops = 0
-                total_time_on_each_edge = []
-                for clientIP in config.EDGE_MAP[edgeIP]:
-                    clientAction = server.split_layers[config.CLIENTS_CONFIG[clientIP]]
-                    op1 = clientAction[0]
-                    op2 = clientAction[1]
-
-                    total_time_on_each_edge.append(server.computation_time_of_each_client_on_edges[clientIP])
-
-                    # offloading on client, edge and server
-                    if op1 < op2 < config.model_len - 1:
-                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                        server_flops += sum(flops_of_each_layer[op2 + 1:])
-                    # offloading on client and edge
-                    elif (op1 < op2) and op2 == config.model_len - 1:
-                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                    # offloading on client and server
-                    elif (op1 == op2) and op1 < config.model_len - 1:
-                        server_flops += sum(flops_of_each_layer[op2 + 1:])
-                flop_on_each_edge[edgeIP].append(edge_flops)
-                time_on_each_edge[edgeIP].append(max(total_time_on_each_edge))
-            flop_on_server.append(server_flops)
+            server_flop, each_edge_flop, server_computation_time, each_edge_computation_time = \
+                server.getFlopsOnEdgeAndServer()
+            flop_on_server.append(server_flop)
+            time_on_server.append(server_computation_time)
+            for edge in config.EDGE_SERVER_LIST:
+                flop_on_each_edge[edge].append(each_edge_flop[edge])
+                time_on_each_edge[edge].append(each_edge_computation_time[edge])
 
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())
@@ -304,7 +260,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
             plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
                        clientRemainingEnergy, iotBW, edge_server_BW, clientUtilization, res['test_acc_record'],
-                       flop_on_each_edge, time_on_each_edge)
+                       flop_on_each_edge, time_on_each_edge, flop_on_server, time_on_server)
         else:
             break
 
@@ -422,7 +378,8 @@ def run_no_edge(server: FedServerInterface, LR, options):
 
 def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=None, clientCompEnergy=None,
                clientCommEnergy=None, clientTT=None, remainingEnergy=None, iotBW=None, edge_serverBW=None,
-               clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None):
+               clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None,
+               flop_on_server=None, time_on_server=None):
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -571,42 +528,12 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.savefig(os.path.join("/fed-flow/Graphs", f"edge_serverBW"))
         plt.close()
 
-    # if flop_on_each_edge:
-    #     plt.figure(figsize=(int(25), int(5)))
-    #     for k in flop_on_each_edge.keys():
-    #         edgeDevice_K = flop_on_each_edge[k]
-    #         r = random.random()
-    #         b = random.random()
-    #         g = random.random()
-    #         color = (r, g, b)
-    #         plt.title(f"FLOP on edge devices")
-    #         plt.xlabel("Round")
-    #         plt.ylabel("Workload(FLOP)")
-    #         plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
-    #     plt.legend()
-    #     plt.savefig(os.path.join("/fed-flow/Graphs", f"edge flop"))
-    #     plt.close()
-    #
-    # if time_on_each_edge:
-    #     plt.figure(figsize=(int(25), int(5)))
-    #     for k in time_on_each_edge.keys():
-    #         edgeDevice_K = time_on_each_edge[k]
-    #         r = random.random()
-    #         b = random.random()
-    #         g = random.random()
-    #         color = (r, g, b)
-    #         plt.title(f"Total computation time on edge devices")
-    #         plt.xlabel("Round")
-    #         plt.ylabel("Computation time (second)")
-    #         plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
-    #     plt.legend()
-    #     plt.savefig(os.path.join("/fed-flow/Graphs", f"total computation time on edge"))
-    #     plt.close()
-
-    flops_of_each_edge = {}
-    for edge in flops_of_each_edge.keys():
-        flops_of_each_edge[edge] = []
+    fed_logger.info(Fore.MAGENTA + f"{flop_on_each_edge}, {time_on_each_edge}")
     if flop_on_each_edge:
+        flops_of_each_edge = {}
+        for edge in flop_on_each_edge.keys():
+            flops_of_each_edge[edge] = []
+
         for edge in flop_on_each_edge.keys():
             rl_utils.draw_scatter(time_on_each_edge[edge], flop_on_each_edge[edge], "FLOP-Time",
                                   "Total time", "FLOP", "/fed-flow/Graphs",
@@ -614,89 +541,50 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             flops_of_each_edge[edge] = [w / t if t != 0 else float('inf') for w, t in
                                         zip(flop_on_each_edge[edge], time_on_each_edge[edge])]
 
-    if flops_of_each_edge:
-        plt.figure(figsize=(int(25), int(5)))
-        for k in flops_of_each_edge.keys():
-            edgeDevice_K = flops_of_each_edge[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
-            plt.title(f"Flops of edge devices")
-            plt.xlabel("round")
-            plt.ylabel("FLOPS")
-            plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
-        plt.legend()
-        plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
-        plt.close()
+            plt.figure(figsize=(int(25), int(5)))
+            for k in flops_of_each_edge.keys():
+                edgeDevice_K = flops_of_each_edge[k]
+                r = random.random()
+                b = random.random()
+                g = random.random()
+                color = (r, g, b)
+                plt.title(f"Flops of edge devices")
+                plt.xlabel("round")
+                plt.ylabel("FLOPS")
+                plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
+            plt.legend()
+            plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
+            plt.close()
 
-        with open('/fed-flow/Graphs/flop-time.csv', 'w', newline='') as file:
-            # array = [['edgeIndex', 'flop', 'time']]
+            with open('/fed-flow/Graphs/edge_flop_time.csv', 'w', newline='') as file:
+                # array = [['edgeIndex', 'flop', 'time']]
+                array = []
+                for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
+                    edge = config.EDGE_SERVER_CONFIG[edgeIndex]
+                    for flop, timeTaken in zip(flop_on_each_edge[edge], time_on_each_edge[edge]):
+                        array.append([edgeIndex, flop, timeTaken])
+                writer = csv.writer(file)
+                writer.writerows(array)
+
+            model_utils.createFlopsPredictionModel(flop_time_csv_path='/fed-flow/Graphs/edge_flop_time.csv',
+                                                   isEdge=True)
+    if flop_on_server:
+        rl_utils.draw_scatter(time_on_server, flop_on_server, "FLOP-Time", "Total time", "FLOP",
+                              "/fed-flow/Graphs", "FLOP-Time Scatter server", True)
+        flops_on_server = [w / t if t != 0 else float('inf') for w, t in zip(flop_on_server, time_on_server)]
+        plt.title(f"Flops of server")
+        plt.xlabel("round")
+        plt.ylabel("FLOPS")
+        plt.plot(flops_on_server, color="Red", linewidth='3', label=f"Central Server")
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of central server"))
+        plt.close()
+        with open('/fed-flow/Graphs/server_flop_time.csv', 'w', newline='') as file:
             array = []
-            for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
-                edge = config.EDGE_SERVER_CONFIG[edgeIndex]
-                for flop, timeTaken in zip(flop_on_each_edge[edge], time_on_each_edge[edge]):
-                    array.append([edgeIndex, flop, timeTaken])
+            for flop, timeTaken in zip(flops_on_server, time_on_server):
+                array.append([flop, timeTaken])
             writer = csv.writer(file)
             writer.writerows(array)
-
-        # Step 1: Load the new data
-        file_path = '/fed-flow/Graphs/flop-time.csv'  # Replace with your file path
-        data = pd.read_csv(file_path, names=['edgeIndex', 'flop', 'time'])
-        fed_logger.info(Fore.MAGENTA + f"FLOP and Time in csv: {data['time']}, {data['flop']}")
-        data['time'] = pd.to_numeric(data['time'], errors='coerce')  # Non-numeric values will become NaN
-        data['flop'] = pd.to_numeric(data['flop'], errors='coerce')  # Non-numeric values will become NaN
-
-        # Step 2: Filter out invalid rows (where time <= 0)
-        filtered_data = data[(data['time'] > 0) & (data['flop'].notna())]
-
-        if len(filtered_data) > 0:
-
-            # Step 3: Extract features (X) and target (Y)
-            X = filtered_data[['edgeIndex', 'flop']].values  # Features: edgeIndex and flop
-            y = filtered_data['time'].values  # Target: time
-
-            # Step 4: Fit a Linear Regression model
-            linear_model = LinearRegression()
-            linear_model.fit(X, y)
-
-            # Step 5: Fit a Polynomial Regression model
-            degree = 2  # Change the degree for more complex models
-            poly_model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
-            poly_model.fit(X, y)
-
-            # Step 6: Generate predictions for visualization
-            flop_range = np.linspace(filtered_data['flop'].min(), filtered_data['flop'].max(), 1000)
-            index_mean = filtered_data['edgeIndex'].mean()  # Use average index for 2D plot
-
-            # Predict for linear regression
-            linear_predictions = linear_model.predict(np.c_[np.full_like(flop_range, index_mean), flop_range])
-
-            # Predict for polynomial regression
-            poly_predictions = poly_model.predict(np.c_[np.full_like(flop_range, index_mean), flop_range])
-
-            # Step 7: Plot the results
-            plt.figure(figsize=(12, 8))
-
-            # Scatter plot of original data
-            plt.scatter(filtered_data['flop'], filtered_data['time'], color='blue', label='Original Data', alpha=0.6)
-
-            # Linear regression predictions
-            plt.plot(flop_range, linear_predictions, color='green', label='Linear Regression Model')
-
-            # Polynomial regression predictions
-            plt.plot(flop_range, poly_predictions, color='red', label=f'Polynomial Regression Model (Degree {degree})')
-
-            # Add labels, legend, and title
-            plt.xlabel('Workload (FLOP)')
-            plt.ylabel('Time Taken (seconds)')
-            plt.title('Workload vs Time with Linear and Polynomial Regression')
-            plt.legend()
-            plt.grid(True)
-            if not os.path.exists('/fed-flow/Graphs'):
-                os.makedirs('/fed-flow/Graphs')
-            plt.savefig(os.path.join('/fed-flow/Graphs', 'Prediction'))
-            plt.close()
+        model_utils.createFlopsPredictionModel(flop_time_csv_path='/fed-flow/Graphs/server_flop_time.csv', isEdge=False)
 
 
 def run(options_ins):

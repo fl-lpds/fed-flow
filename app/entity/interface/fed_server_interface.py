@@ -236,3 +236,10 @@ class FedServerInterface(ABC, Communicator):
     @abstractmethod
     def get_power_of_client(self):
         pass
+
+    @abstractmethod
+    def getFlopsOnEdgeAndServer(self):
+        pass
+
+    def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list):
+        pass

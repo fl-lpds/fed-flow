@@ -3,10 +3,16 @@ import collections
 import os.path
 import urllib.request
 
+import joblib
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.init as init
 import tqdm
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PolynomialFeatures
 
 from app.config import config
 from app.config.logger import fed_logger
@@ -166,3 +172,65 @@ def get_unit_model_len():
 
 def get_unit_model() -> NNModel:
     return get_class()()
+
+
+def createFlopsPredictionModel(flop_time_csv_path, isEdge=True):
+    file_path = flop_time_csv_path  # Replace with your file path
+    data = pd.read_csv(file_path, names=['flop', 'time'])
+    if isEdge:
+        data = pd.read_csv(file_path, names=['edgeIndex', 'flop', 'time'])
+
+    data['time'] = pd.to_numeric(data['time'], errors='coerce')  # Non-numeric values will become NaN
+    data['flop'] = pd.to_numeric(data['flop'], errors='coerce')  # Non-numeric values will become NaN
+
+    filtered_data = data[(data['time'] > 0) & (data['flop'].notna())]
+
+    if len(filtered_data) > 0:
+        X = filtered_data['flop'].values.reshape(-1, 1)
+        y = filtered_data['time'].values
+        if isEdge:
+            X = filtered_data[['edgeIndex', 'flop']].values
+            y = filtered_data['time'].values
+
+        linear_model = LinearRegression()
+        linear_model.fit(X, y)
+
+        degree = 2
+        poly_model = make_pipeline(PolynomialFeatures(degree), LinearRegression())
+        poly_model.fit(X, y)
+
+        if isEdge:
+            flop_range = np.linspace(filtered_data['flop'].min(), filtered_data['flop'].max(), 1000)
+            index_mean = filtered_data['edgeIndex'].mean()
+            linear_predictions = linear_model.predict(np.c_[np.full_like(flop_range, index_mean), flop_range])
+            poly_predictions = poly_model.predict(np.c_[np.full_like(flop_range, index_mean), flop_range])
+        else:
+            flop_range = np.linspace(filtered_data['flop'].min(), filtered_data['flop'].max(), 1000).reshape(-1, 1)
+            linear_predictions = linear_model.predict(flop_range)
+            poly_predictions = poly_model.predict(flop_range)
+
+        plt.figure(figsize=(12, 8))
+        plt.scatter(filtered_data['flop'], filtered_data['time'], color='blue', label='Original Data', alpha=0.6)
+        plt.plot(flop_range, linear_predictions, color='green', label='Linear Regression Model')
+        plt.plot(flop_range, poly_predictions, color='red', label=f'Polynomial Regression Model (Degree {degree})')
+
+        plt.xlabel('Workload (FLOP)')
+        plt.ylabel('Time Taken (seconds)')
+        plt.title('Workload vs Time with Linear and Polynomial Regression')
+        plt.legend()
+        plt.grid(True)
+        if not os.path.exists('/fed-flow/Graphs'):
+            os.makedirs('/fed-flow/Graphs')
+
+        if isEdge:
+            plt.savefig(os.path.join('/fed-flow/Graphs', 'edge_Prediction'))
+        else:
+            plt.savefig(os.path.join('/fed-flow/Graphs', 'server_Prediction'))
+
+        plt.close()
+        if isEdge:
+            joblib.dump(linear_model, '/fed-flow/app/model/edge_flops_prediction_linear_model.pkl')
+            joblib.dump(poly_model, '/fed-flow/app/model/edge_flops_prediction_poly_model.pkl')
+        else:
+            joblib.dump(linear_model, '/fed-flow/app/model/server_flops_prediction_linear_model.pkl')
+            joblib.dump(poly_model, '/fed-flow/app/model/server_flops_prediction_poly_model.pkl')

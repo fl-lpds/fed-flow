@@ -725,3 +725,60 @@ class FedServer(FedServerInterface):
                 trans_power_usage = msg[2]
                 power_usage[clientIP] = [comp_power_usage, trans_power_usage]
         self.power_usage_of_client = power_usage
+
+    def getFlopsOnEdgeAndServer(self):
+        flop_on_server = 0
+        flop_on_each_edge = {}
+        total_computation_time_on_each_edge = {}
+        total_computation_time_on_server = 0
+        flops_of_each_layer = self.model_flops_per_layer
+        flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
+        flops_of_each_layer = list(flops_of_each_layer.values())
+
+        total_computation_time_on_server = self.total_computation_time
+        for edgeIP in config.EDGE_SERVER_LIST:
+            edge_flops = 0
+            total_computation_time_on_each_edge[edgeIP] = self.total_computation_time_of_each_edge[edgeIP]
+            for clientIP in config.EDGE_MAP[edgeIP]:
+                clientAction = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
+                op1 = clientAction[0]
+                op2 = clientAction[1]
+
+                # offloading on client, edge and server
+                if op1 < op2 < config.model_len - 1:
+                    edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                    flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+                # offloading on client and edge
+                elif (op1 < op2) and op2 == config.model_len - 1:
+                    edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                # offloading on client and server
+                elif (op1 == op2) and op1 < config.model_len - 1:
+                    flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+            flop_on_each_edge[edgeIP] = edge_flops
+
+        return flop_on_server, flop_on_each_edge, total_computation_time_on_server, total_computation_time_on_each_edge
+
+    def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list):
+        total_time_for_each_client = {}
+        if len(config.CLIENTS_LIST) > 0:
+            for clientip in config.CLIENTS_LIST:
+                total_time_for_each_client[clientip] = \
+                    self.computation_time_of_each_client_on_edges[clientip] + \
+                    self.computation_time_of_each_client[clientip] + \
+                    energy_tt_list[clientip][2] + \
+                    self.client_training_transmissionTime[clientip]
+
+            trainingTime_simnetBW = max(total_time_for_each_client.values()) + \
+                                    aggregation_time + \
+                                    server_sequential_transmission_time
+
+            # trainingTime_simnetBW = max(server.total_computation_time_of_each_edge.values()) + \
+            #                         max(server.computation_time_of_each_client.values()) + \
+            #                         max(list(map(lambda x: x[-1], clientTT.values()))) + \
+            #                         aggregation_time + \
+            #                         server_sequential_transmission_time
+            fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
+            return trainingTime_simnetBW
+        else:
+            fed_logger.info("All Clients had been Turned off.")
+            return 0

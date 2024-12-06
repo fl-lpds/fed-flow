@@ -3,6 +3,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./../../../Graphs:/fed-flow/Graphs
+      - ./../../../app/model:/fed-flow/app/model
       - ./../../../app/logs:/fed-flow/app/logs
     image: autlpdslab/fedflow:rabbitmq
     ports:
@@ -29,9 +30,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '3'
+          cpus: '2'
         reservations:
-          cpus: '3'
+          cpus: '2'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
