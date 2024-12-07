@@ -557,7 +557,6 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.close()
 
             with open('/fed-flow/Graphs/edge_flop_time.csv', 'w', newline='') as file:
-                # array = [['edgeIndex', 'flop', 'time']]
                 array = []
                 for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
                     edge = config.EDGE_SERVER_CONFIG[edgeIndex]

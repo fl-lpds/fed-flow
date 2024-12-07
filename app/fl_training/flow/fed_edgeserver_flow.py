@@ -56,18 +56,48 @@ def run_offload(server: FedEdgeServerInterface, LR):
             threads = {}
             fed_logger.info("start training")
 
-            start_training = time.perf_counter()
+            import resource
+
+            def thread_wrapper(target_func, *args):
+                thread_start_time = time.thread_time()
+                target_func(*args)
+                thread_end_time = time.thread_time()
+                fed_logger.info(Fore.MAGENTA + f"Thread CPU time: {thread_end_time - thread_start_time} seconds")
+
+            start_training = time.time()
+            comp_start_time = time.process_time()
+            start_user_resource = resource.getrusage(resource.RUSAGE_SELF).ru_utime
+            start_sys_resource = resource.getrusage(resource.RUSAGE_SELF).ru_stime
+
+            threads = {}
             for i in range(len(client_ips)):
-                threads[client_ips[i]] = threading.Thread(target=server.thread_offload_training,
-                                                          args=(client_ips[i],), name=client_ips[i])
+                threads[client_ips[i]] = threading.Thread(
+                    target=thread_wrapper,
+                    args=(server.thread_offload_training, client_ips[i]),
+                    name=client_ips[i]
+                )
                 threads[client_ips[i]].start()
 
-            for i in range(len(client_ips)):
-                threads[client_ips[i]].join()
+            for thread in threads.values():
+                thread.join()
+            # for i in range(len(client_ips)):
+            #     threads[client_ips[i]] = threading.Thread(target=server.thread_offload_training,
+            #                                               args=(client_ips[i],), name=client_ips[i])
+            #     threads[client_ips[i]].start()
+            #
+            # for i in range(len(client_ips)):
+            #     threads[client_ips[i]].join()
 
-            total_training_time = time.perf_counter() - start_training
+            comp_end_time = time.process_time()
+            total_training_time = time.time() - start_training
+            end_user_resource = resource.getrusage(resource.RUSAGE_SELF).ru_utime
+            end_sys_resource = resource.getrusage(resource.RUSAGE_SELF).ru_stime
 
+            fed_logger.info(Fore.RED + f"time.process_time: {comp_end_time - comp_start_time:.4f}")
             fed_logger.info(Fore.RED + f"Total training time: {total_training_time}")
+            fed_logger.info(Fore.RED + f"User: resource.getrusage(): {end_user_resource - start_user_resource} seconds")
+            fed_logger.info(Fore.RED + f"System: resource.getrusage(): {end_sys_resource - start_sys_resource} seconds")
+
             server.total_computation_time_on_edge = max(server.computation_time_of_each_client.values())
             fed_logger.info(Fore.RED + f"each client communication time: {server.communication_time_of_each_client}")
             fed_logger.info(Fore.RED + f"computation time of each client: {server.computation_time_of_each_client}")
