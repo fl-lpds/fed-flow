@@ -146,7 +146,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             state = server.edge_based_state()
             fed_logger.info(Fore.RED + f"STATE: {str(state)}")
 
-            if r > 100:
+            if r == 0:
+                server.split_layers = [[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]
+            elif r > 35:
                 fed_logger.info("splitting")
                 server.split(state, options)
                 fed_logger.info(f"Action : {server.split_layers}")
@@ -176,16 +178,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # fed_logger.info('==> Reinitialization Finish')
 
             fed_logger.info("start training")
-            start_training_time = time.perf_counter()
-
+            start_training_time = time.time()
             server.edge_offloading_train(config.CLIENTS_LIST)
+            total_training_time = time.time() - start_training_time
 
-            total_training_time = time.perf_counter() - start_training_time
-            server.total_computation_time = max(server.computation_time_of_each_client.values())
+            server.total_computation_time = sum(server.computation_time_of_each_client.values())
             fed_logger.info(Fore.RED + f"Total time: {total_training_time}")
             fed_logger.info(Fore.RED + f"Total computation time: {server.total_computation_time}")
-            fed_logger.info(
-                Fore.RED + f"each client communication time: {server.real_communication_time_of_each_client}")
             fed_logger.info(Fore.RED + f"each client computation time: {server.computation_time_of_each_client}")
 
             fed_logger.info("receiving local weights")
@@ -239,13 +238,12 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                                                                       energy_tt_list))
 
             fed_logger.info(f"Training Time using time.time(): {training_time}")
-            server_flop, each_edge_flop, server_computation_time, each_edge_computation_time = \
-                server.getFlopsOnEdgeAndServer()
+            server_flop, each_edge_flop, = server.getFlopsOnEdgeAndServer()
             flop_on_server.append(server_flop)
-            time_on_server.append(server_computation_time)
+            time_on_server.append(server.total_computation_time)
             for edge in config.EDGE_SERVER_LIST:
                 flop_on_each_edge[edge].append(each_edge_flop[edge])
-                time_on_each_edge[edge].append(each_edge_computation_time[edge])
+                time_on_each_edge[edge].append(server.total_computation_time_of_each_edge[edge])
 
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())

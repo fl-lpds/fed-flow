@@ -27,8 +27,10 @@ class FedServerInterface(ABC, Communicator):
         self.client_remaining_energy = {}
         self.client_energy = {}
         self.client_comp_energy = {}
+        self.client_comp_time = {}
         for client, index in config.CLIENTS_CONFIG.items():
             self.client_comp_energy[client] = {}
+            self.client_comp_time[client] = {}
         self.client_comm_energy = {}
         self.power_usage_of_client = {}
         self.client_utilization = {}

@@ -29,6 +29,14 @@ from app.util import model_utils
 def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.MAGENTA + f"Heuristic Splitting algorithm =======================")
 
+    MODEL_PATH = '/fed-flow/app/model'
+    edge_linear_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_linear_model.pkl")
+    edge_poly_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_poly_model.pkl")
+
+    server_linear_model = joblib.load(f"{MODEL_PATH}/server_flops_prediction_linear_model.pkl")
+    server_poly_model = joblib.load(f"{MODEL_PATH}/server_flops_prediction_linear_model.pkl")
+    fed_logger.info(Fore.MAGENTA + f"Edge and server flops prediction model loaded =======================")
+
     client_remaining_runtime = {}
     previous_action = state['prev_action']
 
@@ -48,6 +56,9 @@ def edge_based_heuristic_splitting(state: dict, label):
     client_utilization = state['client_utilization']
     client_remaining_energy = state['client_remaining_energy']
     client_power_usage = state['client_power']
+    client_comp_time = state['client_comp_time']
+    client_comm_time = {client: comm_energy / client_power_usage[client][1] for client, comm_energy in
+                        client_comm_energy.items()}
 
     comp_time_of_each_client_on_edges = state['comp_time_of_each_client_on_edge']
     comp_time_of_each_client_on_server = state['comp_time_of_each_client_on_server']
@@ -76,10 +87,17 @@ def edge_based_heuristic_splitting(state: dict, label):
     high_prio_device = {device: score for device, score in client_score.items() if score <= 1.0}
     fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_comp_score.items()}")
     fed_logger.info(f"HIGH PRIO DEVICES: {high_prio_device.items()}")
-    classicFL_tt = trainingTimeEstimator(action, )
+    classicFL_tt = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw, flops_of_each_layer,
+                                         activation_size, total_model_size, batchNumber, edge_poly_model,
+                                         server_poly_model)
+    fed_logger.info(f"Classic FL training time approximation: {classicFL_tt}")
+
+    currentAction = previous_action
     for client, score in high_prio_device.items():
-        client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
+        client_op1 = currentAction[config.CLIENTS_CONFIG[client]][0]
+        client_op2 = currentAction[config.CLIENTS_CONFIG[client]][1]
         best_op1 = client_op1
+        best_op2 = client_op2
         if client_op1 != config.model_len - 1:
             tt_trans_now = (2 * (activation_size[client_op1]) * batchNumber) / client_bw[client]
         else:
@@ -90,8 +108,8 @@ def edge_based_heuristic_splitting(state: dict, label):
         client_comp_energy_ratio = 1 - client_comm_energy_ratio
 
         fed_logger.info(Fore.GREEN + f"====================================================")
-        fed_logger.info(Fore.GREEN + f"CLIENT : {client}")
-        fed_logger.info(Fore.GREEN + f"Activation Layer : {activation_size}")
+        fed_logger.info(Fore.GREEN + f"CLIENT: {client}")
+        fed_logger.info(Fore.GREEN + f"Activation Layer: {activation_size}")
         fed_logger.info(Fore.GREEN + f"BW : {client_bw[client]}")
         fed_logger.info(Fore.GREEN + f"Approx. transmission time : {tt_trans_now}")
         fed_logger.info(Fore.GREEN + f"Approx. communication energy : {comm_energy}")
@@ -115,45 +133,18 @@ def edge_based_heuristic_splitting(state: dict, label):
             else:
                 best_op1 = candidate_op1
                 break
+            action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
 
-        # if client_comm_energy_ratio > client_comp_energy_ratio:
-        #     condidate_op1 = int(min(activation_size, key=activation_size.get))
-        #     tt_trans = (2 * (activation_size[condidate_op1]) * batchNumber) / client_bw[client]
-        #     comm_energy = tt_trans * client_power_usage[client][1]
-        #     if condidate_op1 in client_comp_energy[client]:
-        #         comp_energy = client_comp_energy[client][condidate_op1]
-        #         if (comp_energy + comm_energy) < (
-        #                 tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]):
-        #             best_op1 = condidate_op1
-        #         else:
-        #             best_op1 = client_op1
-        #     else:
-        #         best_op1 = condidate_op1
-        # elif client_comp_energy_ratio > client_comm_energy_ratio:
-        #     filtered = {k: v for k, v in activation_size.items() if 0 <= k < client_op1}
-        #
-        #     if len(filtered.values()) == 0:
-        #         best_op1 = 0
-        #     else:
-        #         min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
-        #         for layer, size in filtered.items():
-        #             condidate_op1 = layer
-        #             tt_trans = (2 * size * batchNumber) / client_bw[client]
-        #             comm_energy = tt_trans * client_power_usage[client][1]
-        #             if condidate_op1 in client_comp_energy[client]:
-        #                 comp_energy = client_comp_energy[client][condidate_op1]
-        #                 if (comp_energy + comm_energy) < min_total_energy:
-        #                     min_total_energy = comp_energy + comm_energy
-        #                     best_op1 = condidate_op1
-        #             else:
-        #                 best_op1 = condidate_op1
+            for candidate_op2 in range(best_op1, config.model_len):
+                candidate_op2_tt = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw,
+                                                         flops_of_each_layer, activation_size, total_model_size,
+                                                         batchNumber, edge_poly_model, server_poly_model)
+                fed_logger.info(
+                    Fore.GREEN + f"Client {client}, OP2 Candidate: {candidate_op2}, candidate op2 training time: {candidate_op2_tt}")
+                if candidate_op2_tt < classicFL_tt * 1.2:
+                    action[config.CLIENTS_CONFIG[client]] = [best_op1, candidate_op2]
 
-        action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
-        # until now, we decide best op1 splitting for worst devices to reduce their energy consumption
-        # now we want to check the threshold for training time
-    fed_logger.info(Fore.GREEN + f"EDGE FLOPS: {edge_flops}")
-    fed_logger.info(Fore.GREEN + f"SERVER FLOPS: {server_flops}")
-
+        fed_logger.info(Fore.GREEN + f"client: {client}, best_op1: {best_op1}, best_op2: {best_op2}")
     return action
 
 
@@ -327,15 +318,7 @@ def actionToLayerEdgeBase(splitDecision: list[float]) -> tuple[int, int]:
 
 
 def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_server_bw, flops_of_each_layer,
-                          activation_size, total_model_size, batchNumber):
-    MODEL_PATH = '/fed-flow/app/model'
-    edge_linear_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_linear_model.pkl")
-    edge_poly_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_poly_model.pkl")
-
-    server_linear_model = joblib.load(f"{MODEL_PATH}/server_flops_prediction_linear_model.pkl")
-    server_poly_model = joblib.load(f"{MODEL_PATH}/server_flops_prediction_linear_model.pkl")
-    fed_logger.info(Fore.MAGENTA + f"Edge and server flops prediction model loaded =======================")
-
+                          activation_size, total_model_size, batchNumber, edge_flops_model, server_flops_model):
     edge_flops = {edgeIP: 0.0 for edgeIP in config.EDGE_SERVER_LIST}
     server_flops = 0
     transmission_time_on_each_client = {}
@@ -344,41 +327,43 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
 
     total_time_for_each_client = {}
 
-    for edgeIP in config.EDGE_SERVER_LIST:
-        for clientIP in config.EDGE_MAP[edgeIP]:
-            clientAction = action[config.CLIENTS_CONFIG[clientIP]]
-            op1 = clientAction[0]
-            op2 = clientAction[1]
+    for i in range(len(action)):
+        clientAction = action[i]
+        clientIP = config.CLIENTS_INDEX[i]
+        edgeIP = config.CLIENT_MAP[clientIP]
+        op1 = clientAction[0]
+        op2 = clientAction[1]
 
-            if op1 != config.model_len - 1:
-                transmission_time_on_each_client[clientIP] = (2 * (activation_size[op1]) * batchNumber) / clients_bw[
-                    clientIP]
-            else:
-                transmission_time_on_each_client[clientIP] = total_model_size / clients_bw[clientIP]
+        if op1 != config.model_len - 1:
+            transmission_time_on_each_client[clientIP] = ((2 * (activation_size[op1]) * batchNumber)
+                                                          / clients_bw[clientIP])
+        else:
+            transmission_time_on_each_client[clientIP] = total_model_size / clients_bw[clientIP]
 
-            if op2 != config.model_len - 1:
-                edge_server_transmission_time_for_each_client[clientIP] = (2 * (activation_size[op2]) * batchNumber) / \
-                                                                          edge_server_bw[edgeIP]
-            else:
-                edge_server_transmission_time_for_each_client[clientIP] = total_model_size / edge_server_bw[edgeIP]
+        if op2 != config.model_len - 1:
+            edge_server_transmission_time_for_each_client[clientIP] = ((2 * (activation_size[op2]) * batchNumber) /
+                                                                       edge_server_bw[edgeIP])
+        else:
+            edge_server_transmission_time_for_each_client[clientIP] = total_model_size / edge_server_bw[edgeIP]
 
-            # offloading on client, edge and server
-            if op1 < op2 < config.model_len - 1:
-                edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                server_flops += sum(flops_of_each_layer[op2 + 1:])
-            # offloading on client and edge
-            elif (op1 < op2) and op2 == config.model_len - 1:
-                edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-            # offloading on client and server
-            elif (op1 == op2) and op1 < config.model_len - 1:
-                server_flops += sum(flops_of_each_layer[op2 + 1:])
+        # offloading on client, edge and server
+        if op1 < op2 < config.model_len - 1:
+            edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+            server_flops += sum(flops_of_each_layer[op2 + 1:])
+        # offloading on client and edge
+        elif (op1 < op2) and op2 == config.model_len - 1:
+            edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+        # offloading on client and server
+        elif (op1 == op2) and op1 < config.model_len - 1:
+            server_flops += sum(flops_of_each_layer[op2 + 1:])
 
     EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
-    comp_time_on_each_edge = {edge: edge_poly_model.predict([[index, edge_flops[edge]]]) for edge, index in EDGE_INDEX}
-    comp_time_on_server = server_poly_model.predict([[server_flops]])
+    comp_time_on_each_edge = {edge: edge_flops_model.predict([[index, edge_flops[edge]]]) for edge, index in EDGE_INDEX}
+    comp_time_on_server = server_flops_model.predict([[server_flops]])
 
     for clientIP in config.CLIENTS_CONFIG.keys():
-        total_time_for_each_client[clientIP] = comp_time_on_each_client[clientIP] + \
+        op1 = action[config.CLIENTS_CONFIG[clientIP]][0]
+        total_time_for_each_client[clientIP] = comp_time_on_each_client[clientIP][op1] + \
                                                transmission_time_on_each_client[clientIP] + \
                                                edge_server_transmission_time_for_each_client[clientIP]
 
