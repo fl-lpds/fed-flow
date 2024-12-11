@@ -35,6 +35,10 @@ class FedClient(FedBaseNodeInterface):
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, config.lr_step_size, config.lr_gamma)
 
+    def initialize(self, learning_rate):
+        self.net = model_utils.get_model('Client', self.split_layers, self.device, self.is_edge_based)
+        self.optimizer = optim.SGD(self.net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
+
     def gather_global_weights(self, node_type: NodeType):
         msgs: list[ReceivedMessage] = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [node_type])
         msg: GlobalWeightMessage = msgs[0].message
@@ -133,4 +137,3 @@ class FedClient(FedBaseNodeInterface):
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)
-
