@@ -3,15 +3,14 @@ import time
 from abc import ABC
 
 from app.config import config
-from app.config.logger import fed_logger
 from app.dto.bandwidth import BandWidth
 from app.dto.message import BaseMessage, GlobalWeightMessage, SplitLayerConfigMessage, MessageType, NetworkTestMessage
 from app.dto.received_message import ReceivedMessage
 from app.entity.communicator import Communicator
+from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node import Node
 from app.entity.node_identifier import NodeIdentifier
 from app.entity.node_type import NodeType
-from app.entity.http_communicator import HTTPCommunicator
 from app.util import data_utils
 
 
@@ -24,6 +23,7 @@ class FedBaseNodeInterface(ABC, Node, Communicator):
         self.uninet = None
         self.split_layers = None
         self.device = None
+        self._edge_based = None
 
     def scatter_msg(self, msg: BaseMessage, neighbors_types: list[NodeType] = None):
         for neighbor in self.get_neighbors(neighbors_types):
@@ -55,7 +55,7 @@ class FedBaseNodeInterface(ABC, Node, Communicator):
             neighbor_type = HTTPCommunicator.get_node_type(neighbor)
             if neighbors_type is None or neighbor_type == neighbors_type:
                 net_threads[neighbor] = threading.Thread(target=self._thread_network_testing,
-                                                              args=(neighbor,), name=str(neighbor))
+                                                         args=(neighbor,), name=str(neighbor))
                 net_threads[neighbor].start()
 
         for _, thread in net_threads.items():
@@ -71,3 +71,27 @@ class FedBaseNodeInterface(ABC, Node, Communicator):
         network_time_end = time.time()
         self.neighbor_bandwidth[neighbor] = BandWidth(data_utils.sizeofmessage(msg.weights),
                                                       network_time_end - network_time_start)
+
+    @property
+    def is_edge_based(self) -> bool:
+        if self._edge_based is not None:
+            return self._edge_based
+        self._edge_based = False
+        for edge in self.get_neighbors([NodeType.EDGE]):
+            server_neighbors = HTTPCommunicator.get_neighbors_from_neighbor(edge)
+            if len(server_neighbors) > 0:
+                self._edge_based = True
+                break
+        return self._edge_based
+
+    def initialize_split_layers(self):
+        self.split_layers = {}
+        if not self.is_edge_based:
+            assert self._node_type == NodeType.EDGE
+            for neighbor in self.get_neighbors([NodeType.CLIENT]):
+                self.split_layers[neighbor] = len(self.uninet.cfg) - 1
+        else:
+            assert self._node_type == NodeType.SERVER
+            for edge in self.get_neighbors([NodeType.EDGE]):
+                for client in HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT]):
+                    self.split_layers[client] = [len(self.uninet.cfg) - 1, len(self.uninet.cfg) - 1]

@@ -44,7 +44,7 @@ class FedServer(FedBaseNodeInterface):
         self.split_layers: dict[NodeIdentifier, list] = {}
         self.aggregator = aggregator
 
-        self.uninet = model_utils.get_model('Unit', None, self.device, True)
+        self.uninet = model_utils.get_model('Unit', None, self.device, self.is_edge_based)
 
         self.testset = data_utils.get_testset()
         self.testloader = data_utils.get_testloader(self.testset, 0)
@@ -53,10 +53,9 @@ class FedServer(FedBaseNodeInterface):
     def initialize(self, LR):
         self.nets = {}
         self.optimizers = {}
+        self.initialize_split_layers()
         for edge in self.get_neighbors([NodeType.EDGE]):
             for client in HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT]):
-                if client not in self.split_layers:
-                    self.split_layers[client] = [len(self.uninet.cfg) - 4, len(self.uninet.cfg) - 2]
                 split_point = self.split_layers[client][1]
                 if split_point < len(self.uninet.cfg) - 1:
                     self.nets[client] = model_utils.get_model('Server', self.split_layers[client], self.device, True)
@@ -75,10 +74,9 @@ class FedServer(FedBaseNodeInterface):
         self.criterion = nn.CrossEntropyLoss()
 
     def scatter_split_layers(self, neighbors_types: list[NodeType] = None):
-        for edge in self.get_neighbors([NodeType.EDGE]):
-            clients = HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT])
-            msg = SplitLayerConfigMessage(dict((k, self.split_layers[k]) for k in self.split_layers if k in clients))
-            self.send_msg(self.get_exchange_name(), HTTPCommunicator.get_rabbitmq_url(edge), msg)
+        for neighbor in self.get_neighbors():
+            msg = SplitLayerConfigMessage(self.split_layers)
+            self.send_msg(self.get_exchange_name(), HTTPCommunicator.get_rabbitmq_url(neighbor), msg)
 
     def start_edge_training(self):
         self.threads = {}
