@@ -29,7 +29,7 @@ def get_trainset():
 def get_trainloader(trainset, part_tr, cpu_count):
     subset = Subset(trainset, part_tr)
     trainloader = DataLoader(
-        subset, batch_size=B, shuffle=True, num_workers=cpu_count)
+        subset, batch_size=B, shuffle=True, num_workers=0)
     return trainloader
 
 
@@ -42,7 +42,7 @@ def sizeofmessage(msg):
 
 
 def get_testloader(testset, cpu_count):
-    return torch.utils.data.DataLoader(testset, batch_size=B, shuffle=False, num_workers=cpu_count)
+    return torch.utils.data.DataLoader(testset, batch_size=B, shuffle=False, num_workers=0)
 
 
 def get_testset():

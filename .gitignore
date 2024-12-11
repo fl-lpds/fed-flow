@@ -1,0 +1,11 @@
+Results
+VGG.pth
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+.DS_Store
+app/dataset

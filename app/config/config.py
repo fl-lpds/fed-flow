@@ -21,10 +21,10 @@ model_cfg = {
 N = 50000  # data length
 # mq_url = "sparrow.rmq.cloudamqp.com"
 mq_port = 5672
-mq_url = "amqp://user:password@broker:5672/%2F"
-mq_host = "broker"
-mq_user = "user"
-mq_pass = "password"
+mq_url = "amqp://user:password@localhost:5672/%2F"
+mq_host = "localhost"
+mq_user = "rabbitmq"
+mq_pass = "rabbitmq"
 mq_vh = "/"
 cluster = "fed-flow"
 current_round = 0
@@ -32,12 +32,13 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [[6, 6], [6, 6], [6, 6]]  # Initial split layers
+# split_layer = [6,6,6]  # Initial split layers
+split_layer = [[6, 6], [6, 6], [6, 6]]
 model_len = 7
 
 # FL training configration
 
-R = 100  # FL rounds
+R = 70  # FL rounds
 LR = 0.01  # Learning rate
 B = 100  # Batch size
 
@@ -66,7 +67,7 @@ EDGESERVER_PORT = {'edge1': 5001}
 
 K = 3  # Number of devices
 G = 1  # Number of groups
-S = 1  # Number of server connecting devices
+S = 3  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}

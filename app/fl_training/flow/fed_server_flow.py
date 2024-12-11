@@ -154,10 +154,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
+            fed_logger.info('==> Accuracy: {:}'.format(test_acc))
 
-            # plot_graph(x, tt, avgEnergy, remainingEnergy, iotBW, edgeBW, res['test_acc_record'])
         else:
             break
+    plot_graph(x, tt, accuracy=res['test_acc_record'])
     fed_logger.info(f"{socket.gethostname()} quit")
 
 
@@ -269,13 +270,13 @@ def run_no_edge(server: FedServerInterface, LR, options):
 
 def plot_graph(x, tt=None, avgEnergy=None, remainingEnergy=None, iotBW=None, edgeBW=None, accuracy=None):
     if tt:
-        rl_utils.draw_graph(10, 5, x, tt, "Training time", "FL Rounds", "Training Time", "/fed-flow/Graphs",
+        rl_utils.draw_graph(10, 5, x, tt, "Training time", "FL Rounds", "Training Time", "./fed-flow/Graphs",
                             "trainingTime", True)
     if avgEnergy:
-        rl_utils.draw_graph(10, 5, x, avgEnergy, "Energy time", "FL Rounds", "Energy", "/fed-flow/Graphs",
+        rl_utils.draw_graph(10, 5, x, avgEnergy, "Energy time", "FL Rounds", "Energy", "./fed-flow/Graphs",
                             "energy", True)
     if accuracy:
-        rl_utils.draw_graph(10, 5, x, accuracy, "Accuracy", "FL Rounds", "Accuracy", "/fed-flow/Graphs",
+        rl_utils.draw_graph(10, 5, x, accuracy, "Accuracy", "FL Rounds", "Accuracy", "./fed-flow/Graphs",
                             "accuracy", True)
 
     if remainingEnergy:
@@ -294,7 +295,7 @@ def plot_graph(x, tt=None, avgEnergy=None, remainingEnergy=None, iotBW=None, edg
             plt.ylabel("remaining energy")
             plt.plot(x, iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
-        plt.savefig(os.path.join("/fed-flow/Graphs", f"Remaining Energies"))
+        plt.savefig(os.path.join("./fed-flow/Graphs", f"Remaining Energies"))
         plt.close()
 
     if iotBW:

@@ -1,4 +1,5 @@
 import socket
+
 import sys
 
 import numpy as np
@@ -12,6 +13,8 @@ from app.util import message_utils, model_utils, data_utils
 from app.entity.interface.fed_client_interface import FedClientInterface
 from app.config.logger import fed_logger
 from app.util.energy_estimation import *
+
+socket.gethostname = lambda: f"client{config.index + 1}"
 
 np.random.seed(0)
 torch.manual_seed(0)
