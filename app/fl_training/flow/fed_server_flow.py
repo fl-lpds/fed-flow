@@ -98,14 +98,42 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's activation and gradient size started on server")
     server.calculate_each_layer_activation_gradiant_size()
+
     fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's FLOP started on server")
     server.calculate_each_layer_FLOP()
 
+    flops_of_each_layer = server.model_flops_per_layer
+    flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
+    flops_of_each_layer = list(flops_of_each_layer.values())
+    test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
+    # low load on edge 90% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # medium load on edge 50% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # high load on edge 100% of each model on edge
+    op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # low load on server 90% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # medium load on server 50% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # high load on server 100% of each model on edge
+    op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    fed_logger.info(Fore.RED + f"Load testing: {test_load_on_edges_and_server}")
+
     fed_logger.info('Getting power usage from edge servers')
     server.get_power_of_client()
-    i = config.model_len - 1
-    j = 0
-    server.split_layers = [[i] * 2 for _ in range(config.K)]
 
     for r in range(config.R):
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
@@ -146,23 +174,12 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             state = server.edge_based_state()
             fed_logger.info(Fore.RED + f"STATE: {str(state)}")
 
-            if r == 0:
-                server.split_layers = [[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]
-            elif r > 35:
+            if r < len(test_load_on_edges_and_server):
+                server.split_layers = test_load_on_edges_and_server[r]
+            else:
                 fed_logger.info("splitting")
                 server.split(state, options)
                 fed_logger.info(f"Action : {server.split_layers}")
-            else:
-                splitting = server.split_layers
-                if i != -1:
-                    splitting[j][0] = i
-                    i -= 1
-                else:
-                    i = config.model_len - 1
-                    if j != len(config.CLIENTS_CONFIG.keys()) - 1:
-                        j += 1
-                    splitting[j][0] = i
-                server.split_layers = splitting
 
             fed_logger.info("Scattering splitting info to edges.")
             server.send_split_layers_config()
@@ -228,7 +245,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             e_time = time.time()
 
-            # Recording each round training time, bandwidth and test_app accuracy
             training_time = e_time - s_time
             tt.append(training_time)
 
@@ -575,6 +591,8 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.plot(flops_on_server, color="Red", linewidth='3', label=f"Central Server")
         plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of central server"))
         plt.close()
+
+        fed_logger.info(Fore.MAGENTA + f"{flops_on_server}, {time_on_server}")
         with open('/fed-flow/Graphs/server_flop_time.csv', 'w', newline='') as file:
             array = []
             for flop, timeTaken in zip(flops_on_server, time_on_server):

@@ -87,9 +87,11 @@ def edge_based_heuristic_splitting(state: dict, label):
     high_prio_device = {device: score for device, score in client_score.items() if score <= 1.0}
     fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_comp_score.items()}")
     fed_logger.info(f"HIGH PRIO DEVICES: {high_prio_device.items()}")
-    classicFL_tt = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw, flops_of_each_layer,
-                                         activation_size, total_model_size, batchNumber, edge_poly_model,
-                                         server_poly_model)
+
+    classicFL_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
+    classicFL_tt = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw,
+                                         flops_of_each_layer, activation_size, total_model_size, batchNumber,
+                                         edge_poly_model, server_poly_model)
     fed_logger.info(f"Classic FL training time approximation: {classicFL_tt}")
 
     currentAction = previous_action
@@ -360,7 +362,7 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
     EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
     comp_time_on_each_edge = {edge: edge_flops_model.predict([[index, edge_flops[edge]]]) for edge, index in EDGE_INDEX}
     comp_time_on_server = server_flops_model.predict([[server_flops]])
-
+    fed_logger.info(Fore.GREEN + f"{action}, {config.CLIENTS_CONFIG}")
     for clientIP in config.CLIENTS_CONFIG.keys():
         op1 = action[config.CLIENTS_CONFIG[clientIP]][0]
         total_time_for_each_client[clientIP] = comp_time_on_each_client[clientIP][op1] + \
@@ -370,4 +372,4 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
     total_trainingTime = max(total_time_for_each_client.values()) + comp_time_on_server + max(
         comp_time_on_each_edge.values())
 
-    return total_trainingTime
+    return total_trainingTime[0]

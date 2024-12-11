@@ -737,12 +737,12 @@ class FedServer(FedServerInterface):
                 elif (op1 == op2) and op1 < config.model_len - 1:
                     flop_on_server += sum(flops_of_each_layer[op2 + 1:])
             flop_on_each_edge[edgeIP] = edge_flops
-
+        fed_logger.info(Fore.RED + f"SERVER and EDGE FLOPS : {flop_on_server}, {flop_on_each_edge}")
         return flop_on_server, flop_on_each_edge
 
     def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list):
         total_time_for_each_client = {}
-        fed_logger.info(Fore.GREEN + f"AAAAAAA: {self.client_training_transmissionTime}")
+
         if len(config.CLIENTS_LIST) > 0:
             for clientip in config.CLIENTS_LIST:
                 total_time_for_each_client[clientip] = \

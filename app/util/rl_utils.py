@@ -5,10 +5,11 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
-# from gymnasium import spaces
 
-import app.util.model_utils as model_utils
-from app.config.config import K, G
+import config
+
+
+# from gymnasium import spaces
 
 
 # from tensorforce import Agent
@@ -186,31 +187,38 @@ def randomSelectionSplitting(modelLen, deviceNumber) -> list[list[int]]:
 #         raise Exception('Invalid config select from [ppo, ac, tensorforce, random]')
 
 
-def actionToLayerEdgeBase(splitDecision: list[float]) -> tuple[float, float]:
+def actionToLayer(splitDecision: list[float], flop_per_layer) -> tuple[float, float]:
     """ It returns the offloading points for the given action ( op1 , op2 )"""
     op1: float
-    op2: float  # Offloading points op1, op2
+    op2: float
     workLoad = []
     model_state_flops = []
-    for l in model_utils.get_unit_model().cfg:
-        workLoad.append(l[5])
+
+    print(f"{flop_per_layer} flops")
+    for l in flop_per_layer:
+        workLoad.append(l)
         model_state_flops.append(sum(workLoad))
 
     totalWorkLoad = sum(workLoad)
     model_flops_list = np.array(model_state_flops)
-    model_flops_list = model_flops_list / totalWorkLoad
+    model_flops_list = (model_flops_list / totalWorkLoad)
+    print(model_flops_list)
     idx = np.where(np.abs(model_flops_list - splitDecision[0]) == np.abs(model_flops_list - splitDecision[0]).min())
     op1 = int(idx[0][-1])
 
-    op2_totalWorkload = sum(workLoad[op1:])
+    op2_totalWorkload = sum(workLoad[op1 + 1:])
     model_state_flops = []
-    for l in range(op1, model_utils.get_unit_model_len()):
-        model_state_flops.append(sum(workLoad[op1:l + 1]))
+    import app.config.config as cfg
+    for l in range(op1 + 1, cfg.model_len):
+        model_state_flops.append(sum(workLoad[op1 + 1:l + 1]))
     model_flops_list = np.array(model_state_flops)
     model_flops_list = model_flops_list / op2_totalWorkload
-
+    print(model_flops_list)
     idx = np.where(np.abs(model_flops_list - splitDecision[1]) == np.abs(model_flops_list - splitDecision[1]).min())
-    op2 = int(idx[0][-1]) + op1
+    if splitDecision[1] != 0:
+        op2 = (int(idx[0][-1]) + 1) + op1
+    else:
+        op2 = op1
 
     return op1, op2
 
