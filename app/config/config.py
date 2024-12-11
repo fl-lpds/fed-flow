@@ -38,7 +38,7 @@ model_len = 7
 
 # FL training configration
 
-R = 70  # FL rounds
+R = 3  # FL rounds
 LR = 0.01  # Learning rate
 B = 100  # Batch size
 

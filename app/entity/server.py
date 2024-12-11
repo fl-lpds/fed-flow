@@ -1,3 +1,4 @@
+import json
 import sys
 import threading
 import time
@@ -192,8 +193,11 @@ class FedServer(FedServerInterface):
 
     def aggregate(self, client_ips, aggregate_method, eweights: dict):
         w_local_list = []
+        if not hasattr(self, 'round'):
+            self.round = 0
+        self.round += 1
         # fed_logger.info("aggregation start")
-        for client in eweights.keys():
+        for index, client in enumerate(eweights.keys()):
             if self.offload:
                 i = config.CLIENTS_CONFIG[client]
                 sp = self.split_layers[i]
@@ -212,11 +216,14 @@ class FedServer(FedServerInterface):
             # test_model = model_utils.get_model('Unit', None, self.device, self.edge_based)
             # acc = model_utils.test(test_model, self.testloader, self.device, self.criterion)
             # fed_logger.info(Fore.MAGENTA + f"mini accuracy: {acc}")
-
+            with open(f'weights/client_local_{self.round}_{index}', 'w') as f:
+                f.write(str(w_local))
             w_local_list.append(w_local)
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = aggregate_method(zero_model, w_local_list, config.N)
         self.uninet.load_state_dict(aggregated_model)
+        with open(f'weights/server_aggregated_{self.round}', 'w') as f:
+            f.write(str(self.uninet.state_dict()))
         return aggregated_model
 
     def test_network(self, connection_ips):
