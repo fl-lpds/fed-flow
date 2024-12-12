@@ -28,7 +28,10 @@ def run_edge_based(client: FedClientInterface, LR):
     client.send_power_to_edge()
 
     for r in range(config.R):
-        simnet_BW = (config.index + r + 1) * 10_000_000
+        if r < 20:
+            simnet_BW = 10_000_000
+        else:
+            simnet_BW = 100_000_000
 
         config.current_round = r
         fed_logger.info('====================================>')

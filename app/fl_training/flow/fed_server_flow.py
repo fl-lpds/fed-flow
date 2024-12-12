@@ -105,7 +105,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     flops_of_each_layer = server.model_flops_per_layer
     flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
     flops_of_each_layer = list(flops_of_each_layer.values())
+
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
+
     # low load on edge 90% of each model on client
     op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
     test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
@@ -595,7 +597,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         fed_logger.info(Fore.MAGENTA + f"{flops_on_server}, {time_on_server}")
         with open('/fed-flow/Graphs/server_flop_time.csv', 'w', newline='') as file:
             array = []
-            for flop, timeTaken in zip(flops_on_server, time_on_server):
+            for flop, timeTaken in zip(flop_on_server, time_on_server):
                 array.append([flop, timeTaken])
             writer = csv.writer(file)
             writer.writerows(array)

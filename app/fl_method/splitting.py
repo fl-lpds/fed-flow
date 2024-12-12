@@ -136,15 +136,20 @@ def edge_based_heuristic_splitting(state: dict, label):
                 best_op1 = candidate_op1
                 break
             action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
-
+            min_total_training_time = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw,
+                                                            flops_of_each_layer, activation_size, total_model_size,
+                                                            batchNumber, edge_poly_model, server_poly_model)
             for candidate_op2 in range(best_op1, config.model_len):
-                candidate_op2_tt = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw,
+                candidateAction = action
+                candidateAction[config.CLIENTS_CONFIG[client]][1] = candidate_op2
+                candidate_op2_tt = trainingTimeEstimator(candidateAction, client_comp_time, client_bw, edge_server_bw,
                                                          flops_of_each_layer, activation_size, total_model_size,
                                                          batchNumber, edge_poly_model, server_poly_model)
                 fed_logger.info(
                     Fore.GREEN + f"Client {client}, OP2 Candidate: {candidate_op2}, candidate op2 training time: {candidate_op2_tt}")
-                if candidate_op2_tt < classicFL_tt * 1.2:
+                if candidate_op2_tt < min_total_training_time:
                     action[config.CLIENTS_CONFIG[client]] = [best_op1, candidate_op2]
+                    min_total_training_time = candidate_op2_tt
 
         fed_logger.info(Fore.GREEN + f"client: {client}, best_op1: {best_op1}, best_op2: {best_op2}")
     return action

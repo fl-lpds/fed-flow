@@ -3,6 +3,7 @@ import io
 import json
 import logging
 import pickle
+import time
 
 import pika
 import torch
@@ -173,6 +174,8 @@ class Communicator(object):
                 msg.extend(res)
                 fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
                 return msg
+
+            time.sleep(1)
 
     @staticmethod
     def serialize_message(msg, is_weight=False):
