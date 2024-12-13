@@ -150,7 +150,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                 if candidate_op2_tt < min_total_training_time:
                     action[config.CLIENTS_CONFIG[client]] = [best_op1, candidate_op2]
                     min_total_training_time = candidate_op2_tt
-
+        action[config.CLIENTS_CONFIG[client]] = [best_op1, best_op2]
         fed_logger.info(Fore.GREEN + f"client: {client}, best_op1: {best_op1}, best_op2: {best_op2}")
     return action
 

@@ -65,11 +65,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     training_y = []
 
     avgEnergy, tt, simnet_tt = [], [], []
-    iotBW, edge_server_BW = {}, {}
+    clientBW, edge_server_BW = {}, {}
     clientRemainingEnergy = {}
     clientConsumedEnergy = {}
     clientCompEnergy = {}
     clientCommEnergy = {}
+    clientCompTime = {}
+    clientCommTime = {}
     clientUtilization = {}
     clientTT = {}
 
@@ -79,12 +81,14 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     time_on_server = []
 
     for client in config.CLIENTS_LIST:
-        iotBW[client] = []
+        clientBW[client] = []
         clientRemainingEnergy[client] = []
         clientConsumedEnergy[client] = []
         clientUtilization[client] = []
         clientCompEnergy[client] = []
         clientCommEnergy[client] = []
+        clientCompTime[client] = []
+        clientCommTime[client] = []
         clientTT[client] = []
 
     for edge in config.EDGE_SERVER_LIST:
@@ -160,7 +164,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 server.client_network(config.EDGE_SERVER_LIST)
 
             for client in server.client_bandwidth.keys():
-                iotBW[client].append(server.client_bandwidth[client])
+                clientBW[client].append(server.client_bandwidth[client])
             for edge_server in server.edge_bandwidth.keys():
                 edge_server_BW[edge_server].append(server.edge_bandwidth[edge_server])
 
@@ -234,6 +238,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             for client in energy_tt_list.keys():
                 clientCompEnergy[client].append(energy_tt_list[client][0])
                 clientCommEnergy[client].append(energy_tt_list[client][1])
+                compTime = energy_tt_list[client][0] / (
+                        energy_tt_list[client][4] * server.power_usage_of_client[client][0])
+                commTime = energy_tt_list[client][1] / server.power_usage_of_client[client][1]
+                clientCompTime[client].append(compTime)
+                clientCommTime[client].append(commTime)
                 clientConsumedEnergy[client].append(energy_tt_list[client][0] + energy_tt_list[client][1])
                 clientTT[client].append(energy_tt_list[client][2])
                 clientRemainingEnergy[client].append(energy_tt_list[client][3])
@@ -275,8 +284,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
             plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
-                       clientRemainingEnergy, iotBW, edge_server_BW, clientUtilization, res['test_acc_record'],
-                       flop_on_each_edge, time_on_each_edge, flop_on_server, time_on_server)
+                       clientRemainingEnergy, clientBW, edge_server_BW, clientUtilization, res['test_acc_record'],
+                       flop_on_each_edge, time_on_each_edge, flop_on_server, time_on_server, clientCompTime,
+                       clientCommTime)
         else:
             break
 
@@ -352,7 +362,7 @@ def run_no_edge(server: FedServerInterface, LR, options):
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     avgEnergy, tt, remainingEnergy = [], [], []
-    iotBW, edgeBW = [], []
+    clientBW, edgeBW = [], []
     for r in range(config.R):
         if config.K > 0:
             config.current_round = r
@@ -393,9 +403,9 @@ def run_no_edge(server: FedServerInterface, LR, options):
 
 
 def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=None, clientCompEnergy=None,
-               clientCommEnergy=None, clientTT=None, remainingEnergy=None, iotBW=None, edge_serverBW=None,
+               clientCommEnergy=None, clientTT=None, remainingEnergy=None, clientBW=None, edge_serverBW=None,
                clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None,
-               flop_on_server=None, time_on_server=None):
+               flop_on_server=None, time_on_server=None, clientCompTime=None, clientCommTime=None):
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -464,6 +474,38 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Communication Energy"))
         plt.close()
 
+    if clientCompTime:
+        plt.figure(figsize=(int(25), int(5)))
+        for k in clientCompTime.keys():
+            iotDevice_K = clientCompTime[k]
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            plt.title(f"Computation Time of iot devices")
+            plt.xlabel("FL Round")
+            plt.ylabel("Computation energy")
+            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+        plt.legend()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"Computation time of client"))
+        plt.close()
+
+    if clientCommTime:
+        plt.figure(figsize=(int(25), int(5)))
+        for k in clientCommTime.keys():
+            iotDevice_K = clientCommTime[k]
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            plt.title(f"Communication Time of iot devices")
+            plt.xlabel("FL Round")
+            plt.ylabel("Communication energy")
+            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+        plt.legend()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"Communication time of client"))
+        plt.close()
+
     if clientTT:
         plt.figure(figsize=(int(25), int(5)))
         for k in clientTT.keys():
@@ -512,10 +554,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.savefig(os.path.join("/fed-flow/Graphs", f"client utilization"))
         plt.close()
 
-    if iotBW:
+    if clientBW:
         plt.figure(figsize=(int(25), int(5)))
-        for k in iotBW.keys():
-            iotDevice_K = iotBW[k]
+        for k in clientBW.keys():
+            iotDevice_K = clientBW[k]
             r = random.random()
             b = random.random()
             g = random.random()
@@ -525,7 +567,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("BW")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
-        plt.savefig(os.path.join("/fed-flow/Graphs", f"iotBW"))
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"clientBW"))
         plt.close()
 
     if edge_serverBW:
