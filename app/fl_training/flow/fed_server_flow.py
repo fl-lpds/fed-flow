@@ -136,6 +136,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
     test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
+    for layer in range(config.model_len - 1):
+        test_load_on_edges_and_server.append([[layer, config.model_len-1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
     fed_logger.info(Fore.RED + f"Load testing: {test_load_on_edges_and_server}")
 
     fed_logger.info('Getting power usage from edge servers')
