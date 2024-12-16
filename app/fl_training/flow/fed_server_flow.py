@@ -77,6 +77,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     flop_on_each_edge = {}
     time_on_each_edge = {}
+    flop_of_each_edge_on_server = {}
     flop_on_server = []
     time_on_server = []
 
@@ -95,6 +96,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
         edge_server_BW[edge] = []
         flop_on_each_edge[edge] = []
         time_on_each_edge[edge] = []
+        flop_of_each_edge_on_server[edge] = []
 
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
@@ -137,7 +139,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
     for layer in range(config.model_len - 1):
-        test_load_on_edges_and_server.append([[layer, config.model_len-1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+        test_load_on_edges_and_server.append(
+            [[layer, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
     fed_logger.info(Fore.RED + f"Load testing: {test_load_on_edges_and_server}")
 
@@ -268,12 +271,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                                                                       energy_tt_list))
 
             fed_logger.info(f"Training Time using time.time(): {training_time}")
-            server_flop, each_edge_flop, = server.getFlopsOnEdgeAndServer()
+            server_flop, each_edge_flop, flop_of_each_edges_on_server = server.getFlopsOnEdgeAndServer()
             flop_on_server.append(server_flop)
             time_on_server.append(server.total_computation_time)
             for edge in config.EDGE_SERVER_LIST:
                 flop_on_each_edge[edge].append(each_edge_flop[edge])
                 time_on_each_edge[edge].append(server.total_computation_time_of_each_edge[edge])
+                flop_of_each_edge_on_server[edge].append(flop_of_each_edges_on_server[edge])
 
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())
@@ -286,10 +290,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
+            fed_logger.info(Fore.MAGENTA + f"Flop on server: {flop_on_server}")
             plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
                        clientRemainingEnergy, clientBW, edge_server_BW, clientUtilization, res['test_acc_record'],
-                       flop_on_each_edge, time_on_each_edge, flop_on_server, time_on_server, clientCompTime,
-                       clientCommTime)
+                       flop_on_each_edge, time_on_each_edge, flop_of_each_edge_on_server, flop_on_server,
+                       time_on_server, clientCompTime, clientCommTime)
         else:
             break
 
@@ -408,7 +413,8 @@ def run_no_edge(server: FedServerInterface, LR, options):
 def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=None, clientCompEnergy=None,
                clientCommEnergy=None, clientTT=None, remainingEnergy=None, clientBW=None, edge_serverBW=None,
                clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None,
-               flop_on_server=None, time_on_server=None, clientCompTime=None, clientCommTime=None):
+               flop_of_each_edge_on_server=None, flop_on_server=None, time_on_server=None, clientCompTime=None,
+               clientCommTime=None):
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -602,32 +608,37 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             flops_of_each_edge[edge] = [w / t if t != 0 else float('inf') for w, t in
                                         zip(flop_on_each_edge[edge], time_on_each_edge[edge])]
 
-            plt.figure(figsize=(int(25), int(5)))
-            for k in flops_of_each_edge.keys():
-                edgeDevice_K = flops_of_each_edge[k]
-                r = random.random()
-                b = random.random()
-                g = random.random()
-                color = (r, g, b)
-                plt.title(f"Flops of edge devices")
-                plt.xlabel("round")
-                plt.ylabel("FLOPS")
-                plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
-            plt.legend()
-            plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
-            plt.close()
+        plt.figure(figsize=(int(25), int(5)))
+        for k in flops_of_each_edge.keys():
+            edgeDevice_K = flops_of_each_edge[k]
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            plt.title(f"Flops of edge devices")
+            plt.xlabel("round")
+            plt.ylabel("FLOPS")
+            plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
+        plt.legend()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
+        plt.close()
 
-            with open('/fed-flow/Graphs/edge_flop_time.csv', 'w', newline='') as file:
-                array = []
-                for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
-                    edge = config.EDGE_SERVER_CONFIG[edgeIndex]
-                    for flop, timeTaken in zip(flop_on_each_edge[edge], time_on_each_edge[edge]):
-                        array.append([edgeIndex, flop, timeTaken])
-                writer = csv.writer(file)
-                writer.writerows(array)
+        with open('/fed-flow/Graphs/edge_flop_time.csv', 'w', newline='') as file:
+            array = []
+            for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
+                edge = config.EDGE_SERVER_CONFIG[edgeIndex]
+                for flop, flop_of_edge_on_server, flop_on_servers, timeTaken in zip(flop_on_each_edge[edge],
+                                                                                    flop_of_each_edge_on_server[edge],
+                                                                                    flop_on_server,
+                                                                                    time_on_each_edge[edge]):
+                    array.append([edgeIndex, flop, flop_of_edge_on_server, flop_on_servers, timeTaken])
+            writer = csv.writer(file)
+            writer.writerows(array)
 
-            model_utils.createFlopsPredictionModel(flop_time_csv_path='/fed-flow/Graphs/edge_flop_time.csv',
-                                                   isEdge=True)
+        model_utils.createFlopsPredictionModel(flop_time_csv_path='/fed-flow/Graphs/edge_flop_time.csv',
+                                               isEdge=True)
+
+    fed_logger.info(Fore.MAGENTA + f"{time_on_server}, {flop_on_server}")
     if flop_on_server:
         rl_utils.draw_scatter(time_on_server, flop_on_server, "FLOP-Time", "Total time", "FLOP",
                               "/fed-flow/Graphs", "FLOP-Time Scatter server", True)
@@ -639,7 +650,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of central server"))
         plt.close()
 
-        fed_logger.info(Fore.MAGENTA + f"{flops_on_server}, {time_on_server}")
+        fed_logger.info(Fore.MAGENTA + f"{flop_on_server}, {time_on_server}")
         with open('/fed-flow/Graphs/server_flop_time.csv', 'w', newline='') as file:
             array = []
             for flop, timeTaken in zip(flop_on_server, time_on_server):

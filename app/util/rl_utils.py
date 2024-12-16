@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-import config
-
 
 # from gymnasium import spaces
 
@@ -194,7 +192,6 @@ def actionToLayer(splitDecision: list[float], flop_per_layer) -> tuple[float, fl
     workLoad = []
     model_state_flops = []
 
-    print(f"{flop_per_layer} flops")
     for l in flop_per_layer:
         workLoad.append(l)
         model_state_flops.append(sum(workLoad))
@@ -202,7 +199,7 @@ def actionToLayer(splitDecision: list[float], flop_per_layer) -> tuple[float, fl
     totalWorkLoad = sum(workLoad)
     model_flops_list = np.array(model_state_flops)
     model_flops_list = (model_flops_list / totalWorkLoad)
-    print(model_flops_list)
+
     idx = np.where(np.abs(model_flops_list - splitDecision[0]) == np.abs(model_flops_list - splitDecision[0]).min())
     op1 = int(idx[0][-1])
 
@@ -213,7 +210,7 @@ def actionToLayer(splitDecision: list[float], flop_per_layer) -> tuple[float, fl
         model_state_flops.append(sum(workLoad[op1 + 1:l + 1]))
     model_flops_list = np.array(model_state_flops)
     model_flops_list = model_flops_list / op2_totalWorkload
-    print(model_flops_list)
+
     idx = np.where(np.abs(model_flops_list - splitDecision[1]) == np.abs(model_flops_list - splitDecision[1]).min())
     if splitDecision[1] != 0:
         op2 = (int(idx[0][-1]) + 1) + op1

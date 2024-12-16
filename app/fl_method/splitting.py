@@ -29,6 +29,8 @@ from app.util import model_utils
 def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.MAGENTA + f"Heuristic Splitting algorithm =======================")
 
+    candidate_splitting = []
+
     MODEL_PATH = '/fed-flow/app/model'
     edge_linear_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_linear_model.pkl")
     edge_poly_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_poly_model.pkl")
