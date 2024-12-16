@@ -135,13 +135,55 @@ class Communicator(object):
                 fed_logger.error(Fore.RED + f"{e}")
                 continue
 
+    # def recv_msg(self, exchange, expect_msg_type: str = None, is_weight=False, url=None):
+    #     channel, connection = self.open_connection(url)
+    #     fed_logger.debug(Fore.YELLOW + f"receiving {config.cluster}.{expect_msg_type}.{exchange}")
+    #     res = None
+    #
+    #     while True:
+    #         try:
+    #             channel, connection = self.reconnect(connection, channel)
+    #             queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange)
+    #             channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True,
+    #                                      exchange_type='topic')
+    #             channel.queue_bind(exchange=config.cluster + "." + exchange,
+    #                                queue=config.cluster + "." + expect_msg_type + "." + exchange,
+    #                                routing_key=config.cluster + "." + expect_msg_type + "." + exchange)
+    #             fed_logger.debug(Fore.YELLOW + f"receiving loop {config.cluster}.{expect_msg_type}.{exchange}")
+    #             for method_frame, properties, body in channel.consume(queue=
+    #                                                                   config.cluster + "." + expect_msg_type + "." + exchange
+    #                                                                   ):
+    #                 msg = [expect_msg_type]
+    #                 res = self.deserialize_message(body, is_weight)
+    #                 msg.extend(res)
+    #                 channel.stop_consuming()
+    #                 channel.cancel()
+    #                 channel.basic_ack(method_frame.delivery_tag)
+    #                 channel.queue_delete(queue=config.cluster + "." + expect_msg_type + "." + exchange)
+    #                 self.close_connection(channel, connection)
+    #                 fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
+    #                 fed_logger.debug(Fore.CYAN + f"received {config.cluster}.{expect_msg_type}.{exchange}")
+    #                 return msg
+    #         except Exception as e:
+    #             fed_logger.exception(Fore.RED + f"{expect_msg_type},{e},{is_weight}")
+    #             fed_logger.exception(Fore.RED + f"revived {config.cluster}.{expect_msg_type}.{exchange}")
+    #             if res is None:
+    #                 continue
+    #             self.close_connection(channel, connection)
+    #             msg = [expect_msg_type]
+    #             msg.extend(res)
+    #             fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
+    #             return msg
+    #
+    #         time.sleep(1)
+
     def recv_msg(self, exchange, expect_msg_type: str = None, is_weight=False, url=None):
         channel, connection = self.open_connection(url)
         fed_logger.debug(Fore.YELLOW + f"receiving {config.cluster}.{expect_msg_type}.{exchange}")
         res = None
 
-        while True:
-            try:
+        try:
+            while True:
                 channel, connection = self.reconnect(connection, channel)
                 queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange)
                 channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True,
@@ -150,9 +192,9 @@ class Communicator(object):
                                    queue=config.cluster + "." + expect_msg_type + "." + exchange,
                                    routing_key=config.cluster + "." + expect_msg_type + "." + exchange)
                 fed_logger.debug(Fore.YELLOW + f"receiving loop {config.cluster}.{expect_msg_type}.{exchange}")
-                for method_frame, properties, body in channel.consume(queue=
-                                                                      config.cluster + "." + expect_msg_type + "." + exchange
-                                                                      ):
+                method_frame, header_frame, body = channel.basic_get(
+                    queue=config.cluster + "." + expect_msg_type + "." + exchange)
+                if method_frame:
                     msg = [expect_msg_type]
                     res = self.deserialize_message(body, is_weight)
                     msg.extend(res)
@@ -164,18 +206,16 @@ class Communicator(object):
                     fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
                     fed_logger.debug(Fore.CYAN + f"received {config.cluster}.{expect_msg_type}.{exchange}")
                     return msg
-            except Exception as e:
-                fed_logger.exception(Fore.RED + f"{expect_msg_type},{e},{is_weight}")
-                fed_logger.exception(Fore.RED + f"revived {config.cluster}.{expect_msg_type}.{exchange}")
-                if res is None:
-                    continue
-                self.close_connection(channel, connection)
-                msg = [expect_msg_type]
-                msg.extend(res)
-                fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-                return msg
-
-            time.sleep(1)
+                else:
+                    time.sleep(1)
+        except Exception as e:
+            fed_logger.exception(Fore.RED + f"{expect_msg_type},{e},{is_weight}")
+            fed_logger.exception(Fore.RED + f"revived {config.cluster}.{expect_msg_type}.{exchange}")
+            self.close_connection(channel, connection)
+            msg = [expect_msg_type]
+            msg.extend(res)
+            fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
+            return msg
 
     @staticmethod
     def serialize_message(msg, is_weight=False):
