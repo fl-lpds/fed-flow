@@ -196,7 +196,7 @@ class FedServer(FedServerInterface):
         if not hasattr(self, 'round'):
             self.round = 0
         self.round += 1
-        # fed_logger.info("aggregation start")
+
         for index, client in enumerate(eweights.keys()):
             if self.offload:
                 i = config.CLIENTS_CONFIG[client]
@@ -208,22 +208,48 @@ class FedServer(FedServerInterface):
                         model_utils.concat_weights(self.uninet.state_dict(), eweights[client],
                                                    self.nets[client].state_dict()),
                         config.N / config.K)
-                    # w_local_list.append(w_local)
                 else:
                     w_local = (eweights[client], config.N / config.K)
             else:
                 w_local = (eweights[client], config.N / config.K)
-            # test_model = model_utils.get_model('Unit', None, self.device, self.edge_based)
-            # acc = model_utils.test(test_model, self.testloader, self.device, self.criterion)
-            # fed_logger.info(Fore.MAGENTA + f"mini accuracy: {acc}")
-            with open(f'weights/client_local_{self.round}_{index}', 'w') as f:
-                f.write(str(w_local))
+
+            # Save client weights in readable format
+            with open(f'weights/client_local_{self.round}_{index}.txt', 'w') as f:
+                f.write(f"Client {index} weights for round {self.round}\n")
+                f.write(f"Sample weight: {w_local[1]}\n\n")
+                for key, tensor in w_local[0].items():
+                    f.write(f"Layer: {key}\n")
+                    f.write(f"Shape: {tensor.shape}\n")
+                    f.write(f"Values: {tensor.cpu().numpy().tolist()}\n")
+                    # Only calculate mean and std for floating point tensors
+                    if tensor.dtype in [torch.float32, torch.float64, torch.float16]:
+                        f.write(f"Mean: {tensor.mean().item():.6f}\n")
+                        f.write(f"Std: {tensor.std().item():.6f}\n")
+                    else:
+                        f.write(f"Dtype: {tensor.dtype}\n")
+                    f.write("-" * 50 + "\n\n")
+
             w_local_list.append(w_local)
+
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = aggregate_method(zero_model, w_local_list, config.N)
         self.uninet.load_state_dict(aggregated_model)
-        with open(f'weights/server_aggregated_{self.round}', 'w') as f:
-            f.write(str(self.uninet.state_dict()))
+
+        # Save aggregated model weights in readable format
+        with open(f'weights/server_aggregated_{self.round}.txt', 'w') as f:
+            f.write(f"Aggregated model weights for round {self.round}\n\n")
+            for key, tensor in aggregated_model.items():
+                f.write(f"Layer: {key}\n")
+                f.write(f"Shape: {tensor.shape}\n")
+                f.write(f"Values: {tensor.cpu().numpy().tolist()}\n")
+                # Only calculate mean and std for floating point tensors
+                if tensor.dtype in [torch.float32, torch.float64, torch.float16]:
+                    f.write(f"Mean: {tensor.mean().item():.6f}\n")
+                    f.write(f"Std: {tensor.std().item():.6f}\n")
+                else:
+                    f.write(f"Dtype: {tensor.dtype}\n")
+                f.write("-" * 50 + "\n\n")
+
         return aggregated_model
 
     def test_network(self, connection_ips):
