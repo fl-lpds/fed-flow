@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 
 import numpy as np
+import torch
 from colorama import Fore
 from torch import nn, optim
 
@@ -123,20 +124,57 @@ class FedServer(FedBaseNodeInterface):
 
     def aggregate(self, clients_local_weights):
         w_local_list = []
+        if not hasattr(self, 'round'):
+            self.round = 0
+        self.round += 1
+        
         for client, weight in clients_local_weights.items():
             split_point = self.split_layers[client][0]
             if split_point != (config.model_len - 1):
                 w_local = (
                     model_utils.concat_weights(self.uninet.state_dict(), clients_local_weights[client],
-                                               self.nets[client].state_dict()),
+                                       self.nets[client].state_dict()),
                     config.N / config.K)
-                w_local_list.append(w_local)
             else:
                 w_local = (clients_local_weights[client], config.N / config.K)
+                
+            # Save client weights in readable format
+            with open(f'weights/client_local_{self.round}_{str(client)}.txt', 'w') as f:
+                f.write(f"Client {str(client)} weights for round {self.round}\n")
+                f.write(f"Sample weight: {w_local[1]}\n\n")
+                for key, tensor in w_local[0].items():
+                    f.write(f"Layer: {key}\n")
+                    f.write(f"Shape: {tensor.shape}\n")
+                    f.write(f"Values: {tensor.cpu().numpy().tolist()}\n")
+                    # Only calculate mean and std for floating point tensors
+                    if tensor.dtype in [torch.float32, torch.float64, torch.float16]:
+                        f.write(f"Mean: {tensor.mean().item():.6f}\n")
+                        f.write(f"Std: {tensor.std().item():.6f}\n")
+                    else:
+                        f.write(f"Dtype: {tensor.dtype}\n")
+                    f.write("-" * 50 + "\n\n")
+                
             w_local_list.append(w_local)
+            
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, w_local_list)
         self.uninet.load_state_dict(aggregated_model)
+        
+        # Save aggregated model weights in readable format
+        with open(f'weights/server_aggregated_{self.round}.txt', 'w') as f:
+            f.write(f"Aggregated model weights for round {self.round}\n\n")
+            for key, tensor in aggregated_model.items():
+                f.write(f"Layer: {key}\n")
+                f.write(f"Shape: {tensor.shape}\n")
+                f.write(f"Values: {tensor.cpu().numpy().tolist()}\n")
+                # Only calculate mean and std for floating point tensors
+                if tensor.dtype in [torch.float32, torch.float64, torch.float16]:
+                    f.write(f"Mean: {tensor.mean().item():.6f}\n")
+                    f.write(f"Std: {tensor.std().item():.6f}\n")
+                else:
+                    f.write(f"Dtype: {tensor.dtype}\n")
+                f.write("-" * 50 + "\n\n")
+        
         return aggregated_model
 
     def _concat_clients_local_weights(self, clients_local_weights) -> list:

@@ -33,7 +33,7 @@ split_layer = [[6, 6]]  # Initial split layers
 model_len = 7
 
 # FL training configration
-R = int(environ.get("ROUND_COUNT", "2"))  # FL rounds
+R = int(environ.get("ROUND_COUNT", "3"))  # FL rounds
 learning_rate = 0.01  # Learning rate
 B = 100  # Batch size
 lr_step_size = 20
