@@ -29,7 +29,16 @@ from app.util import model_utils
 def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.MAGENTA + f"Heuristic Splitting algorithm =======================")
 
+    # ALPHA == 1 try minimum energy and ALPHA == 0 is vice versa
+    ALPHA = 1
+    score_threshold = 0.5
+
     candidate_splitting = []
+    min_energy_splitting_for_each_client = {}
+    min_time_splitting_for_each_client = {}
+    for client in state['client_bw'].keys():
+        min_energy_splitting_for_each_client[client] = []
+        min_time_splitting_for_each_client[client] = []
 
     MODEL_PATH = '/fed-flow/app/model'
     edge_linear_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_linear_model.pkl")
@@ -70,31 +79,40 @@ def edge_based_heuristic_splitting(state: dict, label):
 
     batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / config.B
 
+    clients_computation_e, clients_communication_e, clients_totals_e = energyEstimator(previous_action, client_bw,
+                                                                                       activation_size, batchNumber,
+                                                                                       total_model_size,
+                                                                                       client_comp_energy,
+                                                                                       client_power_usage)
     for client in client_remaining_energy.keys():
-        client_op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
-        tt_trans = 0
-        if client_remaining_energy[client] != 0:
-            if client_op1 != config.model_len - 1:
-                tt_trans = (2 * (activation_size[client_op1]) * batchNumber) / client_bw[client]
-            else:
-                tt_trans = total_model_size / client_bw[client]
-            client_remaining_runtime[client] = client_remaining_energy[client] / (
-                    client_comp_energy[client][client_op1] + (tt_trans * client_power_usage[client][1]))
+        client_remaining_runtime[client] = client_remaining_energy[client] / (clients_totals_e[client])
 
     client_remaining_runtime_comp_score = normalizer(client_remaining_runtime)
-    client_score = {}
-    for client, score in client_remaining_runtime_comp_score.items():
-        client_score[client] = client_remaining_runtime_comp_score[client]
+    client_score = client_remaining_runtime_comp_score
 
     high_prio_device = {device: score for device, score in client_score.items() if score <= 1.0}
+
     fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_comp_score.items()}")
     fed_logger.info(f"HIGH PRIO DEVICES: {high_prio_device.items()}")
 
     classicFL_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
-    classicFL_tt = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw,
-                                         flops_of_each_layer, activation_size, total_model_size, batchNumber,
-                                         edge_poly_model, server_poly_model)
-    fed_logger.info(f"Classic FL training time approximation: {classicFL_tt}")
+    classicFL_tt, _ = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw,
+                                            flops_of_each_layer, activation_size, total_model_size, batchNumber,
+                                            edge_poly_model, server_poly_model)
+
+    clients_classicFL_comp_energy, clients_classicFL_comm_energy, clients_classicFL_total_energy = energyEstimator(
+        classicFL_action, client_bw, activation_size, batchNumber, total_model_size, client_comp_energy,
+        client_power_usage)
+
+    if config.K != 0:
+        classicFL_avg_energy = sum(clients_classicFL_total_energy.values()) / config.K
+    else:
+        classicFL_avg_energy = 0
+
+    fed_logger.info(Fore.MAGENTA + f"Classic FL training time approximation: {classicFL_tt}")
+    fed_logger.info(Fore.MAGENTA + f"Classic FL average energy approximation: {classicFL_avg_energy}")
+    fed_logger.info(Fore.MAGENTA + f"Classic FL communication energy approximation: {clients_classicFL_comm_energy}")
+    fed_logger.info(Fore.MAGENTA + f"Classic FL computation energy approximation: {clients_classicFL_comp_energy}")
 
     currentAction = previous_action
     for client, score in high_prio_device.items():
@@ -122,6 +140,10 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.GREEN + f"Communication Energy RATIO: {client_comm_energy_ratio}")
 
         min_total_energy = tt_trans_now * client_power_usage[client][1] + client_comp_energy[client][client_op1]
+        client_op1_energy = []
+        client_op1_time = []
+        fed_logger.info(Fore.GREEN + f"CLIENTS COMP ENERGY: {client_comp_energy}")
+
         for layer, size in activation_size.items():
             candidate_op1 = layer
             if layer != config.model_len - 1:
@@ -130,30 +152,146 @@ def edge_based_heuristic_splitting(state: dict, label):
                 tt_trans = total_model_size / client_bw[client]
             comm_energy = tt_trans * client_power_usage[client][1]
             if candidate_op1 in client_comp_energy[client]:
+                fed_logger.info(Fore.GREEN + f"I AM HERE ========")
                 comp_energy = client_comp_energy[client][candidate_op1]
-                if (comp_energy + comm_energy) < min_total_energy:
+                total_energy = comp_energy + comm_energy
+                fed_logger.info(Fore.GREEN + f"CLIENT TOTAL ENERGY: {(candidate_op1, total_energy)}")
+                client_op1_energy.append((candidate_op1, total_energy))
+                client_op1_time.append((candidate_op1, client_comp_time[client][candidate_op1] + tt_trans))
+                fed_logger.info(Fore.GREEN + f"CLIENT OP1 ENERGY: {client_op1_energy}")
+
+                if total_energy < min_total_energy:
                     min_total_energy = comp_energy + comm_energy
                     best_op1 = candidate_op1
             else:
                 best_op1 = candidate_op1
                 break
             action[config.CLIENTS_CONFIG[client]] = [best_op1, 6]
-            min_total_training_time = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw,
-                                                            flops_of_each_layer, activation_size, total_model_size,
-                                                            batchNumber, edge_poly_model, server_poly_model)
-            for candidate_op2 in range(best_op1, config.model_len):
-                candidateAction = action
-                candidateAction[config.CLIENTS_CONFIG[client]][1] = candidate_op2
-                candidate_op2_tt = trainingTimeEstimator(candidateAction, client_comp_time, client_bw, edge_server_bw,
-                                                         flops_of_each_layer, activation_size, total_model_size,
-                                                         batchNumber, edge_poly_model, server_poly_model)
-                fed_logger.info(
-                    Fore.GREEN + f"Client {client}, OP2 Candidate: {candidate_op2}, candidate op2 training time: {candidate_op2_tt}")
-                if candidate_op2_tt < min_total_training_time:
-                    action[config.CLIENTS_CONFIG[client]] = [best_op1, candidate_op2]
-                    min_total_training_time = candidate_op2_tt
-        action[config.CLIENTS_CONFIG[client]] = [best_op1, best_op2]
-        fed_logger.info(Fore.GREEN + f"client: {client}, best_op1: {best_op1}, best_op2: {best_op2}")
+        min_energy_splitting_for_each_client[client] = sorted(client_op1_energy, key=lambda x: x[1])
+        min_time_splitting_for_each_client[client] = sorted(client_op1_time, key=lambda x: x[1])
+        fed_logger.info(Fore.MAGENTA + f"Splitting-energy map: {min_energy_splitting_for_each_client}")
+        fed_logger.info(Fore.MAGENTA + f"Splitting-time map: {min_time_splitting_for_each_client}")
+
+    splitting_score = 0
+    splitting_energy_score = 0
+    splitting_time_score = 0
+    best_score = -10
+    best_action = None
+
+    op1_pointers = {client: 0 for client, _ in config.CLIENTS_CONFIG.items()}
+    op2_pointers = {client: 0 for client, _ in config.CLIENTS_CONFIG.items()}
+
+    satisfied = False
+
+    if ALPHA != 0 or ALPHA != 1:
+        for client in config.CLIENTS_CONFIG.keys():
+            if satisfied:
+                break
+            for op1 in range(config.model_len - 1):
+                if satisfied:
+                    break
+                for op2 in range(op1, config.model_len - 1):
+                    action[config.CLIENTS_CONFIG[client]] = [op1, op2]
+                    training_time_of_action, _ = trainingTimeEstimator(action, client_comp_time, client_bw,
+                                                                       edge_server_bw,
+                                                                       flops_of_each_layer, activation_size,
+                                                                       total_model_size,
+                                                                       batchNumber, edge_poly_model, server_poly_model)
+                    clients_comp_e_of_action, clients_comm_e_of_action, clients_total_e_of_action = (
+                        energyEstimator(action,
+                                        client_bw,
+                                        activation_size,
+                                        batchNumber,
+                                        total_model_size,
+                                        client_comp_energy,
+                                        client_power_usage))
+                    avg_e_of_action = sum(clients_total_e_of_action.values()) / len(clients_total_e_of_action.values())
+
+                    if avg_e_of_action > classicFL_avg_energy:
+                        splitting_energy_score = (classicFL_avg_energy / avg_e_of_action) - 1
+                    else:
+                        splitting_energy_score = 1 - (avg_e_of_action / classicFL_avg_energy)
+
+                    if training_time_of_action > classicFL_tt:
+                        splitting_time_score = (classicFL_tt / training_time_of_action) - 1
+                    else:
+                        splitting_time_score = 1 - (training_time_of_action / classicFL_tt)
+
+                    splitting_score = ALPHA * splitting_energy_score + (1 - ALPHA) * splitting_time_score
+
+                    if splitting_score >= score_threshold:
+                        satisfied = True
+                        best_action = action
+                        break
+                    if splitting_score > best_score:
+                        best_score = splitting_score
+                        best_action = action
+    elif ALPHA == 1:
+        baseline_tt = classicFL_tt
+        baseline_energy = classicFL_avg_energy
+        not_found = False
+        action = [[op1s[0][0], config.model_len - 1] for client, op1s in
+                  min_energy_splitting_for_each_client.items()]
+        best_score_client_index = 0
+        best_layer_index = 0
+        action_tt_and_baseline_tt_dif = 1e5
+        while not satisfied:
+            for client in config.CLIENTS_CONFIG.keys():
+                if satisfied or not_found:
+                    break
+                best_op1 = min_energy_splitting_for_each_client[client][0][0]
+                for op2 in range(best_op1, config.model_len - 1):
+                    action[config.CLIENTS_CONFIG[client]] = [best_op1, op2]
+                    training_time_of_action, _ = trainingTimeEstimator(action, client_comp_time, client_bw,
+                                                                       edge_server_bw, flops_of_each_layer,
+                                                                       activation_size, total_model_size, batchNumber,
+                                                                       edge_poly_model, server_poly_model)
+                    clients_comp_e_of_action, clients_comm_e_of_action, clients_total_e_of_action = (
+                        energyEstimator(action,
+                                        client_bw,
+                                        activation_size,
+                                        batchNumber,
+                                        total_model_size,
+                                        client_comp_energy,
+                                        client_power_usage))
+                    avg_e_of_action = sum(clients_total_e_of_action.values()) / len(clients_total_e_of_action.values())
+
+                    if (abs(training_time_of_action - classicFL_tt)) < action_tt_and_baseline_tt_dif:
+                        best_action = action
+                        action_tt_and_baseline_tt_dif = abs(training_time_of_action - classicFL_tt)
+                    if (training_time_of_action < baseline_tt) and (avg_e_of_action <= baseline_energy):
+                        best_action = action
+                        satisfied = True
+                        break
+
+                    if avg_e_of_action > baseline_energy:
+                        not_found = True
+                        break
+            clients_score = sorted(client_score.items(), key=lambda item: item[1], reverse=True)
+            best_score_client = clients_score[best_score_client_index][0]  # client_score[0] = ('client1', 1.0)
+            if best_layer_index + 1 < config.model_len - 1:
+                action[config.CLIENTS_CONFIG[clients_score[0]]] = [
+                    min_energy_splitting_for_each_client[best_score_client][best_layer_index + 1][0],
+                    config.model_len - 1]
+            else:
+                if best_score_client_index < len(config.CLIENTS_CONFIG.keys()) - 1:
+                    best_score_client_index += 1
+        return best_action
+
+    elif ALPHA == 0:
+        action = [[op1s[0][0], config.model_len - 1] for client, op1s in min_time_splitting_for_each_client.items()]
+        for client in config.CLIENTS_CONFIG.keys():
+            best_op1 = min_time_splitting_for_each_client[client][0][0]
+            for op2 in range(best_op1, config.model_len - 1):
+                action[config.CLIENTS_CONFIG[client]] = [best_op1, op2]
+                training_time_of_action, _ = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw,
+                                                                   flops_of_each_layer, activation_size,
+                                                                   total_model_size,
+                                                                   batchNumber, edge_poly_model, server_poly_model)
+                if training_time_of_action < best_tt:
+                    best_tt = training_time_of_action
+                    best_action = action
+
     return action
 
 
@@ -326,14 +464,32 @@ def actionToLayerEdgeBase(splitDecision: list[float]) -> tuple[int, int]:
     return op1, op2
 
 
+def energyEstimator(action, client_bw, activation_size, batchNumber, total_model_size, client_comp_energy,
+                    client_power_usage):
+    client_computation_energy = {client: 0 for client, _ in client_bw.items()}
+    client_communication_energy = {client: 0 for client, _ in client_bw.items()}
+    client_total_energy = {client: 0 for client, _ in client_bw.items()}
+
+    for client in config.CLIENTS_CONFIG.keys():
+        client_op1 = action[config.CLIENTS_CONFIG[client]][0]
+        if client_op1 != config.model_len - 1:
+            tt_trans = (2 * (activation_size[client_op1]) * batchNumber) / client_bw[client]
+        else:
+            tt_trans = total_model_size / client_bw[client]
+        client_computation_energy[client] = client_comp_energy[client][client_op1]
+        client_communication_energy[client] = tt_trans * client_power_usage[client][1]
+        client_total_energy[client] = client_communication_energy[client] + client_computation_energy[client]
+
+    return client_computation_energy, client_communication_energy, client_total_energy
+
+
 def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_server_bw, flops_of_each_layer,
                           activation_size, total_model_size, batchNumber, edge_flops_model, server_flops_model):
     edge_flops = {edgeIP: 0.0 for edgeIP in config.EDGE_SERVER_LIST}
+    flop_of_each_edge_on_server = {edgeIP: 0.0 for edgeIP in config.EDGE_SERVER_LIST}
     server_flops = 0
     transmission_time_on_each_client = {}
-
     edge_server_transmission_time_for_each_client = {}
-
     total_time_for_each_client = {}
 
     for i in range(len(action)):
@@ -358,6 +514,7 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
         # offloading on client, edge and server
         if op1 < op2 < config.model_len - 1:
             edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+            flop_of_each_edge_on_server[edgeIP] += sum(flops_of_each_layer[op2 + 1:])
             server_flops += sum(flops_of_each_layer[op2 + 1:])
         # offloading on client and edge
         elif (op1 < op2) and op2 == config.model_len - 1:
@@ -365,9 +522,12 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
         # offloading on client and server
         elif (op1 == op2) and op1 < config.model_len - 1:
             server_flops += sum(flops_of_each_layer[op2 + 1:])
+            flop_of_each_edge_on_server[edgeIP] += sum(flops_of_each_layer[op2 + 1:])
 
     EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
-    comp_time_on_each_edge = {edge: edge_flops_model.predict([[index, edge_flops[edge]]]) for edge, index in EDGE_INDEX}
+    comp_time_on_each_edge = {
+        edge: edge_flops_model.predict([[index, edge_flops[edge], flop_of_each_edge_on_server[edge], server_flops]]) for
+        edge, index in EDGE_INDEX}
     comp_time_on_server = server_flops_model.predict([[server_flops]])
     fed_logger.info(Fore.GREEN + f"{action}, {config.CLIENTS_CONFIG}")
     for clientIP in config.CLIENTS_CONFIG.keys():
@@ -379,4 +539,4 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
     total_trainingTime = max(total_time_for_each_client.values()) + comp_time_on_server + max(
         comp_time_on_each_edge.values())
 
-    return total_trainingTime[0]
+    return total_trainingTime[0], total_time_for_each_client
