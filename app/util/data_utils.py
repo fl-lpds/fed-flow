@@ -15,13 +15,9 @@ DATASET_BASE_DIR = "app.dataset.entity."
 
 
 def get_trainset():
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-    trainset: DatasetInterface = get_class()(
+    transform_train = model_utils.get_class().data_transformer()
+    dataset = get_class()()
+    trainset: DatasetInterface = dataset.get_data()(
         root=config.dataset_path + config.dataset_name + '/', train=True, transform=transform_train)
     return trainset
 
@@ -49,8 +45,9 @@ def get_testset():
     transform_test = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
          ])
-    return get_class()(root=config.dataset_path + config.dataset_name + '/', train=False,
-                       transform=transform_test)
+    dataset = get_class()()
+    return dataset.get_data()(root=config.dataset_path + config.dataset_name + '/', train=False,
+                              transform=transform_test)
 
 
 def get_class():

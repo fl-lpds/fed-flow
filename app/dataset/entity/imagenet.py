@@ -10,10 +10,8 @@ from torchvision.datasets.utils import check_integrity
 from app.dataset.entity.dataset_interface import DatasetInterface
 
 
-class cifar10(DatasetInterface):
-
-    def __init__(
-            self,
-    ) -> None:
-
-        super().__init__(torchvision.datasets.CIFAR10)
+class imagenet(DatasetInterface):
+        def __init__(
+                self
+        ) -> None:
+            super().__init__(torchvision.datasets.ImageNet)

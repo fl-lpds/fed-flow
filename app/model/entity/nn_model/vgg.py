@@ -1,4 +1,5 @@
 import torch.nn as nn
+from torchvision import transforms
 
 from app.model.interface.nn_model_interface import NNModel
 
@@ -72,3 +73,12 @@ class vgg(NNModel):
                 ('C', 64, 64, 3, 64 * 8 * 8, 64 * 8 * 8 * 3 * 3 * 64),
                 ('D', 8 * 8 * 64, 128, 1, 64, 128 * 8 * 8 * 64),
                 ('D', 128, 10, 1, 10, 128 * 10)]
+
+    @staticmethod
+    def data_transformer():
+        return transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
