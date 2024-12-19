@@ -13,7 +13,7 @@ def init_p(process, pid, simulate_network):
     config.simulate_network = simulate_network
 
 
-def estimate_computation_energy(process):
+def estimate_computation_energy(process, computation_time):
     if process.cpu_u_count == 0:
         return 0
     # max_energy_per_core = ((process.system_energy) / process.cpu_u_count)
@@ -21,7 +21,7 @@ def estimate_computation_energy(process):
     # energy_logger.info(f"cpus: {cores}")
     utilization = process.cpu_utilization / process.cpu_u_count / 100 / cores
 
-    computation_time = process.comp_time
+    # computation_time = process.comp_time
     # energy_logger.info(Fore.LIGHTYELLOW_EX + f"{process.cpu_u_count}")
     return get_power_now() * utilization * computation_time
 
@@ -30,10 +30,10 @@ def estimate_communication_energy(config, process):
     return process.transmission_time * config.tx_power
 
 
-def estimate_total_energy(config, process):
+def estimate_total_energy(config, process, computation_time):
     energy_logger.info(
-        Fore.GREEN + f"computation: {config.process.comp_time}, transmission: {config.process.transmission_time}")
-    comp = estimate_computation_energy(process)
+        Fore.GREEN + f"computation: {computation_time}, transmission: {config.process.transmission_time}")
+    comp = estimate_computation_energy(process, computation_time)
     tr = estimate_communication_energy(config, process)
     energy_logger.info(
         Fore.MAGENTA + f"energy-computation: {comp}, energy-transmission: {tr}")
@@ -112,7 +112,7 @@ def get_TX():
 
 def computation_start(process):
     config.process.end_comp = False
-    process.start_comp_time = time.time()
+    process.start_comp_time = time.process_time()
     # energy_logger.info(f": {process.end_comp}")
     while not process.end_comp:
         # energy_logger.info(f"count: {process.cpu_u_count}")
@@ -134,7 +134,7 @@ def computation_end(process):
         logging.error("no started process")
         return
     process.end_comp = True
-    process.end_comp_time = time.time()
+    process.end_comp_time = time.process_time()
     process.comp_time += process.end_comp_time - process.start_comp_time
 
 

@@ -79,9 +79,9 @@ async def set_simnet(simnetbw):
     system_utils.set_simnet(config.process, simnetbw)
 
 
-@app.get("/energy/")
-async def energy():
-    return system_utils.estimate_total_energy(config, config.process)
+@app.get("/energy/{computation_time}")
+async def energy(computation_time):
+    return system_utils.estimate_total_energy(config, config.process, float(computation_time))
 
 
 @app.get("/remaining-energy/")

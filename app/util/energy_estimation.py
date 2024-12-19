@@ -58,12 +58,12 @@ def end_transmission(bits):
         session.get(url=URL + "/end-transmission/" + str(bits))
 
 
-def energy():
+def energy(computation_time):
     global is_init
     if is_init:
         session = requests.session()
         session.trust_env = False
-        result = session.get(url=URL + "/energy/").json()
+        result = session.get(url=URL + "/energy/" + str(computation_time)).json()
         computation_energy = float(result[0])
         communication_energy = float(result[1])
         return computation_energy, communication_energy
