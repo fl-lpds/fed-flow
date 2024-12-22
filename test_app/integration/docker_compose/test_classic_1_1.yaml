@@ -1,14 +1,15 @@
 version: '3'
 services:
   server:
-    deploy:
-      resources:
-        limits:
-          cpus: '3'
-        reservations:
-          cpus: '3'
-      restart_policy:
-        condition: on-failure
+    shm_size: 3GB
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '3'
+#        reservations:
+#          cpus: '3'
+#      restart_policy:
+#        condition: on-failure
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: negaranabestani/fed-flow:rabbitmq
@@ -18,6 +19,9 @@ services:
     working_dir: /fed-flow/app/fl_training/runner
     entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -m alexnet"
   broker:
+    attach: false
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
     image: rabbitmq:3.13-management
     ports:
       - "5672:5672"
@@ -28,14 +32,15 @@ services:
     hostname: broker
 
   client1:
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-        reservations:
-          cpus: '0.5'
-      restart_policy:
-        condition: on-failure
+    shm_size: 3GB
+#    deploy:
+#      resources:
+#        limits:
+#          cpus: '0.5'
+#        reservations:
+#          cpus: '0.5'
+#      restart_policy:
+#        condition: on-failure
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: negaranabestani/fed-flow:rabbitmq

@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torchvision
 from torchvision import transforms
+from app.config.logger import fed_logger
 
 from app.model.interface.nn_model_interface import NNModel
 
@@ -95,17 +96,26 @@ class alexnet(NNModel):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        out = self.features(x)
-        return out
+        if len(self.features) > 0:
+            out = self.features(x)
+        else:
+            out = x
+        if len(self.denses) > 0:
+            out = out.view(out.size(0), -1)
+            fed_logger.info(out.shape)
+            out = self.denses(out)
 
+        return out
     def get_config(self):
         return ["layer1", "layer2", "layer3", "layer4", "layer5", "fc", "fc1", "fc2"]
 
     @staticmethod
     def data_transformer():
         return transforms.transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                transforms.Resize((227, 227)),
+                transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.4914, 0.4822, 0.4465],
+                std=[0.2023, 0.1994, 0.2010],
+            )
         ])

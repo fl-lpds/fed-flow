@@ -119,6 +119,7 @@ class Communicator(object):
 
         for idx, chunk in enumerate(chunks):
             published = False
+            self.send_bug=False
             while not published:
                 try:
                     self.reconnect(connection, channel)
@@ -138,8 +139,8 @@ class Communicator(object):
                         mandatory=True,
                         properties=properties
                     )
-                    if self.send_bug:
-                        fed_logger.debug(Fore.RED + f"published {config.cluster}.{msg[0]}.{exchange}")
+                    # if self.send_bug:
+                    fed_logger.debug(Fore.RED + f"published {config.cluster}.{msg[0]}.{exchange}")
                     published = True
 
                 except Exception as e:
@@ -189,7 +190,7 @@ class Communicator(object):
 
                     msg = [expect_msg_type]
                     msg.extend(res)
-                    fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
+                    fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
                     return msg
 
         except Exception as e:
@@ -222,9 +223,10 @@ class Communicator(object):
             return json.loads(msg)
 
 
-def chunk_message(msg, chunk_size=512 * 1024 * 1024):
+def chunk_message(msg, chunk_size=500 * 1024 * 1024):
     """Splits the message into chunks."""
     chunks = []
+    # fed_logger.info(len(msg))
     for i in range(0, len(msg), chunk_size):
         if len(msg[i:]) > chunk_size:
             chunks.append(msg[i:i + chunk_size])
