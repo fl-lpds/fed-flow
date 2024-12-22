@@ -20,7 +20,7 @@ node_base: &node_base
       NEIGHBORS: ""
       NODE_TYPE: ""
       ROUND_COUNT: ""
-      DEVICE_COUNT: "1"
+      DEVICE_COUNT: ""
     entrypoint: >
       bash -c "python3 /fed-flow/main.py
       --aggregation $$AGGREGATION
