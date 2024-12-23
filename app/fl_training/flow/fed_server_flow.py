@@ -284,9 +284,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             # with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
             #     pickle.dump(res, f)
 
-            fed_logger.info("testing accuracy")
-            test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
-            res['test_acc_record'].append(test_acc)
+            # fed_logger.info("testing accuracy")
+            # test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
+            # res['test_acc_record'].append(test_acc)
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))

@@ -152,14 +152,10 @@ def edge_based_heuristic_splitting(state: dict, label):
                 tt_trans = total_model_size / client_bw[client]
             comm_energy = tt_trans * client_power_usage[client][1]
             if candidate_op1 in client_comp_energy[client]:
-                fed_logger.info(Fore.GREEN + f"I AM HERE ========")
                 comp_energy = client_comp_energy[client][candidate_op1]
                 total_energy = comp_energy + comm_energy
-                fed_logger.info(Fore.GREEN + f"CLIENT TOTAL ENERGY: {(candidate_op1, total_energy)}")
                 client_op1_energy.append((candidate_op1, total_energy))
                 client_op1_time.append((candidate_op1, client_comp_time[client][candidate_op1] + tt_trans))
-                fed_logger.info(Fore.GREEN + f"CLIENT OP1 ENERGY: {client_op1_energy}")
-
                 if total_energy < min_total_energy:
                     min_total_energy = comp_energy + comm_energy
                     best_op1 = candidate_op1
@@ -234,14 +230,18 @@ def edge_based_heuristic_splitting(state: dict, label):
                   min_energy_splitting_for_each_client.items()]
         best_score_client_index = 0
         best_layer_index = 0
-        action_tt_and_baseline_tt_dif = 1e5
-        while not satisfied:
+        action_tt_and_baseline_tt_dif = 0
+        action_e_and_baseline_e_diff = 0
+        best_energy_action = None
+        best_tt_action = None
+
+        while not satisfied and not not_found:
             for client in config.CLIENTS_CONFIG.keys():
                 if satisfied or not_found:
                     break
-                best_op1 = min_energy_splitting_for_each_client[client][0][0]
-                for op2 in range(best_op1, config.model_len - 1):
-                    action[config.CLIENTS_CONFIG[client]] = [best_op1, op2]
+                client_op1 = action[config.CLIENTS_CONFIG[client]][0]
+                for op2 in range(client_op1, config.model_len - 1):
+                    action[config.CLIENTS_CONFIG[client]][1] = op2
                     training_time_of_action, _ = trainingTimeEstimator(action, client_comp_time, client_bw,
                                                                        edge_server_bw, flops_of_each_layer,
                                                                        activation_size, total_model_size, batchNumber,
@@ -256,27 +256,38 @@ def edge_based_heuristic_splitting(state: dict, label):
                                         client_power_usage))
                     avg_e_of_action = sum(clients_total_e_of_action.values()) / len(clients_total_e_of_action.values())
 
-                    if (abs(training_time_of_action - classicFL_tt)) < action_tt_and_baseline_tt_dif:
-                        best_action = action
-                        action_tt_and_baseline_tt_dif = abs(training_time_of_action - classicFL_tt)
-                    if (training_time_of_action < baseline_tt) and (avg_e_of_action <= baseline_energy):
-                        best_action = action
-                        satisfied = True
-                        break
+                    if (avg_e_of_action - baseline_energy) < action_e_and_baseline_e_diff:
+                        best_energy_action = action
+                        action_e_and_baseline_e_diff = avg_e_of_action - baseline_energy
+                        if training_time_of_action < baseline_tt:
+                            best_action = action
+                            satisfied = True
+                            break
+
+                    if (training_time_of_action - baseline_tt) < action_tt_and_baseline_tt_dif:
+                        best_tt_action = action
+                        action_tt_and_baseline_tt_dif = training_time_of_action - baseline_tt
 
                     if avg_e_of_action > baseline_energy:
                         not_found = True
                         break
+
             clients_score = sorted(client_score.items(), key=lambda item: item[1], reverse=True)
-            best_score_client = clients_score[best_score_client_index][0]  # client_score[0] = ('client1', 1.0)
-            if best_layer_index + 1 < config.model_len - 1:
-                action[config.CLIENTS_CONFIG[clients_score[0]]] = [
+            if best_score_client_index < len(config.CLIENTS_CONFIG.keys()):
+                best_score_client = clients_score[best_score_client_index][0]  # client_score[0] = ('client1', 1.0)
+            if best_layer_index + 1 <= config.model_len - 1:
+                action[config.CLIENTS_CONFIG[best_score_client]] = [
                     min_energy_splitting_for_each_client[best_score_client][best_layer_index + 1][0],
                     config.model_len - 1]
+                best_layer_index += 1
             else:
                 if best_score_client_index < len(config.CLIENTS_CONFIG.keys()) - 1:
                     best_score_client_index += 1
-        return best_action
+                    best_layer_index = 0
+        if not_found:
+            return best_energy_action
+        else:
+            return best_action
 
     elif ALPHA == 0:
         action = [[op1s[0][0], config.model_len - 1] for client, op1s in min_time_splitting_for_each_client.items()]
@@ -362,7 +373,7 @@ def no_splitting(state, labels):
 def only_edge_splitting(state, labels):
     split_list = []
     for i in range(config.K):
-        split_list.append([0, 6])
+        split_list.append([0, config.model_len - 1])
     return split_list
 
 
@@ -378,15 +389,11 @@ def randomSplitting(state, labels):
     """ Randomly split the model between clients edge devices and cloud server """
 
     splittingArray = []
-    for i in range(config.K):
-        op1 = random.randint(1, config.model_len - 1)
+    for i in range(len(config.CLIENTS_CONFIG.keys())):
+        op1 = random.randint(0, config.model_len - 1)
         op2 = random.randint(op1, config.model_len - 1)
         splittingArray.append([op1, op2])
     return splittingArray
-    # split_list = []
-    # for i in range(config.K):
-    #     split_list.append([2, 6])
-    # return split_list
 
 
 # FedMec: which empirically deploys the convolutional layers of a DNN on the device-side while
