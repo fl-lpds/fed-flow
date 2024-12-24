@@ -366,7 +366,7 @@ def fake(state, labels):
 def no_splitting(state, labels):
     split_list = []
     for i in range(config.K):
-        split_list.append([6, 6])
+        split_list.append([config.model_len - 1, config.model_len - 1])
     return split_list
 
 
