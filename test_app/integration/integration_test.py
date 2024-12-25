@@ -9,7 +9,7 @@ from app.config.logger import fed_logger
 
 class TestFed(unittest.TestCase):
     def test_classic_1_1(self):
-        with open("test_config/test_classic_1_1_config.py", "r") as f:
+        with open("docker_compose/1_1/config.py", "r") as f:
             data = f.read()
 
         with open("../../app/config/config.py", "w") as f:
@@ -70,7 +70,7 @@ class TestFed(unittest.TestCase):
             self.fail(str(test.stderr))
 
     def test_fake_offloading_1_3(self):
-        with open("test_config/test_fake_offloading_1_3_config.py", "r") as f:
+        with open("docker_compose/1_3/config.py", "r") as f:
             data = f.read()
 
         with open("../../app/config/config.py", "w") as f:
@@ -102,7 +102,7 @@ class TestFed(unittest.TestCase):
             self.fail(str(test.stderr))
 
     def test_fake_offloading_1_1_3(self):
-        with open("test_config/test_fake_offloading_1_1_3_config.py", "r") as f:
+        with open("docker_compose/1_1_3/config.py", "r") as f:
             data = f.read()
 
         with open("../../app/config/config.py", "w") as f:
@@ -173,7 +173,7 @@ class TestFed(unittest.TestCase):
             f.write(data)
         subprocess.run(['docker', 'build', '-t', 'fed-flow:test', '../../'])
         test = subprocess.run(
-            ['docker', 'compose', '-f', 'docker_compose/test_no_offloading_1_2_4.yaml', 'up',
+            ['docker', 'compose', '-f', 'docker_compose/test_classicFL_offloading_simnet_1_2_4.yaml', 'up',
              '--remove-orphans'])
         subprocess.run(['docker', 'system', 'prune', '-f'])
 
@@ -189,7 +189,7 @@ class TestFed(unittest.TestCase):
             f.write(data)
         subprocess.run(['docker', 'build', '-t', 'fed-flow:test', '../../'])
         test = subprocess.run(
-            ['docker', 'compose', '-f', 'docker_compose/test_only_edge_offloading_1_2_4.yaml', 'up',
+            ['docker', 'compose', '-f', 'docker_compose/test_only_edge_simnet_1_2_4.yaml', 'up',
              '--remove-orphans'])
         subprocess.run(['docker', 'system', 'prune', '-f'])
 
@@ -221,7 +221,7 @@ class TestFed(unittest.TestCase):
             f.write(data)
         subprocess.run(['docker', 'build', '-t', 'fed-flow:test', '../../'])
         test = subprocess.run(
-            ['docker', 'compose', '-f', 'docker_compose/test_only_server_offloading_1_2_4.yaml', 'up',
+            ['docker', 'compose', '-f', 'docker_compose/test_only_server_simnet_1_2_4.yaml', 'up',
              '--remove-orphans'])
         subprocess.run(['docker', 'system', 'prune', '-f'])
 

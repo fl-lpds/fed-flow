@@ -1,0 +1,170 @@
+services:
+  server:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./../../../Graphs:/fed-flow/Graphs
+      - ./../../../app/logs:/fed-flow/app/logs
+    image: autlpdslab/fedflow:rabbitmq
+    ports:
+      - "5002:5002"
+    hostname: server
+    deploy:
+      resources:
+        limits:
+          cpus: '5'
+        reservations:
+          cpus: '5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - broker1
+      - broker2
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -s random_splitting -e True & python3 /fed-flow/energy/service.py  "
+
+  edge1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    ports:
+      - "5001:5001"
+    hostname: edge1
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+        reservations:
+          cpus: '3'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -sb True -s random_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+
+  broker1:
+    attach: false
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+    hostname: broker1
+
+  edge2:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    ports:
+      - "5005:5005"
+    hostname: edge2
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+        reservations:
+          cpus: '3'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker2
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 1 -o True -sb True -s random_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+
+  broker2:
+    attach: false
+    image: rabbitmq:3.13-management
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+    hostname: broker2
+
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    hostname: client1
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+#        reservations:
+#          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker1
+      - edge1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s random_splitting -en True -e True & wait -n"
+
+  client2:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    hostname: client2
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+#        reservations:
+#          cpus: '2.0'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker2
+      - edge2
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -s random_splitting -en True -e True & wait -n"
+
+  client3:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    hostname: client3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+#        reservations:
+#          cpus: '2.0'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker2
+      - edge2
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb True -s random_splitting -en True -e True & wait -n"
+
+  client4:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    hostname: client4
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+#        reservations:
+#          cpus: '2.0'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker2
+      - edge2
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 3 -o True -sb True -s random_splitting -en True -e True & wait -n"

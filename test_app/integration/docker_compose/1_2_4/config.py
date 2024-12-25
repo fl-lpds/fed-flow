@@ -19,7 +19,6 @@ model_cfg = {
 }
 
 N = 500  # data length
-# mq_url = "sparrow.rmq.cloudamqp.com"
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
@@ -32,12 +31,12 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [[6, 6]]  # Initial split layers
+split_layer = [[6, 6], [6, 6], [6, 6], [6, 6]]  # Initial split layers
 model_len = 7
 
 # FL training configration
 
-R = 2000 * 50  # FL rounds
+R = 100  # FL rounds
 LR = 0.01  # Learning rate
 B = 100  # Batch size
 
@@ -62,18 +61,19 @@ random_seed = 0
 SERVER_ADDR = 'server'
 
 SERVER_PORT = 5002
-EDGESERVER_PORT = {'edge1': 5001}
+EDGESERVER_PORT = {'edge1': 5001, 'edge2': 5010}
 
-K = 1  # Number of devices
+K = 4  # Number of devices
 G = 1  # Number of groups
-S = 1  # Number of server connecting devices
+S = 2  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}
-CLIENTS_INDEX = {0: 'client1'}
-CLIENTS_CONFIG = {'client1': 0}
-EDGE_SERVER_LIST = ['edge1']
-EDGE_SERVER_CONFIG = {0: 'edge1'}
-CLIENTS_LIST = ['client1']
-EDGE_MAP = {'edge1': ['client1']}
-CLIENT_MAP = {'client1': 'edge1'}
+EDGE_MQ_MAP = {'edge1': 'broker1', 'edge2': 'broker2'}
+CLIENTS_INDEX = {0: 'client1', 1: 'client2', 2: 'client3', 3: 'client4'}
+CLIENTS_CONFIG = {'client1': 0, 'client2': 1, 'client3': 2, 'client4': 3}
+EDGE_SERVER_LIST = ['edge1', 'edge2']
+EDGE_SERVER_CONFIG = {0: 'edge1', 1: 'edge2'}
+CLIENTS_LIST = ['client1', 'client2', 'client3', 'client4']
+EDGE_MAP = {'edge1': ['client1', 'client2'], 'edge2': ['client3', 'client4']}
+CLIENT_MAP = {'client1': 'edge1', 'client2': 'edge1', 'client3': 'edge2', 'client4': 'edge2'}
