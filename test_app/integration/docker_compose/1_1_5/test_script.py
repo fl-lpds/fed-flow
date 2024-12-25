@@ -6,7 +6,7 @@ import time
 docker_compose_configs = [
     {
         "compose_file": "test_classicFL_simnet_1_1_5.yaml",
-        "compose_name": "ClassifFL",
+        "compose_name": "ClassicFL",
     },
     {
         "compose_file": "test_only_edge_simnet_1_1_5.yaml",

@@ -186,7 +186,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             state = server.edge_based_state()
             fed_logger.info(Fore.RED + f"STATE: {str(state)}")
 
-            if r < len(test_load_on_edges_and_server):
+            if r < len(test_load_on_edges_and_server) and options.get('splitting') == 'edge_based_heuristic':
                 server.split_layers = test_load_on_edges_and_server[r]
             else:
                 fed_logger.info("splitting")
@@ -294,7 +294,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
                        clientRemainingEnergy, clientBW, edge_server_BW, clientUtilization, res['test_acc_record'],
                        flop_on_each_edge, time_on_each_edge, flop_of_each_edge_on_server, flop_on_server,
-                       time_on_server, clientCompTime, clientCommTime)
+                       time_on_server, clientCompTime, clientCommTime, server.approximated_energy_of_actions,
+                       server.approximated_tt_of_actions)
         else:
             break
 
@@ -414,7 +415,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                clientCommEnergy=None, clientTT=None, remainingEnergy=None, clientBW=None, edge_serverBW=None,
                clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None,
                flop_of_each_edge_on_server=None, flop_on_server=None, time_on_server=None, clientCompTime=None,
-               clientCommTime=None):
+               clientCommTime=None, approximated_energy=None, approximated_tt=None):
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -435,6 +436,12 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         rl_utils.draw_graph(10, 5, accuracy, "Accuracy", "FL Rounds", "Accuracy", "/fed-flow/Graphs",
                             "accuracy", True)
 
+    if approximated_energy:
+        rl_utils.draw_graph(10, 5, approximated_energy, "Approximated energy of actions", "FL Rounds", "Approx. Energy", "/fed-flow/Graphs",
+                            "Approx. Energy", True)
+    if approximated_tt:
+        rl_utils.draw_graph(10, 5, approximated_tt, "Approximated tt", "FL Rounds", "Approx. Tt", "/fed-flow/Graphs",
+                            "Approx. Tt", True)
     if clientConsumedEnergy:
         plt.figure(figsize=(int(25), int(5)))
         for k in clientConsumedEnergy.keys():

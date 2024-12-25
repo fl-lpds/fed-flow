@@ -438,7 +438,14 @@ class FedServer(FedServerInterface):
         self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))()
 
     def split(self, state, options: dict):
-        self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels)
+        if options.get('splitting') == 'edge_based_heuristic':
+            self.split_layers, approximated_energy, approximated_tt = fl_method_parser.fl_methods.get(
+                options.get('splitting'))(state, self.group_labels)
+            self.actions.append(self.split_layers)
+            self.approximated_energy_of_actions.append(approximated_energy)
+            self.approximated_tt_of_actions.append(approximated_tt)
+        else:
+            self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels)
         fed_logger.info('Next Round OPs: ' + str(self.split_layers))
 
     def edge_based_state(self) -> dict:

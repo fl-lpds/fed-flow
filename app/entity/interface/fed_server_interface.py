@@ -57,6 +57,10 @@ class FedServerInterface(ABC, Communicator):
         self.server_flops = {}
         self.aggregation_time = 0
 
+        self.approximated_tt_of_actions = []
+        self.approximated_energy_of_actions = []
+        self.actions = []
+
         self.uninet = model_utils.get_model('Unit', None, self.device, self.edge_based)
         self.testset = data_utils.get_testset()
         self.testloader = data_utils.get_testloader(self.testset, multiprocessing.cpu_count())

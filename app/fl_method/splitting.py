@@ -28,6 +28,8 @@ from app.util import model_utils
 
 def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.MAGENTA + f"Heuristic Splitting algorithm =======================")
+    approximated_tt = 0
+    approximated_energy = 0
 
     # ALPHA == 1 try minimum energy and ALPHA == 0 is vice versa
     ALPHA = 1
@@ -236,6 +238,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         best_tt_action = None
 
         while not satisfied and not not_found:
+            fed_logger.info(Fore.GREEN + f"satisfied: {satisfied}, not_found: {not_found}")
             for client in config.CLIENTS_CONFIG.keys():
                 if satisfied or not_found:
                     break
@@ -284,10 +287,25 @@ def edge_based_heuristic_splitting(state: dict, label):
                 if best_score_client_index < len(config.CLIENTS_CONFIG.keys()) - 1:
                     best_score_client_index += 1
                     best_layer_index = 0
+
         if not_found:
-            return best_energy_action
+            approximated_tt, _ = trainingTimeEstimator(best_energy_action, client_comp_time, client_bw, edge_server_bw,
+                                                       flops_of_each_layer, activation_size, total_model_size,
+                                                       batchNumber, edge_poly_model, server_poly_model)
+            _, _, approximated_energy = energyEstimator(best_energy_action, client_bw, activation_size, batchNumber,
+                                                        total_model_size, client_comp_energy, client_power_usage)
+            fed_logger.info(
+                Fore.GREEN + f" Approximation: {best_energy_action}, {approximated_energy}, {approximated_tt}")
+            return best_energy_action, approximated_energy, approximated_tt
         else:
-            return best_action
+            approximated_tt, _ = trainingTimeEstimator(best_action, client_comp_time, client_bw, edge_server_bw,
+                                                       flops_of_each_layer, activation_size, total_model_size,
+                                                       batchNumber, edge_poly_model, server_poly_model)
+            _, _, approximated_energy = energyEstimator(best_action, client_bw, activation_size, batchNumber,
+                                                        total_model_size, client_comp_energy, client_power_usage)
+            fed_logger.info(
+                Fore.GREEN + f" Approximation: {best_action}, {approximated_energy}, {approximated_tt}")
+            return best_action, approximated_energy, approximated_tt
 
     elif ALPHA == 0:
         action = [[op1s[0][0], config.model_len - 1] for client, op1s in min_time_splitting_for_each_client.items()]
@@ -302,8 +320,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                 if training_time_of_action < best_tt:
                     best_tt = training_time_of_action
                     best_action = action
-
-    return action
+        return action
 
 
 def normalizer(input_dict):
@@ -372,14 +389,14 @@ def no_splitting(state, labels):
 
 def only_edge_splitting(state, labels):
     split_list = []
-    for i in range(config.K):
+    for i in range(len(config.CLIENTS_CONFIG.keys())):
         split_list.append([0, config.model_len - 1])
     return split_list
 
 
 def only_server_splitting(state, labels):
     split_list = []
-    for i in range(config.K):
+    for i in range(len(config.CLIENTS_CONFIG.keys())):
         split_list.append([0, 0])
     return split_list
 
