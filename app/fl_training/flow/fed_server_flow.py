@@ -436,12 +436,15 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         rl_utils.draw_graph(10, 5, accuracy, "Accuracy", "FL Rounds", "Accuracy", "/fed-flow/Graphs",
                             "accuracy", True)
 
+    fed_logger.info(Fore.MAGENTA + f"Approx. E: {approximated_energy}")
+    fed_logger.info(Fore.MAGENTA + f"Approx. tt: {approximated_tt}")
+
     if approximated_energy:
-        rl_utils.draw_graph(10, 5, approximated_energy, "Approximated energy of actions", "FL Rounds", "Approx. Energy", "/fed-flow/Graphs",
-                            "Approx. Energy", True)
+        rl_utils.draw_graph(10, 5, approximated_energy, "Approximated energy", "FL Rounds",
+                            "Approx. Energy", "/fed-flow/Graphs", "Approx Energy", True)
     if approximated_tt:
-        rl_utils.draw_graph(10, 5, approximated_tt, "Approximated tt", "FL Rounds", "Approx. Tt", "/fed-flow/Graphs",
-                            "Approx. Tt", True)
+        rl_utils.draw_graph(10, 5, approximated_tt, "Approximated tt", "FL Rounds",
+                            "Approx. Tt", "/fed-flow/Graphs", "Approx Tt", True)
     if clientConsumedEnergy:
         plt.figure(figsize=(int(25), int(5)))
         for k in clientConsumedEnergy.keys():

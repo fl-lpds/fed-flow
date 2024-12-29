@@ -181,7 +181,7 @@ def edge_based_heuristic_splitting(state: dict, label):
 
     satisfied = False
 
-    if ALPHA != 0 or ALPHA != 1:
+    if not (ALPHA == 0 or ALPHA == 1):
         for client in config.CLIENTS_CONFIG.keys():
             if satisfied:
                 break
@@ -227,6 +227,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     elif ALPHA == 1:
         baseline_tt = classicFL_tt
         baseline_energy = classicFL_avg_energy
+        best_action = previous_action
         not_found = False
         action = [[op1s[0][0], config.model_len - 1] for client, op1s in
                   min_energy_splitting_for_each_client.items()]
@@ -234,7 +235,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         best_layer_index = 0
         action_tt_and_baseline_tt_dif = 0
         action_e_and_baseline_e_diff = 0
-        best_energy_action = None
+        best_energy_action = previous_action
         best_tt_action = None
 
         while not satisfied and not not_found:
@@ -294,6 +295,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                        batchNumber, edge_poly_model, server_poly_model)
             _, _, approximated_energy = energyEstimator(best_energy_action, client_bw, activation_size, batchNumber,
                                                         total_model_size, client_comp_energy, client_power_usage)
+            approximated_energy = sum(approximated_energy.values())/len(approximated_energy.values())
             fed_logger.info(
                 Fore.GREEN + f" Approximation: {best_energy_action}, {approximated_energy}, {approximated_tt}")
             return best_energy_action, approximated_energy, approximated_tt
@@ -303,6 +305,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                        batchNumber, edge_poly_model, server_poly_model)
             _, _, approximated_energy = energyEstimator(best_action, client_bw, activation_size, batchNumber,
                                                         total_model_size, client_comp_energy, client_power_usage)
+            approximated_energy = sum(approximated_energy.values())/len(approximated_energy.values())
             fed_logger.info(
                 Fore.GREEN + f" Approximation: {best_action}, {approximated_energy}, {approximated_tt}")
             return best_action, approximated_energy, approximated_tt
@@ -550,10 +553,11 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
 
     EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
     comp_time_on_each_edge = {
-        edge: edge_flops_model.predict([[index, edge_flops[edge], flop_of_each_edge_on_server[edge], server_flops]]) for
+        edge: edge_flops_model.predict([[index, edge_flops[edge], flop_of_each_edge_on_server[edge], server_flops]])[0] for
         edge, index in EDGE_INDEX}
     comp_time_on_server = server_flops_model.predict([[server_flops]])
-    fed_logger.info(Fore.GREEN + f"{action}, {config.CLIENTS_CONFIG}")
+    fed_logger.info(Fore.GREEN + f"Comp time on edges prediction: {comp_time_on_each_edge}")
+
     for clientIP in config.CLIENTS_CONFIG.keys():
         op1 = action[config.CLIENTS_CONFIG[clientIP]][0]
         total_time_for_each_client[clientIP] = comp_time_on_each_client[clientIP][op1] + \
