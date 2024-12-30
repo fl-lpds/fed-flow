@@ -165,7 +165,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             else:
                 # setting BW between each edge and sever
                 for edge in config.EDGE_SERVER_LIST:
-                    server.edge_bandwidth[edge] = 200_000_000
+                    server.edge_bandwidth[edge] = 1_000_000_000
                 fed_logger.info("receiving client simnet network info")
                 server.client_network(config.EDGE_SERVER_LIST)
 
