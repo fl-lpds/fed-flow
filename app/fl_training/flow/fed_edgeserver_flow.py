@@ -59,11 +59,11 @@ def run_offload(server: FedEdgeServerInterface, LR):
             import resource
 
             def thread_wrapper(target_func, *args):
-                thread_start_time = time.thread_time()
+                # thread_start_time = time.thread_time()
                 target_func(*args)
-                thread_end_time = time.thread_time()
-                server.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
-                fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
+                # thread_end_time = time.thread_time()
+                # server.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
+                # fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
 
             start_training = time.time()
             threads = {}

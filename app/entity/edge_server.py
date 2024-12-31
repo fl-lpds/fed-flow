@@ -53,6 +53,7 @@ class FedEdgeServer(FedEdgeServerInterface):
 
     def forward_propagation(self, client_ip):
         i = 0
+        comp_time = 0
         msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
                             url=config.EDGE_SERVER_CONFIG[config.index])
         flag = msg[1]
@@ -91,11 +92,12 @@ class FedEdgeServer(FedEdgeServerInterface):
                         self.split_layers[config.CLIENTS_CONFIG[client_ip]][1]:
 
                     energy_estimation.computation_start()
-
+                    s_time = time.thread_time()
                     if self.optimizers.keys().__contains__(client_ip):
                         self.optimizers[client_ip].zero_grad()
                     outputs = self.nets[client_ip](inputs)
 
+                    comp_time += time.thread_time() - s_time
                     energy_estimation.computation_end()
 
                     if self.split_layers[config.CLIENTS_CONFIG[client_ip]][1] < model_utils.get_unit_model_len() - 1:
@@ -115,9 +117,11 @@ class FedEdgeServer(FedEdgeServerInterface):
                         gradients = msg[1].to(self.device)
 
                         energy_estimation.computation_start()
+                        s_time = time.thread_time()
 
                         outputs.backward(gradients)
 
+                        comp_time += time.thread_time() - s_time
                         energy_estimation.computation_end()
 
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
@@ -126,6 +130,7 @@ class FedEdgeServer(FedEdgeServerInterface):
 
                     else:
                         energy_estimation.computation_start()
+                        s_time = time.thread_time()
 
                         outputs = self.nets[client_ip](inputs)
                         loss = self.criterion(outputs, targets)
@@ -133,6 +138,7 @@ class FedEdgeServer(FedEdgeServerInterface):
                         if self.optimizers.keys().__contains__(client_ip):
                             self.optimizers[client_ip].step()
 
+                        comp_time += time.thread_time() - s_time
                         energy_estimation.computation_end()
 
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
@@ -158,6 +164,8 @@ class FedEdgeServer(FedEdgeServerInterface):
                                   url=config.EDGE_SERVER_CONFIG[config.index])
 
             i += 1
+        with lock:
+            self.computation_time_of_each_client[client_ip] = comp_time
         fed_logger.info(str(client_ip) + ' offloading training end')
 
     def backward_propagation(self, outputs, client_ip, inputs):
