@@ -1,6 +1,11 @@
+import logging
 import os
 import subprocess
 import time
+
+logging.basicConfig(filename='test_script.log', level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # List your Docker Compose file paths and corresponding config file paths
 docker_compose_configs = [
@@ -21,7 +26,7 @@ docker_compose_configs = [
         "compose_name": "Random",
     },
     {
-        "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
+        "compose_file": "test_heuristic_offloading_simnet_1_1_1.yaml",
         "compose_name": "OurMethod",
     },
 ]
@@ -47,7 +52,7 @@ def get_running_containers_with_name(substring):
         containers = result.stdout.strip().splitlines()
         return containers
     except subprocess.CalledProcessError as e:
-        print(f"Error while checking containers: {e}")
+        logger.info(f"Error while checking containers: {e}")
         return []
 
 
@@ -55,7 +60,7 @@ def down_compose(compose_file):
     """
     Bring down the Docker Compose stack.
     """
-    print(f"Stopping containers for {compose_file}")
+    logger.info(f"Stopping containers for {compose_file}")
     subprocess.run(["docker", "compose", "-f", compose_file, "down"], check=True)
 
 
@@ -70,7 +75,7 @@ def copy_config_file():
         with open(f"{DST_CONFIG_FILE}", "w") as f:
             f.write(data)
     except Exception as e:
-        print(f"Error copying config file: {e}")
+        logger.info(f"Error copying config file: {e}")
         raise
 
 
@@ -78,7 +83,7 @@ def up_compose(compose_file):
     """
     Bring up the Docker Compose stack.
     """
-    print(f"Starting containers for {compose_file}")
+    logger.info(f"Starting containers for {compose_file}")
     subprocess.run(["docker", "compose", "-f", compose_file, "up", "-d"], check=True)
 
 
@@ -88,7 +93,7 @@ def archive_graphs(compose_name):
     """
     server_containers = get_running_containers_with_name("server")
     if not server_containers:
-        print(f"No running container with 'server' in its name found for {compose_name}. Skipping archiving.")
+        logger.info(f"No running container with 'server' in its name found for {compose_name}. Skipping archiving.")
         return
 
     container_name = server_containers[0]  # Assuming the first match is the intended container
@@ -97,7 +102,7 @@ def archive_graphs(compose_name):
     # Ensure the archive directory exists
     os.makedirs(archive_folder, exist_ok=True)
 
-    print(f"Archiving Graphs folder from {container_name} to {archive_folder}...")
+    logger.info(f"Archiving Graphs folder from {container_name} to {archive_folder}...")
     try:
         # Copy the Graphs folder from the container to the host
         subprocess.run(
@@ -109,7 +114,7 @@ def archive_graphs(compose_name):
             check=True,
         )
     except subprocess.CalledProcessError as e:
-        print(f"Error archiving Graphs folder: {e}")
+        logger.info(f"Error archiving Graphs folder: {e}")
         raise
 
 
@@ -121,7 +126,7 @@ def main():
         compose_file = compose_config["compose_file"]
         compose_name = compose_config["compose_name"]
 
-        print(f"Preparing to start {compose_file}...")
+        logger.info(f"Preparing to start {compose_file}...")
 
         # Copy the config file
         copy_config_file()
@@ -132,7 +137,7 @@ def main():
         while True:
             running_clients = get_running_containers_with_name("client")
             if not running_clients:
-                print("All 'client' containers are down. Archiving and switching to next stack.")
+                logger.info("All 'client' containers are down. Archiving and switching to next stack.")
 
                 # Archive the Graphs folder
                 archive_graphs(compose_name)
@@ -143,13 +148,13 @@ def main():
                 current_compose_index += 1
                 break
 
-            print(f"Running 'client' containers: {running_clients}")
+            logger.info(f"Running 'client' containers: {running_clients}")
             # Wait and check again
             time.sleep(60)
 
         # If we've processed all compose files, exit
         if current_compose_index >= len(docker_compose_configs):
-            print("All compose files processed. Exiting.")
+            logger.info("All compose files processed. Exiting.")
             break
 
 

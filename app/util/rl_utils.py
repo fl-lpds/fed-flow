@@ -112,8 +112,8 @@ def tanhActivation(x: float) -> float:
 
 
 def normalizeReward_linear(maxAmount, minAmount, x, minNormalized, maxNormalized):
-    P = [maxAmount, minNormalized]
-    Q = [minAmount, maxNormalized]
+    P = [maxAmount, maxNormalized]
+    Q = [minAmount, minNormalized]
     lineGradient = (P[1] - Q[1]) / (P[0] - Q[0])
     y = lineGradient * (x - Q[0]) + Q[1]
     return y

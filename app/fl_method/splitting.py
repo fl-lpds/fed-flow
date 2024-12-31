@@ -7,7 +7,7 @@ from colorama import Fore
 from app.config import config
 from app.config.logger import fed_logger
 # from app.model.entity.rl_model import PPO
-from app.util import model_utils
+from app.util import model_utils, rl_utils
 
 
 # from stable_baselines3 import PPO, DDPG
@@ -236,6 +236,7 @@ def edge_based_heuristic_splitting(state: dict, label):
 
         best_energy_action = action
         best_action = action
+        best_score = float('-inf')
         best_tt_action = None
 
         training_time_of_action, _ = trainingTimeEstimator(action,
@@ -264,11 +265,9 @@ def edge_based_heuristic_splitting(state: dict, label):
 
         def grid_search(evaluate_score, action_size, max_value=6):
             def recursive_search(current_action, depth):
+                global best_score, best_action
                 if depth == action_size:
                     return evaluate_score(current_action), current_action
-
-                best_score = float('-inf')
-                best_action = None
 
                 for x in range(max_value + 1):
                     for y in range(x, max_value + 1):
@@ -284,8 +283,10 @@ def edge_based_heuristic_splitting(state: dict, label):
             initial_action = [[0, 0] for _ in range(action_size)]
             return recursive_search(initial_action, 0)
 
-    # Example usage
+        # Example usage
         def example_score(action):
+            energy_score = 0
+            time_score = 0
             clients_comp_e_of_action, clients_comm_e_of_action, clients_total_e_of_action = (
                 energyEstimator(action,
                                 client_bw,
@@ -295,10 +296,32 @@ def edge_based_heuristic_splitting(state: dict, label):
                                 client_comp_energy,
                                 client_power_usage))
             avg_e_of_action = sum(clients_total_e_of_action.values()) / len(clients_total_e_of_action.values())
+            training_time_of_action, _ = trainingTimeEstimator(action,
+                                                               client_comp_time,
+                                                               client_bw,
+                                                               edge_server_bw,
+                                                               flops_of_each_layer,
+                                                               activation_size,
+                                                               total_model_size,
+                                                               batchNumber,
+                                                               edge_poly_model,
+                                                               server_poly_model)
 
-            return (avg_e_of_action - baseline_energy)
+            energy_score += rl_utils.normalizeReward_linear(1000, -1000, baseline_energy - avg_e_of_action,
+                                                            -1, 1)
+            time_score = rl_utils.normalizeReward_linear(1000, -1000, baseline_tt - training_time_of_action,
+                                                         -1, 1)
+            time_score = min(1, max(-1, time_score))
 
-        best_action, best_score = grid_search(example_score,
+            if training_time_of_action <= baseline_tt:
+                score = 1000 - (1/(energy_score+1e-6))
+            else:
+                time_penalty = 10 * abs(training_time_of_action - baseline_tt)
+                score = 500 - (1/(energy_score+1e-6)) - time_penalty
+
+            return score
+
+        best_score, best_action = grid_search(example_score,
                                               action_size=len(config.CLIENTS_CONFIG.keys()),
                                               max_value=config.model_len - 1)
 
@@ -480,6 +503,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                     best_tt = training_time_of_action
                     best_action = action
         return action
+
 
 def normalizer(input_dict):
     input_list = list(input_dict.values())
