@@ -311,13 +311,14 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                             -1, 1)
             time_score = rl_utils.normalizeReward_linear(1000, -1000, baseline_tt - training_time_of_action,
                                                          -1, 1)
-            time_score = min(1, max(-1, time_score))
+            time_score = min(1, max(1e-6, time_score))
+            energy_score = min(1, max(1e-6, time_score))
 
             if training_time_of_action <= baseline_tt:
-                score = 1000 - (1 / (energy_score + 1e-6))
+                score = 5000 - avg_e_of_action
             else:
                 time_penalty = 10 * abs(training_time_of_action - baseline_tt)
-                score = 500 - (1 / (energy_score + 1e-6)) - time_penalty
+                score = 1000 - energy_score - time_penalty
 
             return score
 
