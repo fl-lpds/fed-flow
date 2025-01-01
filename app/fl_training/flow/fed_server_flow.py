@@ -637,11 +637,8 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             array = []
             for edgeIndex in range(len(config.EDGE_SERVER_LIST)):
                 edge = config.EDGE_SERVER_CONFIG[edgeIndex]
-                for flop, flop_of_edge_on_server, flop_on_servers, timeTaken in zip(flop_on_each_edge[edge],
-                                                                                    flop_of_each_edge_on_server[edge],
-                                                                                    flop_on_server,
-                                                                                    time_on_each_edge[edge]):
-                    array.append([edgeIndex, flop, flop_of_edge_on_server, flop_on_servers, timeTaken])
+                for flop, timeTaken in zip(flop_on_each_edge[edge], time_on_each_edge[edge]):
+                    array.append([edgeIndex, flop, timeTaken])
             writer = csv.writer(file)
             writer.writerows(array)
 

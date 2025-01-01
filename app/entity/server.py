@@ -76,17 +76,17 @@ class FedServer(FedServerInterface):
         self.criterion = nn.CrossEntropyLoss()
 
     def edge_offloading_train(self, client_ips):
-        def thread_wrapper(target_func, *args):
-            thread_start_time = time.thread_time()
-            target_func(*args)
-            thread_end_time = time.thread_time()
-            self.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
-            fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
+        # def thread_wrapper(target_func, *args):
+            # thread_start_time = time.thread_time()
+            # target_func(*args)
+            # thread_end_time = time.thread_time()
+            # self.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
+            # fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
 
         self.threads = {}
         for i in range(len(client_ips)):
-            self.threads[client_ips[i]] = threading.Thread(target=thread_wrapper,
-                                                           args=(self._thread_edge_training, client_ips[i]),
+            self.threads[client_ips[i]] = threading.Thread(target=self._thread_edge_training,
+                                                           args=(client_ips[i],),
                                                            name=client_ips[i])
             fed_logger.info(str(client_ips[i]) + ' offloading training start')
             self.threads[client_ips[i]].start()
@@ -161,6 +161,8 @@ class FedServer(FedServerInterface):
     def _thread_edge_training(self, client_ip):
         # iteration = int((test_config.N / (test_config.K * test_config.B)))
         communication_time = 0
+        comp_time = 0
+
         edge_of_client = config.CLIENT_MAP[client_ip]
         i = 0
         msg = self.recv_msg(config.CLIENT_MAP[client_ip],
@@ -177,6 +179,7 @@ class FedServer(FedServerInterface):
             fed_logger.info(str(client_ip) + ' offloading training end')
             with lock:
                 self.client_training_transmissionTime[client_ip] = communication_time
+                self.computation_time_of_each_client[client_ip] = comp_time
             return 'Finish'
         while flag:
 
@@ -205,6 +208,9 @@ class FedServer(FedServerInterface):
                 labels = msg[2]
 
                 inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
+
+                s_time = time.thread_time()
+
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].zero_grad()
                 outputs = self.nets[client_ip](inputs)
@@ -212,6 +218,8 @@ class FedServer(FedServerInterface):
                 loss.backward()
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].step()
+
+                comp_time += time.thread_time() - s_time
 
                 # Send gradients to edge
                 msg = [f'{message_utils.server_gradients_server_to_edge() + str(client_ip)}_{i}', inputs.grad]
@@ -223,6 +231,7 @@ class FedServer(FedServerInterface):
             i += 1
         with lock:
             self.client_training_transmissionTime[client_ip] = communication_time
+            self.computation_time_of_each_client[client_ip] = comp_time
 
         fed_logger.info(str(client_ip) + ' offloading training end')
         return 'Finish'

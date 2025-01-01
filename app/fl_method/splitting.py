@@ -735,7 +735,7 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
 
     EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
     comp_time_on_each_edge = {
-        edge: edge_flops_model.predict([[index, edge_flops[edge], flop_of_each_edge_on_server[edge], server_flops]])[0]
+        edge: edge_flops_model.predict([[index, edge_flops[edge]]])[0]
         for
         edge, index in EDGE_INDEX}
     comp_time_on_server = server_flops_model.predict([[server_flops]])

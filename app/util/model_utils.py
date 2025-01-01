@@ -12,7 +12,7 @@ import torch.nn.init as init
 import tqdm
 from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import PolynomialFeatures, StandardScaler
+from sklearn.preprocessing import PolynomialFeatures
 
 from app.config import config
 from app.config.logger import fed_logger
@@ -179,16 +179,15 @@ def createFlopsPredictionModel(flop_time_csv_path, isEdge=True):
     filtered_data = pd.read_csv(file_path, names=['flop', 'time'])
     if isEdge:
         filtered_data = pd.read_csv(file_path,
-                                    names=['edgeIndex', 'flop', 'flop_of_edge_on_server', 'flop_on_server', 'time'])
+                                    names=['edgeIndex', 'flop', 'time'])
 
     if len(filtered_data) > 0:
         X = filtered_data['flop'].values.reshape(-1, 1)
         y = filtered_data['time'].values
         if isEdge:
-            X = filtered_data[['edgeIndex', 'flop', 'flop_of_edge_on_server', 'flop_on_server']].values
+            X = filtered_data[['edgeIndex', 'flop']].values
             y = filtered_data['time'].values
 
-        fed_logger.info(f"X: {X}")
         # scaler = StandardScaler()
         # X_scaled = scaler.fit_transform(X)
         # fed_logger.info(f"X scaled: {X}")
@@ -204,27 +203,21 @@ def createFlopsPredictionModel(flop_time_csv_path, isEdge=True):
 
         if isEdge:
             flop_on_edge_range = np.linspace(filtered_data['flop'].min(), filtered_data['flop'].max(), 500)
-            flop_of_each_edge_on_server = np.linspace(filtered_data['flop_of_edge_on_server'].min(),
-                                                      filtered_data['flop_of_edge_on_server'].max(), 500)
-            flop_on_server = np.linspace(filtered_data['flop_on_server'].min(),
-                                         filtered_data['flop_on_server'].max(), 500)
+            # flop_of_each_edge_on_server = np.linspace(filtered_data['flop_of_edge_on_server'].min(),
+            #                                           filtered_data['flop_of_edge_on_server'].max(), 500)
+            # flop_on_server = np.linspace(filtered_data['flop_on_server'].min(),
+            #                              filtered_data['flop_on_server'].max(), 500)
 
             index_mean = filtered_data['edgeIndex'].mean()
-            fed_logger.info(
-                f"FLOP Range: {flop_on_edge_range}, index_mean: {index_mean}, np,full_like: {np.full_like(flop_on_edge_range, 1)}, "
-                f"kir khar: {np.c_[np.full_like(flop_on_edge_range, index_mean), flop_on_edge_range, flop_of_each_edge_on_server, flop_on_server]}")
 
             linear_predictions = linear_model.predict(np.c_[np.full_like(flop_on_edge_range, index_mean),
-                                                        flop_on_edge_range,
-                                                        flop_of_each_edge_on_server,
-                                                        flop_on_server])
+            flop_on_edge_range])
             poly_predictions = poly_model.predict(np.c_[np.full_like(flop_on_edge_range, index_mean),
-                                                flop_on_edge_range,
-                                                flop_of_each_edge_on_server,
-                                                flop_on_server])
+            flop_on_edge_range])
 
             plt.plot(flop_on_edge_range, linear_predictions, color='green', label='Linear Regression Model')
-            plt.plot(flop_on_edge_range, poly_predictions, color='red', label=f'Polynomial Regression Model (Degree {degree})')
+            plt.plot(flop_on_edge_range, poly_predictions, color='red',
+                     label=f'Polynomial Regression Model (Degree {degree})')
 
         else:
             flop_range = np.linspace(filtered_data['flop'].min(), filtered_data['flop'].max(), 1000).reshape(-1, 1)
