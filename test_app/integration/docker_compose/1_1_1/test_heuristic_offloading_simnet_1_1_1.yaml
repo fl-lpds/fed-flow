@@ -1,0 +1,71 @@
+services:
+  server:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./../../../../Graphs:/fed-flow/Graphs
+      - ./../../../../app/model:/fed-flow/app/model
+      - ./../../../../app/logs:/fed-flow/app/logs
+    image: autlpdslab/fedflow:rabbitmq
+    ports:
+      - "5002:5002"
+    hostname: server
+    deploy:
+      resources:
+        limits:
+          cpus: '5'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -s edge_based_heuristic -e True & python3 /fed-flow/energy/service.py  "
+
+  edge1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    ports:
+      - "5001:5001"
+    hostname: edge1
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+        reservations:
+          cpus: '4'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -sb True -s edge_based_heuristic -e True & python3 /fed-flow/energy/service.py & wait -n"
+
+  broker1:
+    attach: false
+    image: rabbitmq:3.13-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+    hostname: broker1
+
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    hostname: client1
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - edge1
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s edge_based_heuristic -en True -e True -iid True & wait -n"
