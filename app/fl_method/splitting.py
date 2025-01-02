@@ -217,7 +217,7 @@ def edge_based_heuristic_splitting(state: dict, label):
 
                     if score == 1:
                         return 1, action
-                    if score > best_score:
+                    elif score > best_score:
                         best_score = score
                         best_action = action
 
@@ -275,7 +275,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                 best_action = best_action_found
             if best_score_found != 1:
                 if best_score_client_index < len(config.CLIENTS_CONFIG.keys()):
-                    if best_layer_index < config.model_len - 1:
+                    if best_layer_index < config.model_len:
                         # Best score client: client_score[0] = ('client1', 1.0)
                         best_score_client = clients_score[best_score_client_index][0]
                         fed_logger.info(Fore.MAGENTA + f"{best_layer_index}")
@@ -285,12 +285,13 @@ def edge_based_heuristic_splitting(state: dict, label):
                         best_layer_index += 1
                     else:
                         if best_score_client_index < len(config.CLIENTS_CONFIG.keys()):
-                            best_score_client_index += 1
                             best_layer_index = 1
                             best_score_client = clients_score[best_score_client_index][0]
                             action[config.CLIENTS_CONFIG[best_score_client]] = [
                                 min_energy_splitting_for_each_client[best_score_client][best_layer_index][0],
                                 config.model_len - 1]
+                            best_score_client_index += 1
+
                         else:
                             notFound = True
                 else:
