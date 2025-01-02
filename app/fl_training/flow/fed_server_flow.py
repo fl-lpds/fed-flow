@@ -190,8 +190,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 server.split_layers = test_load_on_edges_and_server[r]
             else:
                 fed_logger.info("splitting")
+                s_time = time.process_time()
                 server.split(state, options)
-                fed_logger.info(f"Action : {server.split_layers}")
+                splittingTime = time.process_time() - s_time
+                fed_logger.info(Fore.MAGENTA + f"Splitting Time : {splittingTime}")
+                fed_logger.info(Fore.MAGENTA + f"Action : {server.split_layers}")
 
             fed_logger.info("Scattering splitting info to edges.")
             server.send_split_layers_config()
