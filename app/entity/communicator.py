@@ -1,14 +1,14 @@
 # Communicator Object
 
+import hashlib
 import io
 import json
 import logging
 import pickle
 import time
-
-import hashlib
-import pika
 from collections import defaultdict
+
+import pika
 import torch
 from colorama import Fore
 
@@ -120,10 +120,11 @@ class Communicator(object):
         total_chunks = len(chunks)
 
         channel, connection = self.open_connection(url)
+        queue = self.declare_queue_if_not_exist(exchange, msg, channel)
 
         for idx, chunk in enumerate(chunks):
             published = False
-            self.send_bug=False
+            self.send_bug = False
             while not published:
                 try:
                     self.reconnect(connection, channel)
@@ -153,6 +154,8 @@ class Communicator(object):
                     self.send_bug = True
                     fed_logger.error(Fore.RED + f"Failed to send chunk {idx}: {e}")
                     continue
+                time.sleep(1)
+
 
         self.close_connection(channel, connection)
         fed_logger.info(Fore.GREEN + f"Published message in {total_chunks} chunks.")

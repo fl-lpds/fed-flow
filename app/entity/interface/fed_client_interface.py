@@ -28,6 +28,8 @@ class FedClientInterface(ABC, Communicator):
         self.simnet: bool = simnet
         self.simnetbw = 10_000_000 if self.simnet else 0  # 10 Mbps
 
+        self.computational_time = 0
+
     @abstractmethod
     def initialize(self, split_layer, LR, simnetbw: float = None):
         pass

@@ -78,7 +78,7 @@ def run_edge_based(client: FedClientInterface, LR):
         tt = 0
         if client.simnet:
             transmission_time = float(energy_estimation.get_transmission_time())
-            computation_time = process_time_end - proces_time_start
+            computation_time = client.computational_time
             tt = transmission_time + computation_time
             fed_logger.info(Fore.MAGENTA + f"Client SIMNET Total time: {tt}")
         else:

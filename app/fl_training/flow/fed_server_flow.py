@@ -68,6 +68,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     clientBW, edge_server_BW = {}, {}
     clientRemainingEnergy = {}
     clientConsumedEnergy = {}
+    comp_time_of_each_client_on_edge = {}
+    comp_time_of_each_client_on_server = {}
     clientCompEnergy = {}
     clientCommEnergy = {}
     clientCompTime = {}
@@ -91,6 +93,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
         clientCompTime[client] = []
         clientCommTime[client] = []
         clientTT[client] = []
+        comp_time_of_each_client_on_edge[client] = []
+        comp_time_of_each_client_on_server[client] = []
 
     for edge in config.EDGE_SERVER_LIST:
         edge_server_BW[edge] = []
@@ -256,6 +260,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 clientTT[client].append(energy_tt_list[client][2])
                 clientRemainingEnergy[client].append(energy_tt_list[client][3])
                 clientUtilization[client].append(energy_tt_list[client][4])
+                comp_time_of_each_client_on_edge[client].append(server.computation_time_of_each_client_on_edges[client])
+                comp_time_of_each_client_on_server[client].append(server.computation_time_of_each_client[client])
                 energy += (energy_tt_list[client][0] + energy_tt_list[client][1])
 
             if config.K != 0:
@@ -298,7 +304,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                        clientRemainingEnergy, clientBW, edge_server_BW, clientUtilization, res['test_acc_record'],
                        flop_on_each_edge, time_on_each_edge, flop_of_each_edge_on_server, flop_on_server,
                        time_on_server, clientCompTime, clientCommTime, server.approximated_energy_of_actions,
-                       server.approximated_tt_of_actions)
+                       server.approximated_tt_of_actions, comp_time_of_each_client_on_edge,
+                       comp_time_of_each_client_on_server)
         else:
             break
 
@@ -418,7 +425,8 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                clientCommEnergy=None, clientTT=None, remainingEnergy=None, clientBW=None, edge_serverBW=None,
                clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None,
                flop_of_each_edge_on_server=None, flop_on_server=None, time_on_server=None, clientCompTime=None,
-               clientCommTime=None, approximated_energy=None, approximated_tt=None):
+               clientCommTime=None, approximated_energy=None, approximated_tt=None,
+               computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None):
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -608,7 +616,38 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.savefig(os.path.join("/fed-flow/Graphs", f"edge_serverBW"))
         plt.close()
 
-    fed_logger.info(Fore.MAGENTA + f"{flop_on_each_edge}, {time_on_each_edge}")
+    if computation_time_of_each_client_on_edge:
+        plt.figure(figsize=(int(25), int(5)))
+        for k in computation_time_of_each_client_on_edge.keys():
+            iotDevice_K = computation_time_of_each_client_on_edge[k]
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            plt.title(f"Comp time of iot device on edge")
+            plt.xlabel("Round")
+            plt.ylabel("Time (S)")
+            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+        plt.legend()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"Comp time on edge"))
+        plt.close()
+
+    if computation_time_of_each_client_on_server:
+        plt.figure(figsize=(int(25), int(5)))
+        for k in computation_time_of_each_client_on_server.keys():
+            iotDevice_K = computation_time_of_each_client_on_server[k]
+            r = random.random()
+            b = random.random()
+            g = random.random()
+            color = (r, g, b)
+            plt.title(f"Comp Time of each iot device on server")
+            plt.xlabel("Round")
+            plt.ylabel("Time (S)")
+            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+        plt.legend()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"Comp time on server"))
+        plt.close()
+
     if flop_on_each_edge:
         flops_of_each_edge = {}
         for edge in flop_on_each_edge.keys():
