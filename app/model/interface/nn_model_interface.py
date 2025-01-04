@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
 import torch.nn as nn
+import torchvision.models
+from app.config.logger import fed_logger
 
-
+torchvision.models.resnet50()
 class NNModel(ABC, nn.Module):
     """
     class name should be the same as file name
@@ -28,6 +30,7 @@ class NNModel(ABC, nn.Module):
             self._initialize_weights()
         else:
             split_point = split_layer
+            fed_logger.info(len(self.cfg))
             assert split_point < len(self.cfg)
             self.split_layer = split_layer
             self.location = location
@@ -82,5 +85,15 @@ class NNModel(ABC, nn.Module):
         """
 
         :return: the configuration of each layer in a list  of (Type, in_channels, out_channels, kernel_size, out_size(c_out*h*w), flops(c_out*h*w*k*k*c_in))
+        """
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def data_transformer():
+        """
+
+        Returns:  torchvision.transforms object to adjust input data properties
+
         """
         pass

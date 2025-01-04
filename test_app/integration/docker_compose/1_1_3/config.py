@@ -18,7 +18,8 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 500  # data length
+N = 50000  # data length
+# mq_url = "sparrow.rmq.cloudamqp.com"
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
@@ -65,7 +66,7 @@ EDGESERVER_PORT = {'edge1': 5001}
 
 K = 3  # Number of devices
 G = 1  # Number of groups
-S = 1  # Number of server connecting devices
+S = 3  # Number of server connecting devices
 
 # Unique clients order
 HOST2IP = {}

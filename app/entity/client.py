@@ -29,7 +29,7 @@ class Client(FedClientInterface):
         self.simnetbw = simnetbw
         fed_logger.debug('Building Model.')
         self.net = model_utils.get_model('Client', self.split_layers[config.index], self.device, self.edge_based)
-        fed_logger.debug(self.net)
+        fed_logger.debug(f"net:{self.net}")
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR,
                                    momentum=0.9)
@@ -299,6 +299,8 @@ class Client(FedClientInterface):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
             outputs = self.net(inputs)
+            print(outputs.shape)
+            print(targets.shape)
             loss = self.criterion(outputs, targets)
             loss.backward()
             self.optimizer.step()

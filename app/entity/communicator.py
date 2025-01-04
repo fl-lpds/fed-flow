@@ -1,11 +1,14 @@
 # Communicator Object
+
 import io
 import json
 import logging
 import pickle
 import time
 
+import hashlib
 import pika
+from collections import defaultdict
 import torch
 from colorama import Fore
 
@@ -110,112 +113,94 @@ class Communicator(object):
 
     def send_msg(self, exchange, msg, is_weight=False, url=None):
         bb = self.serialize_message(msg, is_weight)
+        if not isinstance(bb, bytes):
+            bb = bb.encode('utf-8')
+        message_id = hashlib.sha256(bb).hexdigest()
+        chunks = chunk_message(bb)
+        total_chunks = len(chunks)
+
         channel, connection = self.open_connection(url)
-        published = False
-        queue = self.declare_queue_if_not_exist(exchange, msg, channel)
-        while True:
-            try:
-                channel, connection = self.reconnect(connection, channel)
-                fed_logger.debug(Fore.GREEN + f"publishing {config.cluster}.{msg[0]}.{exchange}")
-                channel.basic_publish(exchange=config.cluster + "." + exchange,
-                                      routing_key=config.cluster + "." + msg[0] + "." + exchange,
-                                      body=bb, mandatory=True, properties=pika.BasicProperties(
-                        delivery_mode=pika.DeliveryMode.Transient))
-                self.close_connection(channel, connection)
-                fed_logger.debug(Fore.GREEN + f"published {config.cluster}.{msg[0]}.{exchange}")
-                if self.send_bug:
+
+        for idx, chunk in enumerate(chunks):
+            published = False
+            self.send_bug=False
+            while not published:
+                try:
+                    self.reconnect(connection, channel)
+                    fed_logger.debug(Fore.GREEN + f"publishing {config.cluster}.{msg[0]}.{exchange}")
+                    properties = pika.BasicProperties(
+                        delivery_mode=pika.DeliveryMode.Transient,
+                        headers={
+                            "message_id": message_id,
+                            "chunk_index": idx,
+                            "total_chunks": total_chunks
+                        }
+                    )
+                    channel.basic_publish(
+                        exchange=config.cluster + "." + exchange,
+                        routing_key=config.cluster + "." + msg[0] + "." + exchange,
+                        body=chunk,
+                        mandatory=True,
+                        properties=properties
+                    )
+                    # if self.send_bug:
                     fed_logger.debug(Fore.RED + f"published {config.cluster}.{msg[0]}.{exchange}")
-                published = True
-                return
+                    published = True
 
-            except Exception as e:
-                if published:
-                    return
-                self.send_bug = True
-                fed_logger.error(Fore.RED + f"{e}")
-                continue
+                except Exception as e:
+                    if published:
+                        continue
+                    self.send_bug = True
+                    fed_logger.error(Fore.RED + f"Failed to send chunk {idx}: {e}")
+                    continue
 
-    # def recv_msg(self, exchange, expect_msg_type: str = None, is_weight=False, url=None):
-    #     channel, connection = self.open_connection(url)
-    #     fed_logger.debug(Fore.YELLOW + f"receiving {config.cluster}.{expect_msg_type}.{exchange}")
-    #     res = None
-    #
-    #     while True:
-    #         try:
-    #             channel, connection = self.reconnect(connection, channel)
-    #             queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange)
-    #             channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True,
-    #                                      exchange_type='topic')
-    #             channel.queue_bind(exchange=config.cluster + "." + exchange,
-    #                                queue=config.cluster + "." + expect_msg_type + "." + exchange,
-    #                                routing_key=config.cluster + "." + expect_msg_type + "." + exchange)
-    #             fed_logger.debug(Fore.YELLOW + f"receiving loop {config.cluster}.{expect_msg_type}.{exchange}")
-    #             for method_frame, properties, body in channel.consume(queue=
-    #                                                                   config.cluster + "." + expect_msg_type + "." + exchange
-    #                                                                   ):
-    #                 msg = [expect_msg_type]
-    #                 res = self.deserialize_message(body, is_weight)
-    #                 msg.extend(res)
-    #                 channel.stop_consuming()
-    #                 channel.cancel()
-    #                 channel.basic_ack(method_frame.delivery_tag)
-    #                 channel.queue_delete(queue=config.cluster + "." + expect_msg_type + "." + exchange)
-    #                 self.close_connection(channel, connection)
-    #                 fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-    #                 fed_logger.debug(Fore.CYAN + f"received {config.cluster}.{expect_msg_type}.{exchange}")
-    #                 return msg
-    #         except Exception as e:
-    #             fed_logger.exception(Fore.RED + f"{expect_msg_type},{e},{is_weight}")
-    #             fed_logger.exception(Fore.RED + f"revived {config.cluster}.{expect_msg_type}.{exchange}")
-    #             if res is None:
-    #                 continue
-    #             self.close_connection(channel, connection)
-    #             msg = [expect_msg_type]
-    #             msg.extend(res)
-    #             fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-    #             return msg
-    #
-    #         time.sleep(1)
+        self.close_connection(channel, connection)
+        fed_logger.info(Fore.GREEN + f"Published message in {total_chunks} chunks.")
 
     def recv_msg(self, exchange, expect_msg_type: str = None, is_weight=False, url=None):
         channel, connection = self.open_connection(url)
-        fed_logger.debug(Fore.YELLOW + f"receiving {config.cluster}.{expect_msg_type}.{exchange}")
-        res = None
+        received_chunks = defaultdict(dict)  # Store chunks by message_id
+        fed_logger.debug(Fore.YELLOW + f"Receiving {config.cluster}.{expect_msg_type}.{exchange}")
 
         try:
-            while True:
-                channel, connection = self.reconnect(connection, channel)
-                queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange)
-                channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True,
-                                         exchange_type='topic')
-                channel.queue_bind(exchange=config.cluster + "." + exchange,
-                                   queue=config.cluster + "." + expect_msg_type + "." + exchange,
-                                   routing_key=config.cluster + "." + expect_msg_type + "." + exchange)
-                fed_logger.debug(Fore.YELLOW + f"receiving loop {config.cluster}.{expect_msg_type}.{exchange}")
-                method_frame, header_frame, body = channel.basic_get(
-                    queue=config.cluster + "." + expect_msg_type + "." + exchange)
-                if method_frame:
-                    msg = [expect_msg_type]
-                    res = self.deserialize_message(body, is_weight)
-                    msg.extend(res)
-                    channel.stop_consuming()
-                    channel.cancel()
+            self.reconnect(connection, channel)
+            queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange)
+            channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True, exchange_type='topic')
+            channel.queue_bind(
+                exchange=config.cluster + "." + exchange,
+                queue=config.cluster + "." + expect_msg_type + "." + exchange,
+                routing_key=config.cluster + "." + expect_msg_type + "." + exchange
+            )
+
+            for method_frame, properties, body in channel.consume(
+                    queue=config.cluster + "." + expect_msg_type + "." + exchange):
+                message_id = properties.headers["message_id"]
+                chunk_index = properties.headers["chunk_index"]
+                total_chunks = properties.headers["total_chunks"]
+
+                # Save the chunk
+                received_chunks[message_id][chunk_index] = body
+
+                # Check if all chunks are received
+                if len(received_chunks[message_id]) == total_chunks:
+                    all_chunks = [received_chunks[message_id][i] for i in range(total_chunks)]
+                    full_message = b"".join(all_chunks)
+                    del received_chunks[message_id]  # Cleanup
+
+                    res = self.deserialize_message(full_message, is_weight)
                     channel.basic_ack(method_frame.delivery_tag)
-                    channel.queue_delete(queue=config.cluster + "." + expect_msg_type + "." + exchange)
+                    channel.stop_consuming()
                     self.close_connection(channel, connection)
+
+                    msg = [expect_msg_type]
+                    msg.extend(res)
                     fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-                    fed_logger.debug(Fore.CYAN + f"received {config.cluster}.{expect_msg_type}.{exchange}")
                     return msg
-                else:
-                    time.sleep(1)
+
         except Exception as e:
-            fed_logger.exception(Fore.RED + f"{expect_msg_type},{e},{is_weight}")
-            fed_logger.exception(Fore.RED + f"revived {config.cluster}.{expect_msg_type}.{exchange}")
+            fed_logger.exception(Fore.RED + f"Error receiving message: {e}")
             self.close_connection(channel, connection)
-            msg = [expect_msg_type]
-            msg.extend(res)
-            fed_logger.exception(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-            return msg
+            raise
 
     @staticmethod
     def serialize_message(msg, is_weight=False):
@@ -240,3 +225,15 @@ class Communicator(object):
             return fl
         else:
             return json.loads(msg)
+
+
+def chunk_message(msg, chunk_size=500 * 1024 * 1024):
+    """Splits the message into chunks."""
+    chunks = []
+    # fed_logger.info(len(msg))
+    for i in range(0, len(msg), chunk_size):
+        if len(msg[i:]) > chunk_size:
+            chunks.append(msg[i:i + chunk_size])
+        else:
+            chunks.append(msg[i:])
+    return chunks
