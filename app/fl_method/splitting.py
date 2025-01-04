@@ -217,7 +217,7 @@ def edge_based_heuristic_splitting(state: dict, label):
 
                     if score == 1:
                         return 1, action
-                    elif score > best_score:
+                    if score > best_score:
                         best_score = score
                         best_action = action
 
