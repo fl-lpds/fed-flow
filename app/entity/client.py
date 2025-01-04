@@ -147,10 +147,10 @@ class Client(FedClientInterface):
         comp_time = 0
 
         computation_start()
-        comp_time_start = time.thread_time()
+        comp_time_start = time.time()
         self.net.to(self.device)
         self.net.train()
-        comp_time += time.thread_time() - comp_time_start
+        comp_time += time.time() - comp_time_start
         computation_end()
         i = 0
         if self.split_layers[config.index][0] == model_utils.get_unit_model_len() - 1:
@@ -161,7 +161,7 @@ class Client(FedClientInterface):
                           url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
             end_transmission(data_utils.sizeofmessage(flag))
             i += 1
-            comp_time_start = time.thread_time()
+            comp_time_start = time.time()
             for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
                 computation_start()
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
@@ -171,7 +171,7 @@ class Client(FedClientInterface):
                 loss.backward()
                 self.optimizer.step()
                 computation_end()
-            comp_time += time.thread_time() - comp_time_start
+            comp_time += time.time() - comp_time_start
 
         elif self.split_layers[config.index][0] < model_utils.get_unit_model_len() - 1:
             # flag = [message_utils.local_iteration_flag_client_to_edge(), True]
@@ -186,14 +186,14 @@ class Client(FedClientInterface):
             for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
 
                 computation_start()
-                comp_time_start = time.thread_time()
+                comp_time_start = time.time()
 
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 if self.optimizer is not None:
                     self.optimizer.zero_grad()
                 outputs = self.net(inputs)
 
-                comp_time += time.thread_time() - comp_time_start
+                comp_time += time.time() - comp_time_start
                 computation_end()
                 # fed_logger.info("sending local activations")
                 flag = [f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{socket.gethostname()}', True]
@@ -227,13 +227,13 @@ class Client(FedClientInterface):
 
                 # fed_logger.info("received gradients")
                 computation_start()
-                comp_time_start = time.thread_time()
+                comp_time_start = time.time()
 
                 outputs.backward(gradients)
                 if self.optimizer is not None:
                     self.optimizer.step()
 
-                comp_time += time.thread_time() - comp_time_start
+                comp_time += time.time() - comp_time_start
                 computation_end()
                 i += 1
             flag = [f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{socket.gethostname()}', False]
