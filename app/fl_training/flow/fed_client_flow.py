@@ -31,7 +31,7 @@ def run_edge_based(client: FedClientInterface, LR):
     for r in range(config.R):
         base_bw = 10_000_000
         random_number = random.uniform(1, 100)
-        if random_number < 80:
+        if random_number < 100:
             simnet_BW = 1_000_000_000
         else:
             simnet_BW = base_bw
@@ -48,7 +48,7 @@ def run_edge_based(client: FedClientInterface, LR):
             client.edge_test_network()
         else:
             fed_logger.info("Sending BW to edge")
-            client.send_simnet_bw_to_edge(simnet_BW)
+            client.send_simnet_bw(simnet_BW)
 
         fed_logger.info("receiving splitting info")
         client.get_split_layers_config_from_edge()
@@ -110,8 +110,6 @@ def run_no_offload_edge(client: FedClientInterface, LR):
     client.initialize(split_layer=config.split_layer, LR=LR, simnetbw=None)
     for r in range(config.R):
         config.current_round = r
-        fed_logger.info('====================================>')
-        fed_logger.info('ROUND: {} START'.format(r))
         fed_logger.info("receiving global weights")
         client.get_edge_global_weights()
         st = time.time()
@@ -136,48 +134,74 @@ def run_no_offload_edge(client: FedClientInterface, LR):
 
 
 def run_no_edge_offload(client: FedClientInterface, LR):
+    fed_logger.info('Sending power usage to server.')
+    client.send_power_to_edge()
+
+    client.split_layers = config.split_layer
+
     for r in range(config.R):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r))
 
         st = time.time()
+        proces_time_start = time.process_time()
 
-        fed_logger.info("test_app network")
-        energy_estimation.start_transmission()
-        msg = client.test_network()
-        energy_estimation.end_transmission(data_utils.sizeofmessage(msg))
+        base_bw = 10_000_000
+        random_number = random.uniform(1, 100)
+        if random_number < 100:
+            simnet_BW = 100_000_000
+        else:
+            simnet_BW = base_bw
+
+        if not client.simnet:
+            fed_logger.info("test network")
+            client.edge_test_network()
+        else:
+            fed_logger.info("Sending BW to server")
+            client.send_simnet_bw(simnet_BW)
 
         fed_logger.info("receiving splitting info")
         client.get_split_layers_config()
-        energy_estimation.computation_start()
-
-        fed_logger.info("initializing client")
-        client.initialize(client.split_layers, LR, None)
 
         fed_logger.info("receiving global weights")
         client.get_server_global_weights()
 
+        fed_logger.info("initializing client")
+        client.initialize(client.split_layers, LR, simnet_BW)
+
         fed_logger.info("start training")
-        energy_estimation.computation_end()
         client.offloading_train()
 
         fed_logger.info("sending local weights")
-        energy_estimation.start_transmission()
         msg = client.send_local_weights_to_server()
-        energy_estimation.end_transmission(data_utils.sizeofmessage(msg))
+
+        et = time.time()
+        process_time_end = time.process_time()
+
+        if client.simnet:
+            transmission_time = float(energy_estimation.get_transmission_time())
+            computation_time = client.computational_time
+            tt = transmission_time + computation_time
+            fed_logger.info(Fore.MAGENTA + f"Client SIMNET Total time: {tt}")
+        else:
+            computation_time = process_time_end - proces_time_start
+            tt = computation_time
 
         fed_logger.info('ROUND: {} END'.format(r))
-        fed_logger.info('==> Waiting for aggregration')
-        if r > 49:
-            LR = config.LR * 0.1
-        et = time.time()
-        tt = et - st
-        energy = float(energy_estimation.energy())
-        # energy /= batch_num
-        fed_logger.info(Fore.CYAN + f"Energy_tt : {energy}, {tt}")
+        fed_logger.info(Fore.MAGENTA + f"Client Wall-Time: {et - st}")
+        fed_logger.info(Fore.MAGENTA + f"Client Process-Time: {process_time_end - proces_time_start}")
+
+        utilization = float(energy_estimation.get_utilization())
+        comp_energy, comm_energy = energy_estimation.energy(computation_time)
         remaining_energy = float(energy_estimation.remaining_energy())
-        fed_logger.info(Fore.MAGENTA + f"remaining energy: {remaining_energy}")
+
+        fed_logger.info(
+            Fore.MAGENTA + f"Comp Energy, Comm Energy TT, Remaining-energy, utilization: {comp_energy}, {comm_energy}, {tt},"
+                           f" {remaining_energy}, {utilization}")
+        fed_logger.info("Sending Comp Energy, Comm Energy, TT, Remaining-energy, utilization to edge.")
+        client.energy_tt(remaining_energy, comp_energy, comm_energy, tt, utilization)
+
         client.next_round_attendance(remaining_energy)
 
 

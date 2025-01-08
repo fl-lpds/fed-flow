@@ -57,13 +57,6 @@ def run_edge_based_no_offload(server: FedServerInterface, LR, options):
 
 
 def run_edge_based_offload(server: FedServerInterface, LR, options):
-    training_time = 0
-    totalIOTNum = len(config.CLIENTS_INDEX.keys())
-    totalEdgeNum = len(config.EDGE_MAP.keys())
-    energy_tt_list = {}
-    energy_x = []
-    training_y = []
-
     avgEnergy, tt, simnet_tt = [], [], []
     clientBW, edge_server_BW = {}, {}
     clientRemainingEnergy = {}
@@ -313,11 +306,43 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
 
 def run_no_edge_offload(server: FedServerInterface, LR, options):
+    avgEnergy, tt, simnet_tt = [], [], []
+    clientBW = {}
+    clientRemainingEnergy = {}
+    clientConsumedEnergy = {}
+    comp_time_of_each_client_on_server = {}
+    clientCompEnergy = {}
+    clientCommEnergy = {}
+    clientCompTime = {}
+    clientCommTime = {}
+    clientUtilization = {}
+    clientTT = {}
+
+    flop_on_server = []
+    time_on_server = []
+
+    for client in config.CLIENTS_LIST:
+        clientBW[client] = []
+        clientRemainingEnergy[client] = []
+        clientConsumedEnergy[client] = []
+        clientUtilization[client] = []
+        clientCompEnergy[client] = []
+        clientCommEnergy[client] = []
+        clientCompTime[client] = []
+        clientCommTime[client] = []
+        clientTT[client] = []
+        comp_time_of_each_client_on_server[client] = []
+
     server.initialize(config.split_layer, LR)
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
 
+    fed_logger.info('Getting power usage from clients')
+    server.get_power_of_client()
+
     for r in range(config.R):
+        energy_estimation.reset_transmission_time()
+
         if config.K > 0:
             config.current_round = r
 
@@ -325,26 +350,21 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
             fed_logger.info('==> Round {:} Start'.format(r))
 
             s_time = time.time()
-            fed_logger.info("test clients network")
-            server.test_network(config.CLIENTS_LIST)
 
-            fed_logger.info("preparing state...")
-            server.offloading = server.get_offloading(server.split_layers)
+            if not server.simnet:
+                fed_logger.info("receiving client network info")
+                server.client_network(config.EDGE_SERVER_LIST)
+                fed_logger.info("test edge servers network")
+                server.test_network(config.EDGE_SERVER_LIST)
+            else:
+                fed_logger.info("receiving client simnet network info")
+                server.client_network(config.EDGE_SERVER_LIST)
 
-            fed_logger.info("clustering")
-            server.cluster(options)
+            for client in server.client_bandwidth.keys():
+                clientBW[client].append(server.client_bandwidth[client])
 
-            fed_logger.info("getting state")
-            ttpi = server.ttpi(config.CLIENTS_LIST)
-            state = server.concat_norm(ttpi, server.offloading)
-
-            fed_logger.info("splitting")
-            server.split(state, options)
-
+            fed_logger.info("Sending split layer info to clients.")
             server.split_layer()
-
-            fed_logger.info("initializing server")
-            server.initialize(server.split_layers, LR)
 
             fed_logger.info("sending global weights")
             server.no_offloading_global_weights()
@@ -354,24 +374,89 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("receiving local weights")
             local_weights = server.c_local_weights(config.CLIENTS_LIST)
+
+            aggregation_start = time.time()
             fed_logger.info("aggregating weights")
             server.call_aggregation(options, local_weights)
+            aggregation_time = time.time() - aggregation_start
+
+            fed_logger.info("receiving Energy, TT, Remaining-energy, Utilization")
+            energy_tt_list = server.energy_tt(config.CLIENTS_LIST)
+            fed_logger.info(f"Comp Energy, Comm Energy, TT, Remaining-energy, Utilization :{energy_tt_list}")
+
+            server_sequential_transmission_time = float(energy_estimation.get_transmission_time())
+            fed_logger.info(f"Server Sequential Transmission time: {server_sequential_transmission_time}")
+            energy_estimation.reset_transmission_time()
+
             server.client_attendance(config.CLIENTS_LIST)
+
             e_time = time.time()
+
+            energy = 0
+            clientsTT = {}
+            for client in energy_tt_list.keys():
+                clientCompEnergy[client].append(energy_tt_list[client][0])
+                clientCommEnergy[client].append(energy_tt_list[client][1])
+                compTime = energy_tt_list[client][0] / (
+                        energy_tt_list[client][4] * server.power_usage_of_client[client][0])
+                commTime = energy_tt_list[client][1] / server.power_usage_of_client[client][1]
+                clientCompTime[client].append(compTime)
+                clientCommTime[client].append(commTime)
+                clientConsumedEnergy[client].append(energy_tt_list[client][0] + energy_tt_list[client][1])
+                clientTT[client].append(energy_tt_list[client][2])
+                clientRemainingEnergy[client].append(energy_tt_list[client][3])
+                clientUtilization[client].append(energy_tt_list[client][4])
+                comp_time_of_each_client_on_server[client].append(server.computation_time_of_each_client[client])
+                energy += (energy_tt_list[client][0] + energy_tt_list[client][1])
+                clientsTT[client] = energy_tt_list[client][2] + server.computation_time_of_each_client[client]
+
+            if config.K != 0:
+                avgEnergy.append(energy / int(config.K))
+            else:
+                avgEnergy.append(0)
+
+            if server.simnet:
+                simnet_tt.append(server.simnetTrainingTimeCalculation(aggregation_time,
+                                                                      0,
+                                                                      energy_tt_list, edgeBased=False))
+
+            server_flop, _, _ = server.getFlopsOnEdgeAndServer()
+            flop_on_server.append(server_flop)
+            time_on_server.append(server.total_computation_time)
+
+            fed_logger.info("preparing state...")
+            server.offloading = server.get_offloading(server.split_layers)
+
+            fed_logger.info("clustering")
+            server.cluster(options)
+
+            fed_logger.info("getting state")
+            ttpi = server.ttpi(config.CLIENTS_LIST, clientsTT)
+            state = server.concat_norm(ttpi, server.offloading)
+
+            fed_logger.info("splitting")
+            server.split(state, options)
+
+            fed_logger.info("initializing server")
+            server.initialize(server.split_layers, LR)
 
             # Recording each round training time, bandwidth and test accuracy
             training_time = e_time - s_time
             res['training_time'].append(training_time)
             res['bandwidth_record'].append(server.bandwith())
-            with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
-                pickle.dump(res, f)
-            fed_logger.info("testing accuracy")
-            test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
-            res['test_acc_record'].append(test_acc)
-            rl_utils.draw_graph(10, 5, res['test_acc_record'], "Accuracy", 'Round', 'Accuracy', "/fed-flow/Graphs/1_3",
-                                "Accuracy", True)
+            # with open(config.home + '/results/FedAdapt_res.pkl', 'wb') as f:
+            #     pickle.dump(res, f)
+            # fed_logger.info("testing accuracy")
+            # test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
+            # res['test_acc_record'].append(test_acc)
+
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
+            plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
+                       clientRemainingEnergy, clientBW, None, clientUtilization,
+                       None, None, None, None,
+                       flop_on_server, time_on_server, clientCompTime, clientCommTime, None,
+                       None, None, comp_time_of_each_client_on_server)
         else:
             break
     fed_logger.info(f"{socket.gethostname()} quit")
@@ -435,6 +520,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.plot(simnet_tt, color='blue', linewidth='3', label="SIMNET training time")
         plt.plot(tt, color='red', linewidth='3', label="Real training time")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"trainingTime"))
         plt.close()
     else:
@@ -469,6 +555,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Consumed Energy")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Consumed Energy"))
         plt.close()
 
@@ -485,6 +572,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Computation Energy consumed")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Computation Energy"))
         plt.close()
 
@@ -501,6 +589,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("communication energy")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Communication Energy"))
         plt.close()
 
@@ -517,6 +606,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Computation energy")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Computation time of client"))
         plt.close()
 
@@ -533,6 +623,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Communication energy")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Communication time of client"))
         plt.close()
 
@@ -549,6 +640,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("total time")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"total time on each client"))
         plt.close()
 
@@ -565,6 +657,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("remaining energy")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Remaining Energies"))
         plt.close()
 
@@ -581,6 +674,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Utilization")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"client utilization"))
         plt.close()
 
@@ -597,6 +691,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("BW")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"clientBW"))
         plt.close()
 
@@ -613,6 +708,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("BW")
             plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"edge_serverBW"))
         plt.close()
 
@@ -629,6 +725,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Time (S)")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Comp time on edge"))
         plt.close()
 
@@ -645,6 +742,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("Time (S)")
             plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Comp time on server"))
         plt.close()
 
@@ -672,6 +770,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.ylabel("FLOPS")
             plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
         plt.legend()
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of each edge"))
         plt.close()
 
@@ -696,6 +795,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.xlabel("round")
         plt.ylabel("FLOPS")
         plt.plot(flops_on_server, color="Red", linewidth='3', label=f"Central Server")
+        plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"FLOPS of central server"))
         plt.close()
 
@@ -723,14 +823,16 @@ def run(options_ins):
                                options_ins.get('dataset'), offload, edge_based, simnet=simnet)
         run_edge_based_offload(server_ins, LR, options_ins)
     elif edge_based and not offload:
+        energy_estimation.init(os.getpid())
         server_ins = FedServer(options_ins.get('model'),
                                options_ins.get('dataset'), offload, edge_based)
         run_edge_based_no_offload(server_ins, LR, options_ins)
     elif offload:
+        energy_estimation.init(os.getpid())
         server_ins = FedServer(options_ins.get('model'),
-                               options_ins.get('dataset'), offload, edge_based)
+                               options_ins.get('dataset'), offload, edge_based, simnet=simnet)
         run_no_edge_offload(server_ins, LR, options_ins)
     else:
         server_ins = FedServer(options_ins.get('model'),
-                               options_ins.get('dataset'), offload, edge_based)
+                               options_ins.get('dataset'), offload, edge_based, simnet=simnet)
         run_no_edge(server_ins, LR, options_ins)

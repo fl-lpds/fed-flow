@@ -57,6 +57,8 @@ class FedServerInterface(ABC, Communicator):
         self.server_flops = {}
         self.aggregation_time = 0
 
+        self.ttpiOfClients = {}  # Training time per iteration
+
         self.approximated_tt_of_actions = []
         self.approximated_energy_of_actions = []
         self.actions = []
@@ -201,15 +203,17 @@ class FedServerInterface(ABC, Communicator):
 
         return offloading
 
-    def ttpi(self, client_ips):
-        ttpi = {}
-        for c in client_ips:
-            # ttpi[str(client_ips[i])] = self.tt_end[client_ips[i]] - self.tt_start[client_ips[i]]
-            ttpi[c] = 3
-        return ttpi
+    def ttpi(self, client_ips, clients_TT):
+        for client in client_ips:
+            self.ttpiOfClients[client] = clients_TT[client] / ((config.N / config.K) / config.B)
+        return self.ttpiOfClients
 
     def bandwith(self):
         return self.edge_bandwidth
+
+    @abstractmethod
+    def energy_tt(self, client_ips):
+        pass
 
     @abstractmethod
     def e_energy_tt(self, client_ips):
@@ -247,5 +251,6 @@ class FedServerInterface(ABC, Communicator):
     def getFlopsOnEdgeAndServer(self):
         pass
 
-    def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list):
+    def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list,
+                                      edgeBased=True):
         pass

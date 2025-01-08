@@ -109,7 +109,7 @@ class FedClientInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def send_simnet_bw_to_edge(self, simnetbw):
+    def send_simnet_bw(self, simnetbw):
         pass
 
     @abstractmethod
