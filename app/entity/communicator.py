@@ -156,9 +156,8 @@ class Communicator(object):
                     continue
                 time.sleep(1)
 
-
         self.close_connection(channel, connection)
-        fed_logger.info(Fore.GREEN + f"Published message in {total_chunks} chunks.")
+        fed_logger.debug(Fore.GREEN + f"Published message in {total_chunks} chunks.")
 
     def recv_msg(self, exchange, expect_msg_type: str = None, is_weight=False, url=None):
         channel, connection = self.open_connection(url)
