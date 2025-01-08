@@ -3,14 +3,11 @@ import random
 import joblib
 import numpy as np
 from colorama import Fore
-
+import torch
 from app.config import config
 from app.config.logger import fed_logger
-# from app.model.entity.rl_model import PPO
+from app.model.entity.rl_model import PPO
 from app.util import model_utils
-
-
-# from stable_baselines3 import PPO, DDPG
 
 
 # def edge_based_rl_splitting(state, labels):
@@ -501,21 +498,21 @@ def normalizer(input_dict):
     return normalized
 
 
-# def rl_splitting(state, labels):
-#     state_dim = 2 * config.G
-#     action_dim = config.G
-#     agent = None
-#     if agent is None:
-#         # Initialize trained RL agent
-#         agent = PPO.PPO(state_dim, action_dim, config.action_std, config.rl_lr, config.rl_betas, config.rl_gamma,
-#                         config.K_epochs, config.eps_clip)
-#         agent.policy.load_state_dict(torch.load('/fed-flow/app/agent/PPO_FedAdapt.pth'))
-#     action = agent.exploit(state)
-#     action = expand_actions(action, config.CLIENTS_LIST, labels)
-#
-#     result = action_to_layer(action)
-#     config.split_layer = result
-#     return result
+def rl_splitting(state, labels):
+    state_dim = 2 * config.G
+    action_dim = config.G
+    agent = None
+    if agent is None:
+        # Initialize trained RL agent
+        agent = PPO.PPO(state_dim, action_dim, config.action_std, config.rl_lr, config.rl_betas, config.rl_gamma,
+                        config.K_epochs, config.eps_clip)
+        agent.policy.load_state_dict(torch.load('/fed-flow/app/agent/PPO_FedAdapt.pth'))
+    action = agent.exploit(state)
+    action = expand_actions(action, config.CLIENTS_LIST, labels)
+
+    result = action_to_layer(action)
+    config.split_layer = result
+    return result
 
 
 def none(state, labels):
@@ -619,7 +616,7 @@ def action_to_layer(action):  # Expanding group actions to each device
         idx = idx[0][-1]
         if idx >= 5:  # all FC layers combine to one option
             idx = 6
-        split_layer.append(idx)
+        split_layer.append(int(idx))
     return split_layer
 
 
