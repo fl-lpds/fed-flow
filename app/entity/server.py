@@ -77,11 +77,11 @@ class FedServer(FedServerInterface):
 
     def edge_offloading_train(self, client_ips):
         # def thread_wrapper(target_func, *args):
-            # thread_start_time = time.thread_time()
-            # target_func(*args)
-            # thread_end_time = time.thread_time()
-            # self.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
-            # fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
+        # thread_start_time = time.thread_time()
+        # target_func(*args)
+        # thread_end_time = time.thread_time()
+        # self.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
+        # fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
 
         self.threads = {}
         for i in range(len(client_ips)):
@@ -119,50 +119,66 @@ class FedServer(FedServerInterface):
         pass
 
     def _thread_training_offloading(self, client_ip):
-        # iteration = int((test_config.N / (test_config.K * test_config.B)))
+        comp_time = 0
+        communication_time = 0
         i = 0
-        flag = self.recv_msg(client_ip,
-                             f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")[1]
+        msg = self.recv_msg(client_ip, f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")
+        flag = msg[1]
+
+        if self.simnet:
+            communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
 
         i += 1
         while flag:
-            flag = self.recv_msg(client_ip,
-                                 f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")[1]
+            msg = self.recv_msg(client_ip, f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")
+            flag = msg[1]
+
+            if self.simnet:
+                communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
+
             if not flag:
                 continue
-            # fed_logger.info(client_ip + " receiving local activations")
+
             msg = self.recv_msg(client_ip,
                                 f"{message_utils.local_activations_client_to_server()}_{i}_{client_ip}", True)
+
+            if self.simnet:
+                communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
+
             smashed_layers = msg[1]
             labels = msg[2]
-            # fed_logger.info(client_ip + " training model")
-            inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
-            # if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < len(
-            #         self.uninet.cfg) - 1:
-            # if self.optimizers.keys().__contains__(client_ip):
-            self.optimizers[client_ip].zero_grad()
-            outputs = self.nets[client_ip](inputs)
-            loss = self.criterion(outputs, targets)
-            loss.backward()
-            # if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < len(
-            #         self.uninet.cfg) - 1:
-            # if self.optimizers.keys().__contains__(client_ip):
-            self.optimizers[client_ip].step()
 
-            # Send gradients to edge
-            # fed_logger.info(client_ip + " sending gradients")
+            comp_start_time = time.thread_time()
+
+            inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
+            if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < config.model_len - 1:
+                if self.optimizers.keys().__contains__(client_ip):
+                    self.optimizers[client_ip].zero_grad()
+                outputs = self.nets[client_ip](inputs)
+                loss = self.criterion(outputs, targets)
+                loss.backward()
+                if self.optimizers.keys().__contains__(client_ip):
+                    self.optimizers[client_ip].step()
+
+            comp_time += time.thread_time() - comp_start_time
             msg = [f"{message_utils.server_gradients_server_to_client() + str(client_ip)}_{i}", inputs.grad]
+
+            if self.simnet:
+                communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
+
             self.send_msg(client_ip, msg, True)
             i += 1
 
         fed_logger.info(str(client_ip) + 'no edge offloading training end')
+        with lock:
+            self.client_training_transmissionTime[client_ip] = communication_time
+            self.computation_time_of_each_client[client_ip] = comp_time
         return 'Finish'
 
     def _thread_edge_training(self, client_ip):
-        # iteration = int((test_config.N / (test_config.K * test_config.B)))
+
         communication_time = 0
         comp_time = 0
-
         edge_of_client = config.CLIENT_MAP[client_ip]
         i = 0
         msg = self.recv_msg(config.CLIENT_MAP[client_ip],
@@ -174,7 +190,7 @@ class FedServer(FedServerInterface):
 
         flag = msg[1]
         i += 1
-        fed_logger.info(Fore.RED + f"{flag}")
+        fed_logger.debug(Fore.RED + f"{flag}")
         if not flag:
             fed_logger.info(str(client_ip) + ' offloading training end')
             with lock:
@@ -193,7 +209,7 @@ class FedServer(FedServerInterface):
                     communication_time += (data_utils.sizeofmessage(msg) / self.edge_bandwidth[edge_of_client])
 
                 flag = msg[1]
-                fed_logger.info(Fore.RED + f"{flag}")
+                fed_logger.debug(Fore.RED + f"{flag}")
                 if not flag:
                     break
 
@@ -302,15 +318,21 @@ class FedServer(FedServerInterface):
         """
         receive client network speed
         """
-
-        for edge in edge_ips:
-            start_transmission()
-            if self.simnet:
-                set_simnet(self.edge_bandwidth[edge])
-            msg = self.recv_msg(exchange=edge, expect_msg_type=message_utils.client_network(), url=edge)
-            end_transmission(data_utils.sizeofmessage(msg))
-            for k in msg[1].keys():
-                self.client_bandwidth[k] = msg[1][k]
+        url = None
+        if self.edge_based:
+            for edge in edge_ips:
+                start_transmission()
+                if self.simnet:
+                    set_simnet(self.edge_bandwidth[edge])
+                msg = self.recv_msg(exchange=edge, expect_msg_type=message_utils.client_network(), url=edge)
+                end_transmission(data_utils.sizeofmessage(msg))
+                for k in msg[1].keys():
+                    self.client_bandwidth[k] = msg[1][k]
+        else:
+            for client in config.CLIENTS_LIST:
+                msg = self.recv_msg(exchange=client, expect_msg_type=message_utils.simnet_bw_client_to_edge(), url=url)
+                end_transmission(data_utils.sizeofmessage(msg))
+                self.client_bandwidth[client] = msg[1]
 
     def get_simnet_edge_network(self):
         """
@@ -332,6 +354,11 @@ class FedServer(FedServerInterface):
         send splitting data
         """
         msg = [message_utils.split_layers(), self.split_layers]
+        if self.simnet:
+            for client in config.CLIENTS_LIST:
+                start_transmission()
+                set_simnet(self.client_bandwidth[client])
+                end_transmission(data_utils.sizeofmessage(msg))
         self.scatter(msg)
 
     def send_split_layers_config(self):
@@ -362,6 +389,40 @@ class FedServer(FedServerInterface):
             end_transmission(data_utils.sizeofmessage(msg))
             eweights[client_ips[i]] = msg[1]
         return eweights
+
+    def energy_tt(self, client_ips):
+        """
+        get energy consumption, training time, remaining energy and utilization of clients
+        :param client_ips:
+        :return:
+        """
+        energy_tt = {}
+        for client in client_ips:
+            energy_tt[client] = []
+
+        for client in config.CLIENTS_LIST:
+            start_transmission()
+            set_simnet(self.client_bandwidth[client])
+            msg = self.recv_msg(exchange=client, expect_msg_type=message_utils.energy_client_to_server() + '_' + client,
+                                is_weight=False, url=None)
+            end_transmission(data_utils.sizeofmessage(msg))
+            energy_tt[client] = msg[1:]
+
+        self.client_remaining_energy = {}
+        self.client_utilization = {}
+        self.client_energy = {}
+        self.client_comm_energy = {}
+        for client in energy_tt.keys():
+            op = self.split_layers[config.CLIENTS_CONFIG[client]]
+            self.client_energy[client] = (energy_tt[client][0] + energy_tt[client][1])
+            self.client_comp_energy[client][op] = energy_tt[client][0]
+            self.client_comm_energy[client] = energy_tt[client][1]
+            self.client_remaining_energy[client] = energy_tt[client][3]
+            self.client_utilization[client] = energy_tt[client][4]
+            self.client_comp_time[client][op] = (energy_tt[client][0] /
+                                                 (self.client_utilization[client] * self.power_usage_of_client[client][
+                                                     0]))
+        return energy_tt
 
     def e_energy_tt(self, client_ips) -> dict:
         """
@@ -415,21 +476,19 @@ class FedServer(FedServerInterface):
     def c_local_weights(self, client_ips):
         cweights = {}
         for client_ip in client_ips:
+            start_transmission()
+            set_simnet(self.client_bandwidth[client_ip])
             msg = self.recv_msg(client_ip,
                                 message_utils.local_weights_client_to_server(), True)
             self.tt_end[client_ip] = time.time()
-            # sp = self.split_layers[config.CLIENTS_CONFIG[client_ip]]
-            # if sp != (config.model_len - 1):
-            #     w_local = model_utils.concat_weights(self.uninet.state_dict(),msg[1],
-            #                                          self.nets[client_ip].state_dict())
-            # else:
-            #     w_local = msg[1]
+            end_transmission(data_utils.sizeofmessage(msg))
             cweights[client_ip] = msg[1]
+
         return cweights
 
     def edge_offloading_global_weights(self):
         """
-        send global weights
+        send global weights to edges
         """
         msg = [message_utils.initial_global_weights_server_to_edge(), self.uninet.state_dict()]
         if self.simnet:
@@ -440,7 +499,15 @@ class FedServer(FedServerInterface):
         self.scatter(msg, True)
 
     def no_offloading_global_weights(self):
+        """
+        send global weights to clients
+        """
         msg = [message_utils.initial_global_weights_server_to_client(), self.uninet.state_dict()]
+        if self.simnet:
+            for client in config.CLIENTS_LIST:
+                start_transmission()
+                set_simnet(self.client_bandwidth[client])
+                end_transmission(data_utils.sizeofmessage(msg))
         self.scatter(msg, True)
 
     def cluster(self, options: dict):
@@ -736,46 +803,76 @@ class FedServer(FedServerInterface):
         flops_of_each_layer = list(flops_of_each_layer.values())
 
         total_computation_time_on_server = self.total_computation_time
-        for edgeIP in config.EDGE_SERVER_LIST:
-            edge_flops = 0
-            flop_of_edge_on_server = 0
-            for clientIP in config.EDGE_MAP[edgeIP]:
-                clientAction = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
-                op1 = clientAction[0]
-                op2 = clientAction[1]
+        if self.edge_based:
+            for edgeIP in config.EDGE_SERVER_LIST:
+                edge_flops = 0
+                flop_of_edge_on_server = 0
+                for clientIP in config.EDGE_MAP[edgeIP]:
+                    clientAction = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
+                    op1 = clientAction[0]
+                    op2 = clientAction[1]
 
-                # offloading on client, edge and server
-                if op1 < op2 < config.model_len - 1:
-                    edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                    flop_of_edge_on_server += sum(flops_of_each_layer[op2 + 1:])
-                    flop_on_server += sum(flops_of_each_layer[op2 + 1:])
-                # offloading on client and edge
-                elif (op1 < op2) and op2 == config.model_len - 1:
-                    edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                # offloading on client and server
-                elif (op1 == op2) and op1 < config.model_len - 1:
-                    flop_on_server += sum(flops_of_each_layer[op2 + 1:])
-                    flop_of_edge_on_server += sum(flops_of_each_layer[op2 + 1:])
-            flop_on_each_edge[edgeIP] = edge_flops
-            flop_of_each_edge_on_server[edgeIP] = flop_of_edge_on_server
-        return flop_on_server, flop_on_each_edge, flop_of_each_edge_on_server
-
-    def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list):
-        total_time_for_each_client = {}
-
-        if len(config.CLIENTS_LIST) > 0:
-            for clientip in config.CLIENTS_LIST:
-                total_time_for_each_client[clientip] = \
-                    self.computation_time_of_each_client_on_edges[clientip] + \
-                    self.computation_time_of_each_client[clientip] + \
-                    energy_tt_list[clientip][2] + \
-                    self.client_training_transmissionTime[clientip]
-
-            trainingTime_simnetBW = (max(total_time_for_each_client.values())
-                                     + aggregation_time + server_sequential_transmission_time)
-
-            fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
-            return trainingTime_simnetBW
+                    # offloading on client, edge and server
+                    if op1 < op2 < config.model_len - 1:
+                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                        flop_of_edge_on_server += sum(flops_of_each_layer[op2 + 1:])
+                        flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+                    # offloading on client and edge
+                    elif (op1 < op2) and op2 == config.model_len - 1:
+                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                    # offloading on client and server
+                    elif (op1 == op2) and op1 < config.model_len - 1:
+                        flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+                        flop_of_edge_on_server += sum(flops_of_each_layer[op2 + 1:])
+                flop_on_each_edge[edgeIP] = edge_flops
+                flop_of_each_edge_on_server[edgeIP] = flop_of_edge_on_server
+            return flop_on_server, flop_on_each_edge, flop_of_each_edge_on_server
         else:
-            fed_logger.info("All Clients had been Turned off.")
-            return 0
+            for clientIP in config.CLIENTS_LIST:
+                clientOP = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
+
+                # offloading on client and server
+                if clientOP < config.model_len - 1:
+                    flop_on_server += sum(flops_of_each_layer[clientOP + 1:])
+
+            return flop_on_server, None, None
+
+    def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list,
+                                      edgeBased=True):
+        total_time_for_each_client = {}
+        if edgeBased:
+            if len(config.CLIENTS_LIST) > 0:
+                for clientip in config.CLIENTS_LIST:
+                    total_time_for_each_client[clientip] = \
+                        self.computation_time_of_each_client_on_edges[clientip] + \
+                        self.computation_time_of_each_client[clientip] + \
+                        energy_tt_list[clientip][2] + \
+                        self.client_training_transmissionTime[clientip]
+
+                trainingTime_simnetBW = (max(total_time_for_each_client.values())
+                                         + aggregation_time + server_sequential_transmission_time)
+
+                fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
+                return trainingTime_simnetBW
+            else:
+                fed_logger.info("All Clients had been Turned off.")
+                return 0
+        else:
+            fed_logger.info(
+                Fore.MAGENTA + f"{self.computation_time_of_each_client}, {energy_tt_list}, "
+                               f"{self.client_training_transmissionTime}, "
+                               f"{aggregation_time}, {server_sequential_transmission_time}")
+            if len(config.CLIENTS_LIST) > 0:
+                for clientip in config.CLIENTS_LIST:
+                    total_time_for_each_client[clientip] = self.computation_time_of_each_client[clientip] + \
+                                                           energy_tt_list[clientip][2] + \
+                                                           self.client_training_transmissionTime[clientip]
+
+                trainingTime_simnetBW = (max(total_time_for_each_client.values())
+                                         + aggregation_time + server_sequential_transmission_time)
+
+                fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
+                return trainingTime_simnetBW
+            else:
+                fed_logger.info("All Clients had been Turned off.")
+                return 0

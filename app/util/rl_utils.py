@@ -48,7 +48,7 @@ def draw_graph(figSizeX, figSizeY, y, title, xlabel, ylabel, savePath, pictureNa
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-
+    plt.grid()
     if saveFig:
         if not os.path.exists(savePath):
             os.makedirs(savePath)
@@ -76,6 +76,7 @@ def draw_scatter(x, y, title, xlabel, ylabel, savePath, pictureName, saveFig=Tru
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
+    plt.grid()
     if saveFig:
         if not os.path.exists(savePath):
             os.makedirs(savePath)

@@ -136,6 +136,10 @@ def energy_client_to_edge():
     return f'{get_round()}_MSG_ENERGY_CLIENT_TO_EDGE_'
 
 
+def energy_client_to_server():
+    return f'{get_round()}_MSG_ENERGY_CLIENT_TO_SERVER'
+
+
 def client_quit_client_to_edge():
     return f'{get_round()}_MSG_CLIENT_QUIT_CLIENT_TO_EDGE'
 
