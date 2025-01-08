@@ -83,7 +83,7 @@ def render_docker_compose_template(data):
 
 def create_node(port: int, decentralized: bool, offloading: bool, splitting_method: str, node_index: int,
                 node_type: str, round_count: int, device_count: int, neighbors: list[str],
-                scenario_description: str) -> dict:
+                scenario_description: str, cpu_limit: str = '1', memory_limit: str = '1G') -> dict:
     return {
         'port': port,
         'decentralized': str(decentralized),
@@ -96,7 +96,9 @@ def create_node(port: int, decentralized: bool, offloading: bool, splitting_meth
         'neighbors': ' '.join(neighbors),
         'round_count': round_count,
         'device_count': device_count,
-        'scenario_description': scenario_description
+        'scenario_description': scenario_description,
+        'cpu_limit': cpu_limit,
+        'memory_limit': memory_limit
     }
 
 
@@ -109,8 +111,10 @@ def create_node(port: int, decentralized: bool, offloading: bool, splitting_meth
               prompt='Splitting method (find the list of available methods in the splitting.py file)')
 @click.option('--topology', default=None, callback=topology_prompt)
 @click.option('--round-count', default=2, prompt='Enter number of FL round')
+@click.option('--client-cpu-limit', default='0.5', prompt='Enter CPU limit for clients (e.g., 0.5 for half CPU core)')
+@click.option('--client-memory-limit', default='512M', prompt='Enter memory limit for clients (e.g., 512M, 1G)')
 def create_docker_compose(num_clients, num_edges, decentralized, offloading, splitting_method,
-                          topology, round_count):
+                          topology, round_count, client_cpu_limit, client_memory_limit):
     data = {
         'clients': [],
         'edges': [],
@@ -124,7 +128,7 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
     current_port = 8080
     for i in range(1, num_clients + 1):
         client = create_node(current_port, decentralized, offloading, splitting_method, i, 'client', round_count,
-                             num_clients, [], scenario_description)
+                             num_clients, [], scenario_description, client_cpu_limit, client_memory_limit)
         data['clients'].append(client)
         current_port += 1
 
