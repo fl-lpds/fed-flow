@@ -94,7 +94,7 @@ class FedEdgeServerInterface(ABC, Communicator):
             self.send_msg(i, msg, is_weight, url=config.EDGE_SERVER_CONFIG[config.index])
 
     @abstractmethod
-    def forward_propagation(self, client_ip):
+    def forward_propagation(self, client_ip, sharedData):
         pass
 
     @abstractmethod
@@ -102,7 +102,7 @@ class FedEdgeServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def thread_offload_training(self, client_ip):
+    def thread_offload_training(self, client_ip, sharedData):
         pass
 
     @abstractmethod

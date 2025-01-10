@@ -51,8 +51,9 @@ class FedEdgeServer(FedEdgeServerInterface):
     def aggregate(self, client_ips, aggregate_method):
         pass
 
-    def forward_propagation(self, client_ip):
+    def forward_propagation(self, client_ip, sharedData):
         i = 0
+        config.current_round = sharedData['current_round']
         comp_time = 0
         msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
                             url=config.EDGE_SERVER_CONFIG[config.index])
@@ -92,12 +93,12 @@ class FedEdgeServer(FedEdgeServerInterface):
                         self.split_layers[config.CLIENTS_CONFIG[client_ip]][1]:
 
                     energy_estimation.computation_start()
-                    s_time = time.thread_time()
+                    s_time = time.process_time()
                     if self.optimizers.keys().__contains__(client_ip):
                         self.optimizers[client_ip].zero_grad()
                     outputs = self.nets[client_ip](inputs)
 
-                    comp_time += time.thread_time() - s_time
+                    comp_time += time.process_time() - s_time
                     energy_estimation.computation_end()
 
                     if self.split_layers[config.CLIENTS_CONFIG[client_ip]][1] < model_utils.get_unit_model_len() - 1:
@@ -117,11 +118,11 @@ class FedEdgeServer(FedEdgeServerInterface):
                         gradients = msg[1].to(self.device)
 
                         energy_estimation.computation_start()
-                        s_time = time.thread_time()
+                        s_time = time.process_time()
 
                         outputs.backward(gradients)
 
-                        comp_time += time.thread_time() - s_time
+                        comp_time += time.process_time() - s_time
                         energy_estimation.computation_end()
 
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
@@ -130,7 +131,7 @@ class FedEdgeServer(FedEdgeServerInterface):
 
                     else:
                         energy_estimation.computation_start()
-                        s_time = time.thread_time()
+                        s_time = time.process_time()
 
                         outputs = self.nets[client_ip](inputs)
                         loss = self.criterion(outputs, targets)
@@ -138,7 +139,7 @@ class FedEdgeServer(FedEdgeServerInterface):
                         if self.optimizers.keys().__contains__(client_ip):
                             self.optimizers[client_ip].step()
 
-                        comp_time += time.thread_time() - s_time
+                        comp_time += time.process_time() - s_time
                         energy_estimation.computation_end()
 
                         msg = [f'{message_utils.server_gradients_edge_to_client() + client_ip}_{i}', inputs.grad]
@@ -164,8 +165,10 @@ class FedEdgeServer(FedEdgeServerInterface):
                                   url=config.EDGE_SERVER_CONFIG[config.index])
 
             i += 1
-        with lock:
-            self.computation_time_of_each_client[client_ip] = comp_time
+        localData = sharedData['computation_time_of_each_client']
+        localData[client_ip] = comp_time
+        sharedData['computation_time_of_each_client'] = localData
+        fed_logger.info(Fore.MAGENTA + f"Shared Data: {sharedData}, comp time: {comp_time}")
         fed_logger.info(str(client_ip) + ' offloading training end')
 
     def backward_propagation(self, outputs, client_ip, inputs):
@@ -283,7 +286,7 @@ class FedEdgeServer(FedEdgeServerInterface):
                 ms = self.recv_msg(exchange=c,
                                    expect_msg_type=message_utils.energy_client_to_edge() + "_" + c,
                                    url=config.EDGE_SERVER_CONFIG[config.index])
-                fed_logger.info(f"client message: {ms}")
+                fed_logger.debug(f"client message: {ms}")
                 if self.simnet:
                     energy_tt[c] = [ms[1], ms[2], ms[3], ms[4], ms[5], self.computation_time_of_each_client[c],
                                     self.total_computation_time_on_edge]
@@ -331,8 +334,8 @@ class FedEdgeServer(FedEdgeServerInterface):
         msg = [message_utils.initial_global_weights_edge_to_client(), weights]
         self.scatter(msg, True)
 
-    def thread_offload_training(self, client_ip):
-        self.forward_propagation(client_ip)
+    def thread_offload_training(self, client_ip, sharedData):
+        self.forward_propagation(client_ip, sharedData)
         self.local_weights(client_ip)
 
     def thread_no_offload_training(self, client_ip):

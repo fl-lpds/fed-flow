@@ -6,13 +6,15 @@ services:
       - ./../../../../app/model:/fed-flow/app/model
       - ./../../../../app/logs:/fed-flow/app/logs
     image: autlpdslab/fedflow:rabbitmq
+    cap_add: # Add specific capabilities
+      - SYS_NICE
     ports:
       - "5002:5002"
     hostname: server
     deploy:
       resources:
         limits:
-          cpus: '3'
+          cpus: '5'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -24,15 +26,17 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    cap_add: # Add specific capabilities
+      - SYS_NICE
     ports:
       - "5001:5001"
     hostname: edge1
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '3'
         reservations:
-          cpus: '2'
+          cpus: '3'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner

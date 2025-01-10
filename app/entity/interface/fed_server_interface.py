@@ -236,6 +236,10 @@ class FedServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
+    def remove_non_pickleable(self):
+        pass
+
+    @abstractmethod
     def calculate_each_layer_activation_gradiant_size(self):
         pass
 

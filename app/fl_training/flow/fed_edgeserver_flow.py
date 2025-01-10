@@ -13,6 +13,7 @@ from app.config import config
 from app.config.logger import fed_logger
 from app.entity.edge_server import FedEdgeServer
 from app.entity.interface.fed_edgeserver_interface import FedEdgeServerInterface
+from torch.multiprocessing import Process, Manager
 
 
 def run_offload(server: FedEdgeServerInterface, LR):
@@ -56,32 +57,37 @@ def run_offload(server: FedEdgeServerInterface, LR):
             threads = {}
             fed_logger.info("start training")
 
-            import resource
-
-            def thread_wrapper(target_func, *args):
-                # thread_start_time = time.thread_time()
-                target_func(*args)
-                # thread_end_time = time.thread_time()
-                # server.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
-                # fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
-
             start_training = time.time()
-            threads = {}
-            for i in range(len(client_ips)):
-                threads[client_ips[i]] = threading.Thread(
-                    target=thread_wrapper,
-                    args=(server.thread_offload_training, client_ips[i]),
-                    name=client_ips[i])
-                threads[client_ips[i]].start()
 
-            for thread in threads.values():
-                thread.join()
+            for clientips in config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]:
+                server.computation_time_of_each_client[clientips] = 0
+            with Manager() as manager:
+                shared_data = manager.dict()
+                shared_data['computation_time_of_each_client'] = server.communication_time_of_each_client
+                shared_data['current_round'] = config.current_round
+                fed_logger.info(Fore.RED + f"shared data: {shared_data}")
+
+                processes = {}
+                for i in range(len(client_ips)):
+                    processes[client_ips[i]] = Process(target=server.thread_offload_training,
+                                                       args=(client_ips[i], shared_data,),
+                                                       name=client_ips[i])
+                    processes[client_ips[i]].start()
+                    if i == 0:
+                        os.system(f"renice -n -20 -p {processes[client_ips[i]].pid}")
+                    else:
+                        os.system(f"renice -n 19 -p {processes[client_ips[i]].pid}")
+
+                for process in processes.values():
+                    process.join()
+                server.computation_time_of_each_client = shared_data['computation_time_of_each_client']
 
             total_training_time = time.time() - start_training
             fed_logger.info(Fore.RED + f"Total training time: {total_training_time}")
 
             server.total_computation_time_on_edge = sum(server.computation_time_of_each_client.values())
-            fed_logger.info(Fore.RED + f"each client communication time: {server.communication_time_of_each_client}")
+            fed_logger.info(
+                Fore.RED + f"each client communication time: {server.communication_time_of_each_client}")
             fed_logger.info(Fore.RED + f"computation time of each client: {server.computation_time_of_each_client}")
             fed_logger.info(Fore.RED + f"Total computation time: {server.total_computation_time_on_edge}")
 

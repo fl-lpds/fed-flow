@@ -1,3 +1,4 @@
+import os
 import sys
 import threading
 import time
@@ -7,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from colorama import Fore
+from torch.multiprocessing import Process, Manager
 
 from app.entity.interface.fed_server_interface import FedServerInterface
 from app.fl_method import fl_method_parser
@@ -76,24 +78,32 @@ class FedServer(FedServerInterface):
         self.criterion = nn.CrossEntropyLoss()
 
     def edge_offloading_train(self, client_ips):
-        # def thread_wrapper(target_func, *args):
-        # thread_start_time = time.thread_time()
-        # target_func(*args)
-        # thread_end_time = time.thread_time()
-        # self.computation_time_of_each_client[args[0]] = thread_end_time - thread_start_time
-        # fed_logger.info(Fore.MAGENTA + f"Thread {args[0]} CPU time: {thread_end_time - thread_start_time}")
+        for clientips in config.CLIENTS_LIST:
+            self.computation_time_of_each_client[clientips] = 0
+            self.client_training_transmissionTime[clientips] = 0
 
-        self.threads = {}
-        for i in range(len(client_ips)):
-            self.threads[client_ips[i]] = threading.Thread(target=self._thread_edge_training,
-                                                           args=(client_ips[i],),
-                                                           name=client_ips[i])
-            fed_logger.info(str(client_ips[i]) + ' offloading training start')
-            self.threads[client_ips[i]].start()
-            self.tt_start[client_ips[i]] = time.time()
+        with Manager() as manager:
+            shared_data = manager.dict()
+            shared_data['computation_time_of_each_client'] = self.computation_time_of_each_client
+            shared_data['client_training_transmissionTime'] = self.client_training_transmissionTime
+            shared_data['current_round'] = config.current_round
 
-        for i in range(len(client_ips)):
-            self.threads[client_ips[i]].join()
+            processes = {}
+            for i in range(len(client_ips)):
+                processes[client_ips[i]] = Process(target=self._thread_edge_training,
+                                                   args=(client_ips[i], shared_data,),
+                                                   name=client_ips[i])
+                fed_logger.info(str(client_ips[i]) + ' offloading training start')
+                processes[client_ips[i]].start()
+                if i == 0:
+                    os.system(f"renice -n -20 -p {processes[client_ips[i]].pid}")
+
+                self.tt_start[client_ips[i]] = time.time()
+
+            for i in range(len(client_ips)):
+                processes[client_ips[i]].join()
+            self.computation_time_of_each_client = shared_data['computation_time_of_each_client']
+            self.client_training_transmissionTime = shared_data['client_training_transmissionTime']
 
     def no_offloading_train(self, client_ips):
         self.threads = {}
@@ -120,21 +130,14 @@ class FedServer(FedServerInterface):
 
     def _thread_training_offloading(self, client_ip):
         comp_time = 0
-        communication_time = 0
         i = 0
         msg = self.recv_msg(client_ip, f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")
         flag = msg[1]
-
-        if self.simnet:
-            communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
 
         i += 1
         while flag:
             msg = self.recv_msg(client_ip, f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")
             flag = msg[1]
-
-            if self.simnet:
-                communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
 
             if not flag:
                 continue
@@ -142,13 +145,10 @@ class FedServer(FedServerInterface):
             msg = self.recv_msg(client_ip,
                                 f"{message_utils.local_activations_client_to_server()}_{i}_{client_ip}", True)
 
-            if self.simnet:
-                communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
-
             smashed_layers = msg[1]
             labels = msg[2]
 
-            comp_start_time = time.thread_time()
+            comp_start_time = time.process_time()
 
             inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
             if self.split_layers[config.CLIENTS_CONFIG[client_ip]] < config.model_len - 1:
@@ -160,23 +160,20 @@ class FedServer(FedServerInterface):
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].step()
 
-            comp_time += time.thread_time() - comp_start_time
+            comp_time += time.process_time() - comp_start_time
             msg = [f"{message_utils.server_gradients_server_to_client() + str(client_ip)}_{i}", inputs.grad]
-
-            if self.simnet:
-                communication_time += (data_utils.sizeofmessage(msg) / self.client_bandwidth[client_ip])
 
             self.send_msg(client_ip, msg, True)
             i += 1
 
         fed_logger.info(str(client_ip) + 'no edge offloading training end')
         with lock:
-            self.client_training_transmissionTime[client_ip] = communication_time
+            self.client_training_transmissionTime[client_ip] = 0
             self.computation_time_of_each_client[client_ip] = comp_time
         return 'Finish'
 
-    def _thread_edge_training(self, client_ip):
-
+    def _thread_edge_training(self, client_ip, sharedData):
+        config.current_round = sharedData['current_round']
         communication_time = 0
         comp_time = 0
         edge_of_client = config.CLIENT_MAP[client_ip]
@@ -193,9 +190,14 @@ class FedServer(FedServerInterface):
         fed_logger.debug(Fore.RED + f"{flag}")
         if not flag:
             fed_logger.info(str(client_ip) + ' offloading training end')
-            with lock:
-                self.client_training_transmissionTime[client_ip] = communication_time
-                self.computation_time_of_each_client[client_ip] = comp_time
+            localData = sharedData['computation_time_of_each_client']
+            localData[client_ip] = comp_time
+            sharedData['computation_time_of_each_client'] = localData
+
+            localData = sharedData['client_training_transmissionTime']
+            localData[client_ip] = communication_time
+            sharedData['client_training_transmissionTime'] = localData
+
             return 'Finish'
         while flag:
 
@@ -225,7 +227,7 @@ class FedServer(FedServerInterface):
 
                 inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
 
-                s_time = time.thread_time()
+                s_time = time.process_time()
 
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].zero_grad()
@@ -235,7 +237,7 @@ class FedServer(FedServerInterface):
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].step()
 
-                comp_time += time.thread_time() - s_time
+                comp_time += time.process_time() - s_time
 
                 # Send gradients to edge
                 msg = [f'{message_utils.server_gradients_server_to_edge() + str(client_ip)}_{i}', inputs.grad]
@@ -245,9 +247,14 @@ class FedServer(FedServerInterface):
                     communication_time += (data_utils.sizeofmessage(msg) / self.edge_bandwidth[edge_of_client])
 
             i += 1
-        with lock:
-            self.client_training_transmissionTime[client_ip] = communication_time
-            self.computation_time_of_each_client[client_ip] = comp_time
+
+        localData = sharedData['computation_time_of_each_client']
+        localData[client_ip] = comp_time
+        sharedData['computation_time_of_each_client'] = localData
+
+        localData = sharedData['client_training_transmissionTime']
+        localData[client_ip] = communication_time
+        sharedData['client_training_transmissionTime'] = localData
 
         fed_logger.info(str(client_ip) + ' offloading training end')
         return 'Finish'
@@ -635,15 +642,22 @@ class FedServer(FedServerInterface):
                 gradient_size_mb = calculate_size_in_megabits(grad_output[0])
                 gradient_sizes[module] = gradient_size_mb
 
+        hooks = []
         for layer in model.modules():
             if isinstance(layer, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU, nn.MaxPool2d, nn.Linear)):
-                layer.register_forward_hook(forward_hook)
-                layer.register_backward_hook(backward_hook)
+                hooks.append(layer.register_forward_hook(forward_hook))
+                hooks.append(layer.register_backward_hook(backward_hook))
+                # layer.register_forward_hook(forward_hook)
+                # layer.register_backward_hook(backward_hook)
 
         input_data = torch.randn(config.B, 3, 32, 32)
 
         output = model(input_data)
         output.mean().backward()
+
+        # Remove hooks
+        for hook in hooks:
+            hook.remove()
 
         layer_activation = {}
         layer_gradient = {}
@@ -836,6 +850,9 @@ class FedServer(FedServerInterface):
                     flop_on_server += sum(flops_of_each_layer[clientOP + 1:])
 
             return flop_on_server, None, None
+
+    def remove_non_pickleable(self):
+        self.calculate_each_layer_activation_gradiant_size = None
 
     def simnetTrainingTimeCalculation(self, aggregation_time, server_sequential_transmission_time, energy_tt_list,
                                       edgeBased=True):

@@ -99,9 +99,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
     fed_logger.info(f"OPTION: {options}")
 
-    fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's activation and gradient size started on server")
-    server.calculate_each_layer_activation_gradiant_size()
-
+    fed_logger.info(Fore.RED + f"PID of process: {os.getpid()}")
+    if os.getpid() > 0:
+        fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's activation and gradient size started on server")
+        server.calculate_each_layer_activation_gradiant_size()
+        server.remove_non_pickleable()
     fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's FLOP started on server")
     server.calculate_each_layer_FLOP()
 
@@ -153,6 +155,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info('==> Round {:} Start'.format(r))
 
             s_time = time.time()
+            process_time_start = time.process_time()
 
             if not server.simnet:
                 fed_logger.info("receiving client network info")
@@ -263,8 +266,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 avgEnergy.append(0)
 
             e_time = time.time()
+            process_time_end = time.process_time()
 
             training_time = e_time - s_time
+            total_process_time = process_time_end - process_time_start
             tt.append(training_time)
 
             if server.simnet:
@@ -272,7 +277,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                                                                       server_sequential_transmission_time,
                                                                       energy_tt_list))
 
-            fed_logger.info(f"Training Time using time.time(): {training_time}")
+            fed_logger.info(f"Wall-time: {training_time}")
+            fed_logger.info(f"Process-Time: {total_process_time}")
+
             server_flop, each_edge_flop, flop_of_each_edges_on_server = server.getFlopsOnEdgeAndServer()
             flop_on_server.append(server_flop)
             time_on_server.append(server.total_computation_time)
