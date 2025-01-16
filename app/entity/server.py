@@ -116,19 +116,35 @@ class FedServer(FedServerInterface):
             self.threads[client_ips[i]].join()
 
     def no_edge_offloading_train(self, client_ips):
-        self.threads = {}
-        for i in range(len(client_ips)):
-            self.threads[client_ips[i]] = threading.Thread(target=self._thread_training_offloading,
-                                                           args=(client_ips[i],), name=client_ips[i])
-            fed_logger.info(str(client_ips[i]) + ' no edge offloading training start')
-            self.threads[client_ips[i]].start()
-        for i in range(len(client_ips)):
-            self.threads[client_ips[i]].join()
+        for clientips in config.CLIENTS_LIST:
+            self.computation_time_of_each_client[clientips] = 0
+            self.client_training_transmissionTime[clientips] = 0
+
+        with Manager() as manager:
+            shared_data = manager.dict()
+            shared_data['computation_time_of_each_client'] = self.computation_time_of_each_client
+            shared_data['client_training_transmissionTime'] = self.client_training_transmissionTime
+            shared_data['current_round'] = config.current_round
+
+            processes = {}
+            for i in range(len(client_ips)):
+                processes[client_ips[i]] = Process(target=self._thread_training_offloading,
+                                                   args=(client_ips[i], shared_data,),
+                                                   name=client_ips[i])
+                fed_logger.info(str(client_ips[i]) + ' offloading training start')
+                processes[client_ips[i]].start()
+                self.tt_start[client_ips[i]] = time.time()
+
+            for i in range(len(client_ips)):
+                processes[client_ips[i]].join()
+            self.computation_time_of_each_client = shared_data['computation_time_of_each_client']
+            self.client_training_transmissionTime = shared_data['client_training_transmissionTime']
 
     def _thread_training_no_offloading(self, client_ip):
         pass
 
-    def _thread_training_offloading(self, client_ip):
+    def _thread_training_offloading(self, client_ip, sharedData):
+        config.current_round = sharedData['current_round']
         comp_time = 0
         i = 0
         msg = self.recv_msg(client_ip, f"{message_utils.local_iteration_flag_client_to_server()}_{i}_{client_ip}")
@@ -167,15 +183,21 @@ class FedServer(FedServerInterface):
             i += 1
 
         fed_logger.info(str(client_ip) + 'no edge offloading training end')
-        with lock:
-            self.client_training_transmissionTime[client_ip] = 0
-            self.computation_time_of_each_client[client_ip] = comp_time
+        localData = sharedData['computation_time_of_each_client']
+        localData[client_ip] = comp_time
+        sharedData['computation_time_of_each_client'] = localData
+
+        localData = sharedData['client_training_transmissionTime']
+        localData[client_ip] = 0
+        sharedData['client_training_transmissionTime'] = localData
         return 'Finish'
 
     def _thread_edge_training(self, client_ip, sharedData):
         config.current_round = sharedData['current_round']
         communication_time = 0
         comp_time = 0
+        fed_logger.info(Fore.MAGENTA + f"Attribute of each process=> {client_ip}: {self.edge_bandwidth}, "
+                                       f"{self.split_layers}")
         edge_of_client = config.CLIENT_MAP[client_ip]
         i = 0
         msg = self.recv_msg(config.CLIENT_MAP[client_ip],

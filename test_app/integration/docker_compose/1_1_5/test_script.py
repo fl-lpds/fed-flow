@@ -26,7 +26,7 @@ docker_compose_configs = [
         "compose_name": "Random",
     },
     {
-        "compose_file": "test_heuristic_offloading_simnet_1_1_1.yaml",
+        "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
         "compose_name": "OurMethod",
     },
 ]
