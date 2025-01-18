@@ -15,7 +15,8 @@ class HTTPCommunicator:
     def _wait_for_neighbor_to_get_ready(node_identifier: NodeIdentifier):
         for i in range(HTTPCommunicator.MAX_RETRIES):
             try:
-                requests.get(f"http://{node_identifier.ip}:{node_identifier.port}/get-node-type")
+                requests.get(f"http://{node_identifier.ip}:{node_identifier.port}/get-node-type",
+                             timeout=HTTPCommunicator.WAIT_DURATION_SECONDS)
                 return
             except requests.exceptions.ConnectionError:
                 pass

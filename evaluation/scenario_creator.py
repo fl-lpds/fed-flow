@@ -111,7 +111,7 @@ def create_node(port: int, decentralized: bool, offloading: bool, splitting_meth
               prompt='Splitting method (find the list of available methods in the splitting.py file)')
 @click.option('--topology', default=None, callback=topology_prompt)
 @click.option('--round-count', default=2, prompt='Enter number of FL round')
-@click.option('--client-cpu-limit', default='0.5', prompt='Enter CPU limit for clients (e.g., 0.5 for half CPU core)')
+@click.option('--client-cpu-limit', default='2', prompt='Enter CPU limit for clients (e.g., 0.5 for half CPU core)')
 @click.option('--client-memory-limit', default='512M', prompt='Enter memory limit for clients (e.g., 512M, 1G)')
 def create_docker_compose(num_clients, num_edges, decentralized, offloading, splitting_method,
                           topology, round_count, client_cpu_limit, client_memory_limit):
