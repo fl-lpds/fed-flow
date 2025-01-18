@@ -135,6 +135,7 @@ class Node:
         self._server.should_exit = True
 
     def _run_server(self, port: int):
+        print("Starting api server")
         self._server = uvicorn.Server(uvicorn.Config(self._app, host="0.0.0.0", port=port, log_level="warning"))
         self._server.run()
 
