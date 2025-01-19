@@ -2,8 +2,9 @@ import random
 
 import joblib
 import numpy as np
-from colorama import Fore
 import torch
+from colorama import Fore
+
 from app.config import config
 from app.config.logger import fed_logger
 from app.model.entity.rl_model import PPO
@@ -96,9 +97,9 @@ def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(f"HIGH PRIO DEVICES: {high_prio_device.items()}")
 
     classicFL_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
-    classicFL_tt, _ = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw,
-                                            flops_of_each_layer, activation_size, total_model_size, batchNumber,
-                                            edge_poly_model, server_poly_model)
+    classicFL_tt, _, _ = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw,
+                                               flops_of_each_layer, activation_size, total_model_size, batchNumber,
+                                               edge_poly_model, server_poly_model)
 
     clients_classicFL_comp_energy, clients_classicFL_comm_energy, clients_classicFL_total_energy = energyEstimator(
         classicFL_action, client_bw, activation_size, batchNumber, total_model_size, client_comp_energy,
@@ -154,11 +155,12 @@ def edge_based_heuristic_splitting(state: dict, label):
                     break
                 for op2 in range(op1, config.model_len - 1):
                     action[config.CLIENTS_CONFIG[client]] = [op1, op2]
-                    training_time_of_action, _ = trainingTimeEstimator(action, client_comp_time, client_bw,
-                                                                       edge_server_bw,
-                                                                       flops_of_each_layer, activation_size,
-                                                                       total_model_size,
-                                                                       batchNumber, edge_poly_model, server_poly_model)
+                    training_time_of_action, _, _ = trainingTimeEstimator(action, client_comp_time, client_bw,
+                                                                          edge_server_bw,
+                                                                          flops_of_each_layer, activation_size,
+                                                                          total_model_size,
+                                                                          batchNumber, edge_poly_model,
+                                                                          server_poly_model)
                     clients_comp_e_of_action, clients_comm_e_of_action, clients_total_e_of_action = (
                         energyEstimator(action,
                                         client_bw,
@@ -236,16 +238,16 @@ def edge_based_heuristic_splitting(state: dict, label):
                                 client_comp_energy,
                                 client_power_usage))
             avg_e_of_action = sum(clients_total_e_of_action.values()) / len(clients_total_e_of_action.values())
-            training_time_of_action, _ = trainingTimeEstimator(action,
-                                                               client_comp_time,
-                                                               client_bw,
-                                                               edge_server_bw,
-                                                               flops_of_each_layer,
-                                                               activation_size,
-                                                               total_model_size,
-                                                               batchNumber,
-                                                               edge_poly_model,
-                                                               server_poly_model)
+            training_time_of_action, _, _ = trainingTimeEstimator(action,
+                                                                  client_comp_time,
+                                                                  client_bw,
+                                                                  edge_server_bw,
+                                                                  flops_of_each_layer,
+                                                                  activation_size,
+                                                                  total_model_size,
+                                                                  batchNumber,
+                                                                  edge_poly_model,
+                                                                  server_poly_model)
 
             time_score = min(1, max(1e-6, time_score))
             energy_score = min(1, max(1e-6, time_score))
@@ -302,16 +304,16 @@ def edge_based_heuristic_splitting(state: dict, label):
         if notFound:
             best_action_found = best_action
 
-        training_time_of_action, _ = trainingTimeEstimator(best_action_found,
-                                                           client_comp_time,
-                                                           client_bw,
-                                                           edge_server_bw,
-                                                           flops_of_each_layer,
-                                                           activation_size,
-                                                           total_model_size,
-                                                           batchNumber,
-                                                           edge_poly_model,
-                                                           server_poly_model)
+        training_time_of_action, _, nice_value = trainingTimeEstimator(best_action_found,
+                                                                       client_comp_time,
+                                                                       client_bw,
+                                                                       edge_server_bw,
+                                                                       flops_of_each_layer,
+                                                                       activation_size,
+                                                                       total_model_size,
+                                                                       batchNumber,
+                                                                       edge_poly_model,
+                                                                       server_poly_model)
 
         clients_comp_e_of_action, clients_comm_e_of_action, clients_total_e_of_action = (
             energyEstimator(best_action_found,
@@ -324,7 +326,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         avg_e_of_action = sum(clients_total_e_of_action.values()) / len(clients_total_e_of_action.values())
         fed_logger.info(Fore.MAGENTA + f"Best Score: {best_score_found}")
         fed_logger.info(Fore.MAGENTA + f"Best Action: {best_action_found}")
-        return best_action_found, avg_e_of_action, training_time_of_action
+        return best_action_found, avg_e_of_action, training_time_of_action, nice_value
         # training_time_of_action, bad_devices_at_trainingTime = trainingTimeEstimator(action, client_comp_time,
         #                                                                              client_bw, edge_server_bw,
         #                                                                              flops_of_each_layer,
@@ -475,10 +477,11 @@ def edge_based_heuristic_splitting(state: dict, label):
             best_op1 = min_time_splitting_for_each_client[client][0][0]
             for op2 in range(best_op1, config.model_len - 1):
                 action[config.CLIENTS_CONFIG[client]] = [best_op1, op2]
-                training_time_of_action, _ = trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw,
-                                                                   flops_of_each_layer, activation_size,
-                                                                   total_model_size,
-                                                                   batchNumber, edge_poly_model, server_poly_model)
+                training_time_of_action, _, _ = trainingTimeEstimator(action, client_comp_time, client_bw,
+                                                                      edge_server_bw,
+                                                                      flops_of_each_layer, activation_size,
+                                                                      total_model_size,
+                                                                      batchNumber, edge_poly_model, server_poly_model)
                 if training_time_of_action < best_tt:
                     best_tt = training_time_of_action
                     best_action = action
@@ -724,7 +727,20 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
                                                transmission_time_on_each_client[clientIP] + \
                                                edge_server_transmission_time_for_each_client[clientIP]
 
+    NICE_MIN = -20
+    NICE_MAX = 19
+
+    normalized_total_time_of_clients = normalizer(total_time_for_each_client)
+
+    def map_to_nice(normalized_value, nice_min, nice_max):
+        # Invert normalized value (slower process gets lower nice value)
+        inverted_value = 1 - normalized_value
+        return int(inverted_value * (nice_max - nice_min) + nice_min)
+
+    nice_values = {client: map_to_nice(norm_time, NICE_MIN, NICE_MAX) for client, norm_time in
+                   normalized_total_time_of_clients.items()}
+
     total_trainingTime = max(total_time_for_each_client.values()) + comp_time_on_server + max(
         comp_time_on_each_edge.values())
 
-    return total_trainingTime[0], total_time_for_each_client,
+    return total_trainingTime[0], total_time_for_each_client, nice_values

@@ -16,7 +16,7 @@ from app.entity.interface.fed_edgeserver_interface import FedEdgeServerInterface
 from torch.multiprocessing import Process, Manager
 
 
-def run_offload(server: FedEdgeServerInterface, LR):
+def run_offload(server: FedEdgeServerInterface, LR, options):
     server.initialize(config.split_layer, LR, config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]], simnetbw=10)
 
     res = {}
@@ -46,17 +46,18 @@ def run_offload(server: FedEdgeServerInterface, LR):
                 server.get_simnet_client_network()
                 fed_logger.info("sending clients simnet bw to server")
                 server.client_network()
-                # fed_logger.info("sending edge simnet bw to server")
-                # server.send_simnet_bw_to_server(simnetbw)
+
             fed_logger.info("receiving and sending splitting info")
             server.get_split_layers_config(client_ips)
+            fed_logger.info(Fore.MAGENTA + f"Nice Values: {server.nice_value}")
+
             fed_logger.info("initializing server")
             server.initialize(server.split_layers, LR, client_ips, simnetbw=simnetbw)
+
             fed_logger.info("receiving global weights")
             server.global_weights(client_ips)
-            threads = {}
-            fed_logger.info("start training")
 
+            fed_logger.info("start training")
             start_training = time.time()
 
             for clientips in config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]:
@@ -73,10 +74,8 @@ def run_offload(server: FedEdgeServerInterface, LR):
                                                        args=(client_ips[i], shared_data,),
                                                        name=client_ips[i])
                     processes[client_ips[i]].start()
-                    if i == 0:
-                        os.system(f"renice -n -20 -p {processes[client_ips[i]].pid}")
-                    else:
-                        os.system(f"renice -n 19 -p {processes[client_ips[i]].pid}")
+                    if options.get('splitting') == 'edge_based_heuristic':
+                        os.system(f"renice -n {server.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
 
                 for process in processes.values():
                     process.join()
@@ -157,7 +156,7 @@ def run(options_ins):
             options_ins.get('model'),
             options_ins.get('dataset'), offload=offload, simnet=simnet)
         fed_logger.info("start mode: " + str(options_ins.values()))
-        run_offload(edge_server_ins, LR)
+        run_offload(edge_server_ins, LR, options_ins)
     else:
         edge_server_ins = FedEdgeServer(options_ins.get('model'),
                                         options_ins.get('dataset'), offload=offload)

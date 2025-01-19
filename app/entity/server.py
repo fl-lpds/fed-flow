@@ -77,7 +77,7 @@ class FedServer(FedServerInterface):
                                                                  self.edge_based)
         self.criterion = nn.CrossEntropyLoss()
 
-    def edge_offloading_train(self, client_ips):
+    def edge_offloading_train(self, client_ips, hasPriority=False):
         for clientips in config.CLIENTS_LIST:
             self.computation_time_of_each_client[clientips] = 0
             self.client_training_transmissionTime[clientips] = 0
@@ -95,8 +95,8 @@ class FedServer(FedServerInterface):
                                                    name=client_ips[i])
                 fed_logger.info(str(client_ips[i]) + ' offloading training start')
                 processes[client_ips[i]].start()
-                if i == 0:
-                    os.system(f"renice -n -20 -p {processes[client_ips[i]].pid}")
+                if hasPriority:
+                    os.system(f"renice -n {self.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
 
                 self.tt_start[client_ips[i]] = time.time()
 
@@ -394,7 +394,7 @@ class FedServer(FedServerInterface):
         """
         send splitting data
         """
-        msg = [message_utils.split_layers_server_to_edge(), self.split_layers]
+        msg = [message_utils.split_layers_server_to_edge(), self.split_layers, self.nice_value]
 
         if self.simnet:
             for edge in config.EDGE_SERVER_LIST:
@@ -544,11 +544,12 @@ class FedServer(FedServerInterface):
 
     def split(self, state, options: dict):
         if options.get('splitting') == 'edge_based_heuristic':
-            self.split_layers, approximated_energy, approximated_tt = fl_method_parser.fl_methods.get(
+            self.split_layers, approximated_energy, approximated_tt, nice_value = fl_method_parser.fl_methods.get(
                 options.get('splitting'))(state, self.group_labels)
             self.actions.append(self.split_layers)
             self.approximated_energy_of_actions.append(approximated_energy)
             self.approximated_tt_of_actions.append(approximated_tt)
+            self.nice_value = nice_value
         else:
             self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels)
         fed_logger.info('Next Round OPs: ' + str(self.split_layers))

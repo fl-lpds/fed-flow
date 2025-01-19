@@ -188,6 +188,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             if r < len(test_load_on_edges_and_server) and options.get('splitting') == 'edge_based_heuristic':
                 server.split_layers = test_load_on_edges_and_server[r]
+                server.nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
             else:
                 fed_logger.info("splitting")
                 splitTime_start = time.process_time()
@@ -195,6 +196,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 splittingTime = time.process_time() - splitTime_start
                 fed_logger.info(Fore.MAGENTA + f"Splitting Time : {splittingTime}")
                 fed_logger.info(Fore.MAGENTA + f"Action : {server.split_layers}")
+                fed_logger.info(Fore.MAGENTA + f"Nice Value : {server.nice_value}")
 
             fed_logger.info("Scattering splitting info to edges.")
             server.send_split_layers_config()
@@ -211,7 +213,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("start training")
             start_training_time = time.time()
-            server.edge_offloading_train(config.CLIENTS_LIST)
+            if options.get('splitting') == 'edge_based_heuristic':
+                server.edge_offloading_train(config.CLIENTS_LIST, hasPriority=True)
+            else:
+                server.edge_offloading_train(config.CLIENTS_LIST, hasPriority=False)
             total_training_time = time.time() - start_training_time
 
             server.total_computation_time = sum(server.computation_time_of_each_client.values())
@@ -230,6 +235,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("receiving Energy, TT, Remaining-energy, Utilization")
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
+
             fed_logger.info(f"Comp Energy, Comm Energy, TT, Remaining-energy, Utilization :{energy_tt_list}")
             server.e_client_attendance(config.CLIENTS_LIST)
 
@@ -819,7 +825,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
 def run(options_ins):
     LR = config.LR
     fed_logger.info('Preparing Sever.')
-    fed_logger.info("start mode: " + str(options_ins.values()))
+    fed_logger.info("start mode: " + str(options_ins))
     offload = options_ins.get('offload')
     edge_based = options_ins.get('edgebased')
     simnet = options_ins.get("simulatebandwidth") == "True"

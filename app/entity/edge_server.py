@@ -239,6 +239,7 @@ class FedEdgeServer(FedEdgeServerInterface):
                             message_utils.split_layers_server_to_edge(),
                             url=config.EDGE_SERVER_CONFIG[config.index])
         self.split_layers = msg[1]
+        self.nice_value = msg[2]
         fed_logger.info(Fore.LIGHTYELLOW_EX + f"{msg[1]}")
         msg = [message_utils.split_layers_edge_to_client(), self.split_layers]
         self.scatter(msg)
