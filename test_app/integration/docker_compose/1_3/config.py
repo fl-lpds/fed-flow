@@ -28,7 +28,7 @@ mq_pass = "password"
 mq_vh = "/"
 cluster = "fed-flow"
 current_round = 0
-model_name = ''
+model_name = 'vgg'
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
@@ -65,7 +65,7 @@ SERVER_PORT = 5002
 EDGESERVER_PORT = {}
 
 K = 3  # Number of devices
-G = 1  # Number of groups
+G = 3  # Number of groups
 S = 1  # Number of server connecting devices
 
 # Unique clients order
