@@ -142,3 +142,23 @@ class VGG16(NNModel):
     def get_config(self):
         return ['layer1', 'layer2', 'layer3', 'layer4', 'layer5', 'layer6', 'layer7', 'layer8', 'layer9', 'layer10',
                 'layer11', 'layer12', 'layer13', 'fc', 'fc1', 'fc2']
+
+    def get_representation(self, x):
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = self.layer5(out)
+        out = self.layer6(out)
+        out = self.layer7(out)
+        out = self.layer8(out)
+        out = self.layer9(out)
+        out = self.layer10(out)
+        out = self.layer11(out)
+        out = self.layer12(out)
+        out = self.layer13(out)
+        out = out.reshape(out.size(0), -1)
+
+        out = self.fc(out)
+        out = self.fc1(out)
+        return out

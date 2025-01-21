@@ -74,3 +74,15 @@ class VGG(NNModel):
                 ('C', 64, 64, 3, 64 * 8 * 8, 64 * 8 * 8 * 3 * 3 * 64),
                 ('D', 8 * 8 * 64, 128, 1, 64, 128 * 8 * 8 * 64),
                 ('D', 128, 10, 1, 10, 128 * 10)]
+
+    def get_representation(self, x):
+        out = x
+        if len(self.features) > 0:
+            out = self.features(out)
+        if len(self.denses) > 0:
+            out = out.view(out.size(0), -1)
+            if len(self.denses) > 1:
+                for layer in self.denses[:-1]:
+                    out = layer(out)
+        return out
+
