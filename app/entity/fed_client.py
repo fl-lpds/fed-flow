@@ -47,13 +47,6 @@ class FedClient(FedBaseNodeInterface):
         self.mu_fedprox = 0.01
         self.global_net = None       # For FedProx reference
 
-    @property
-    def is_edge_based(self) -> bool:
-        if self._edge_based is not None:
-            return self._edge_based
-        self._edge_based = False
-        return self._edge_based
-
     def initialize(self, learning_rate):
         self.net = model_utils.get_model('Client', self.split_layers, self.device, self.is_edge_based)
         self.optimizer = optim.SGD(self.net.parameters(), lr=learning_rate, momentum=0.9, weight_decay=5e-4)
