@@ -1,3 +1,5 @@
+import copy
+
 import torch
 import torch.nn as nn
 from torch import optim
@@ -39,13 +41,13 @@ class FedClient(FedBaseNodeInterface):
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, config.lr_step_size, config.lr_gamma)
 
-        self.use_moon = False        # Toggle MOON
+        self.use_moon = True
         self.moon_lambda = 1.0
-        self.old_net = None          # For MOON contrastive
+        self.old_net = None
 
-        self.use_fedprox = True     # Toggle FedProx
+        self.use_fedprox = False
         self.mu_fedprox = 0.01
-        self.global_net = None       # For FedProx reference
+        self.global_net = None
 
     def initialize(self, learning_rate):
         self.net = model_utils.get_model('Client', self.split_layers, self.device, self.is_edge_based)
@@ -56,19 +58,15 @@ class FedClient(FedBaseNodeInterface):
         msg: GlobalWeightMessage = msgs[0].message
         pweights = model_utils.split_weights_client(msg.weights[0], self.net.state_dict())
 
-        # For MOON: store old_net
         if self.use_moon:
             if self.old_net is None:
-                self.old_net = model_utils.get_model('Client', self.split_layers, self.device, self.is_edge_based)
+                self.old_net = copy.deepcopy(self.net)
             self.old_net.load_state_dict(self.net.state_dict())
 
-        # For FedProx: store global_net
-        if self.use_fedprox:
-            if self.global_net is None:
-                self.global_net = model_utils.get_model('Client', self.split_layers, self.device, self.is_edge_based)
-            self.global_net.load_state_dict(pweights)
+        if self.global_net is None:
+            self.global_net = copy.deepcopy(self.net)
+        self.global_net.load_state_dict(pweights)
 
-        # Load newly received global weights
         self.net.load_state_dict(pweights)
 
     def scatter_network_speed_to_edges(self):
@@ -108,15 +106,16 @@ class FedClient(FedBaseNodeInterface):
                 outputs = self.net(inputs)
                 ce_loss = self.criterion(outputs, targets)
 
-                # (A) MOON
+                # MOON
                 moon_loss = 0.0
-                if self.use_moon and self.old_net is not None:
+                if self.use_moon and self.old_net and self.global_net is not None:
                     with torch.no_grad():
-                        old_rep = self.old_net.get_representation(inputs)
-                    new_rep = self.net.get_representation(inputs)
-                    moon_loss = self._compute_moon_loss(new_rep, old_rep)
+                        prev_rep = self.old_net.get_representation(inputs)  # w^k_prev
+                        glob_rep = self.global_net.get_representation(inputs)  # w^glob_t
+                    new_rep = self.net.get_representation(inputs)  # w^k_t
+                    moon_loss = self._compute_moon_loss(new_rep, glob_rep, prev_rep)
 
-                # (B) FedProx
+                # FedProx
                 fedprox_loss = 0.0
                 if self.use_fedprox and self.global_net is not None:
                     fedprox_loss = self._compute_fedprox_loss()
@@ -141,15 +140,16 @@ class FedClient(FedBaseNodeInterface):
 
                 outputs = self.net(inputs)
 
-                # (A) MOON partial
-                if self.use_moon and self.old_net is not None:
+                # MOON
+                if self.use_moon and self.old_net and self.global_net is not None:
                     with torch.no_grad():
-                        old_rep = self.old_net.get_representation(inputs)
+                        prev_rep = self.old_net.get_representation(inputs)
+                        glob_rep = self.global_net.get_representation(inputs)
                     new_rep = self.net.get_representation(inputs)
-                    moon_loss = self._compute_moon_loss(new_rep, old_rep)
+                    moon_loss = self._compute_moon_loss(new_rep, glob_rep, prev_rep)
                     (moon_loss * self.moon_lambda).backward(retain_graph=True)
 
-                # (B) FedProx partial
+                # FedProx partial
                 if self.use_fedprox and self.global_net is not None:
                     fedprox_loss = self._compute_fedprox_loss()
                     fedprox_loss.backward(retain_graph=True)
@@ -195,15 +195,16 @@ class FedClient(FedBaseNodeInterface):
             outputs = self.net(inputs)
             ce_loss = self.criterion(outputs, targets)
 
-            # (A) MOON
+            # MOON
             moon_loss = 0.0
-            if self.use_moon and self.old_net is not None:
+            if self.use_moon and self.old_net is not None and self.global_net is not None:
                 with torch.no_grad():
-                    old_rep = self.old_net.get_representation(inputs)
+                    prev_rep = self.old_net.get_representation(inputs)
+                    glob_rep = self.global_net.get_representation(inputs)
                 new_rep = self.net.get_representation(inputs)
-                moon_loss = self._compute_moon_loss(new_rep, old_rep)
+                moon_loss = self._compute_moon_loss(new_rep, glob_rep, prev_rep)
 
-            # (B) FedProx
+            # FedProx
             fedprox_loss = 0.0
             if self.use_fedprox and self.global_net is not None:
                 fedprox_loss = self._compute_fedprox_loss()
@@ -222,23 +223,38 @@ class FedClient(FedBaseNodeInterface):
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)
 
-    # -------------------------------
-    # Helpers for MOON / FedProx
-    # -------------------------------
-    def _compute_moon_loss(self, new_rep: torch.Tensor, old_rep: torch.Tensor, temperature=0.5) -> torch.Tensor:
+    def _compute_moon_loss(self,
+                           new_rep: torch.Tensor,
+                           global_rep: torch.Tensor,
+                           prev_rep: torch.Tensor,
+                           tau: float = 1.0) -> torch.Tensor:
         """
-        Minimal negative-only MOON contrastive example.
-        new_rep vs. old_rep => negative pair
-        new_rep vs. new_rep => positive pair
+            l_con = - log(
+              exp( sim(w^k_t, w^glob_t) / τ )
+              /
+              [ exp( sim(w^k_t, w^glob_t) / τ ) + exp( sim(w^k_t, w^k_prev) / τ ) ]
+            )
+
+        Args:
+            new_rep    (Tensor): w^k_t      (current local representation)
+            global_rep (Tensor): w^glob_t   (current global/server representation)
+            prev_rep   (Tensor): w^k_prev   (previous local representation)
+            tau        (float):  temperature scale
         """
         cos = nn.CosineSimilarity(dim=1)
-        pos_sim = cos(new_rep, new_rep)
-        neg_sim = cos(new_rep, old_rep)
-        logits = torch.stack([pos_sim, neg_sim], dim=1) / temperature
-        labels = torch.zeros(logits.size(0), dtype=torch.long, device=logits.device)
-        loss = nn.CrossEntropyLoss()(logits, labels)
-        fed_logger.info(f"MOON loss computation complete. Loss value: {loss.item()}.")
-        return loss
+        pos_sim = cos(new_rep, global_rep)  # sim(w^k_t, w^glob_t)
+        neg_sim = cos(new_rep, prev_rep)  # sim(w^k_t, w^k_prev)
+
+        # exponentials of the scaled similarities
+        pos_exp = torch.exp(pos_sim / tau)
+        neg_exp = torch.exp(neg_sim / tau)
+
+        # denominator = exp(...) + exp(...)
+        denominator = pos_exp + neg_exp
+
+        # final loss = - log( pos_exp / denominator )
+        loss = -torch.log(pos_exp / denominator)
+        return loss.mean()
 
     def _compute_fedprox_loss(self) -> torch.Tensor:
         """
@@ -249,5 +265,4 @@ class FedClient(FedBaseNodeInterface):
         for param_local, param_global in zip(self.net.parameters(), self.global_net.parameters()):
             loss += torch.sum((param_local - param_global.detach()) ** 2)
         loss = 0.5 * self.mu_fedprox * loss
-        fed_logger.info(f"FedProx loss computation complete. Loss value: {loss.item()}.")
         return loss

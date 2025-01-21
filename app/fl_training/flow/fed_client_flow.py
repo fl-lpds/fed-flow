@@ -86,4 +86,4 @@ def run(options_ins):
     else:
         run_client(client, learning_rate)
     time.sleep(10)
-    client.stop_server()
+    # client.stop_server()
