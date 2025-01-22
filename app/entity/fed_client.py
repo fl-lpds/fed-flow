@@ -241,6 +241,7 @@ class FedClient(FedBaseNodeInterface):
             prev_rep   (Tensor): w^k_prev   (previous local representation)
             tau        (float):  temperature scale
         """
+        fed_logger.info("Calculating moon loss")
         cos = nn.CosineSimilarity(dim=1)
         pos_sim = cos(new_rep, global_rep)  # sim(w^k_t, w^glob_t)
         neg_sim = cos(new_rep, prev_rep)  # sim(w^k_t, w^k_prev)
@@ -261,6 +262,7 @@ class FedClient(FedBaseNodeInterface):
         FedProx penalty:
         mu_fedprox/2 * sum(||W_local - W_global||^2).
         """
+        fed_logger.info("Calculating fedprox loss")
         loss = torch.tensor(0.0, device=self.device)
         for param_local, param_global in zip(self.net.parameters(), self.global_net.parameters()):
             loss += torch.sum((param_local - param_global.detach()) ** 2)
