@@ -56,9 +56,22 @@ def run(options_ins):
 
     fed_logger.info('Preparing Client')
     fed_logger.info('Preparing Data.')
+
     indices = list(range(N))
-    part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
-    train_loader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, 0)
+    dataset = data_utils.get_trainset()
+
+    # if options_ins.get("iid"):
+    if False:
+        part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
+        train_loader = data_utils.get_trainloader(dataset, part_tr, 0)
+    else:
+        labels = [dataset[i][1] for i in range(len(dataset))]
+        sorted_indices = sorted(range(len(labels)), key=lambda i: labels[i])
+        subset_size = len(dataset) // config.K
+        start_idx = subset_size * index
+        end_idx = start_idx + subset_size
+        client_indices = sorted_indices[start_idx:end_idx]
+        train_loader = data_utils.get_trainloader(dataset, client_indices, 0)
 
     estimate_energy = options_ins.get("energy") == "True"
     mobility = options_ins.get('mobility')
