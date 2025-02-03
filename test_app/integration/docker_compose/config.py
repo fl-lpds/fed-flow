@@ -32,7 +32,7 @@ model_name = ''
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [7]  # Initial split layers
+split_layer = [9]  # Initial split layers
 # split_layer = [[6, 6], [6, 6], [6, 6]]
 model_len = 7
 
