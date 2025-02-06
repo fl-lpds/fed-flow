@@ -32,6 +32,8 @@ class FedEdgeServerInterface(ABC, Communicator):
         self.computation_time_of_each_client = {}
         self.communication_time_of_each_client = {}
         self.nice_value = {}
+        self.process_wall_time = {}
+
         # if offload:
         model_len = model_utils.get_unit_model_len()
         self.uninet = model_utils.get_model('Unit', [model_len - 1, model_len - 1], self.device, True)

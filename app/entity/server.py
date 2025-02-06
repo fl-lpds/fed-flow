@@ -81,12 +81,14 @@ class FedServer(FedServerInterface):
         for clientips in config.CLIENTS_LIST:
             self.computation_time_of_each_client[clientips] = 0
             self.client_training_transmissionTime[clientips] = 0
+            self.process_wall_time[clientips] = 0
 
         with Manager() as manager:
             shared_data = manager.dict()
             shared_data['computation_time_of_each_client'] = self.computation_time_of_each_client
             shared_data['client_training_transmissionTime'] = self.client_training_transmissionTime
             shared_data['current_round'] = config.current_round
+            shared_data['process_wall_time'] = self.process_wall_time
 
             processes = {}
             for i in range(len(client_ips)):
@@ -95,8 +97,8 @@ class FedServer(FedServerInterface):
                                                    name=client_ips[i])
                 fed_logger.info(str(client_ips[i]) + ' offloading training start')
                 processes[client_ips[i]].start()
-                if hasPriority:
-                    os.system(f"renice -n {self.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
+                # if hasPriority:
+                    # os.system(f"renice -n {self.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
 
                 self.tt_start[client_ips[i]] = time.time()
 
@@ -104,6 +106,7 @@ class FedServer(FedServerInterface):
                 processes[client_ips[i]].join()
             self.computation_time_of_each_client = shared_data['computation_time_of_each_client']
             self.client_training_transmissionTime = shared_data['client_training_transmissionTime']
+            self.process_wall_time = shared_data['process_wall_time']
 
     def no_offloading_train(self, client_ips):
         self.threads = {}
@@ -196,6 +199,8 @@ class FedServer(FedServerInterface):
         config.current_round = sharedData['current_round']
         communication_time = 0
         comp_time = 0
+        wall_time_comp_time = 0
+
         fed_logger.info(Fore.MAGENTA + f"Attribute of each process=> {client_ip}: {self.edge_bandwidth}, "
                                        f"{self.split_layers}")
         edge_of_client = config.CLIENT_MAP[client_ip]
@@ -215,6 +220,10 @@ class FedServer(FedServerInterface):
             localData = sharedData['computation_time_of_each_client']
             localData[client_ip] = comp_time
             sharedData['computation_time_of_each_client'] = localData
+
+            localData = sharedData['process_wall_time']
+            localData[client_ip] = wall_time_comp_time
+            sharedData['process_wall_time'] = localData
 
             localData = sharedData['client_training_transmissionTime']
             localData[client_ip] = communication_time
@@ -250,6 +259,7 @@ class FedServer(FedServerInterface):
                 inputs, targets = smashed_layers.to(self.device), labels.to(self.device)
 
                 s_time = time.process_time()
+                s_wall_time = time.time()
 
                 if self.optimizers.keys().__contains__(client_ip):
                     self.optimizers[client_ip].zero_grad()
@@ -260,6 +270,7 @@ class FedServer(FedServerInterface):
                     self.optimizers[client_ip].step()
 
                 comp_time += time.process_time() - s_time
+                wall_time_comp_time += time.time() - s_wall_time
 
                 # Send gradients to edge
                 msg = [f'{message_utils.server_gradients_server_to_edge() + str(client_ip)}_{i}', inputs.grad]
@@ -273,6 +284,10 @@ class FedServer(FedServerInterface):
         localData = sharedData['computation_time_of_each_client']
         localData[client_ip] = comp_time
         sharedData['computation_time_of_each_client'] = localData
+
+        localData = sharedData['process_wall_time']
+        localData[client_ip] = wall_time_comp_time
+        sharedData['process_wall_time'] = localData
 
         localData = sharedData['client_training_transmissionTime']
         localData[client_ip] = communication_time
@@ -569,7 +584,8 @@ class FedServer(FedServerInterface):
                  'total_model_size': self.total_model_size,
                  'prev_action': self.split_layers,
                  'comp_time_of_each_client_on_edge': self.computation_time_of_each_client_on_edges,
-                 'comp_time_of_each_client_on_server': self.computation_time_of_each_client,
+                 'comp_time_of_each_client_on_server': self.process_wall_time,
+                 'edge_server_comm_time': self.client_training_transmissionTime,
                  "client_comp_energy": self.client_comp_energy,
                  "client_comm_energy": self.client_comm_energy,
                  "client_comp_time": self.client_comp_time,
@@ -578,7 +594,7 @@ class FedServer(FedServerInterface):
                  "client_bw": self.client_bandwidth,
                  "edge_bw": self.edge_bandwidth,
                  "client_remaining_energy": client_remaining_energy,
-                 "flops_of_each_layer": self.model_flops_per_layer
+                 "flops_of_each_layer": self.model_flops_per_layer,
                  }
 
         return state
@@ -697,6 +713,10 @@ class FedServer(FedServerInterface):
                 layer_num += 1
         self.activation_size = layer_activation
         self.gradient_size = gradient_sizes
+        fed_logger.info(Fore.MAGENTA + f"Each layer activation (bit): {self.activation_size}")
+        fed_logger.info(Fore.MAGENTA + f"Each layer gradient (bit): {self.gradient_size}")
+
+
 
     def calculate_each_layer_FLOP(self):
         def count_relu_flops(input_shape) -> int:
@@ -885,13 +905,12 @@ class FedServer(FedServerInterface):
                 for clientip in config.CLIENTS_LIST:
                     total_time_for_each_client[clientip] = \
                         self.computation_time_of_each_client_on_edges[clientip] + \
-                        self.computation_time_of_each_client[clientip] + \
+                        self.process_wall_time[clientip] + \
                         energy_tt_list[clientip][2] + \
                         self.client_training_transmissionTime[clientip]
 
-                trainingTime_simnetBW = (max(total_time_for_each_client.values())
-                                         + aggregation_time + server_sequential_transmission_time)
-
+                trainingTime_simnetBW = max(total_time_for_each_client.values())
+                fed_logger.info(f"Training time of each client : {total_time_for_each_client}")
                 fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
                 return trainingTime_simnetBW
             else:

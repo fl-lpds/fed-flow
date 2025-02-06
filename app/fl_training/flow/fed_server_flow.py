@@ -113,29 +113,29 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
 
-    # low load on edge 90% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # medium load on edge 50% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # high load on edge 100% of each model on edge
-    op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # low load on server 90% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # medium load on server 50% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # high load on server 100% of each model on edge
-    op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    # # low load on edge 90% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # medium load on edge 50% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # high load on edge 100% of each model on edge
+    # op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # low load on server 90% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # medium load on server 50% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # high load on server 100% of each model on edge
+    # op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
     for layer in range(config.model_len - 1):
         test_load_on_edges_and_server.append(
@@ -219,10 +219,16 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 server.edge_offloading_train(config.CLIENTS_LIST, hasPriority=False)
             total_training_time = time.time() - start_training_time
 
-            server.total_computation_time = sum(server.computation_time_of_each_client.values())
+            e_time = time.time()
+            process_time_end = time.process_time()
+            training_time = e_time - s_time
+            total_process_time = process_time_end - process_time_start
+
+            server.total_computation_time = max(server.process_wall_time.values())
             fed_logger.info(Fore.RED + f"Total time: {total_training_time}")
-            fed_logger.info(Fore.RED + f"Total computation time: {server.total_computation_time}")
-            fed_logger.info(Fore.RED + f"each client computation time: {server.computation_time_of_each_client}")
+            fed_logger.info(Fore.RED + f"Total computation wall-time: {server.total_computation_time}")
+            fed_logger.info(Fore.RED + f"Each client computation time: {server.computation_time_of_each_client}")
+            fed_logger.info(Fore.RED + f"Each process computation wall-time: {server.process_wall_time}")
 
             fed_logger.info("receiving local weights")
             local_weights = server.e_local_weights(config.CLIENTS_LIST)
@@ -236,13 +242,15 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info("receiving Energy, TT, Remaining-energy, Utilization")
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
 
-            fed_logger.info(f"Comp Energy, Comm Energy, TT, Remaining-energy, Utilization :{energy_tt_list}")
+            fed_logger.info(f"Comp Energy, Comm Energy, TT, Remaining-energy, Utilization, computation on edge, "
+                            f"total comp on edge :{energy_tt_list}")
             server.e_client_attendance(config.CLIENTS_LIST)
 
-            fed_logger.info(f"computation time of each client on server: {server.computation_time_of_each_client}")
+            fed_logger.info(f"computation time of each client on server[wall-time]: {server.process_wall_time}")
             fed_logger.info(
-                f"computation time of each client on edge: {server.computation_time_of_each_client_on_edges}")
-            fed_logger.info(f"Total computation time on each edge: {server.total_computation_time_of_each_edge}")
+                f"computation time of each client on edge[wall-time]: {server.computation_time_of_each_client_on_edges}")
+            fed_logger.info(
+                f"Total computation time on each edge[ MAX(wall-time) ]: {server.total_computation_time_of_each_edge}")
             fed_logger.info(f"Transmission time of each client on server: {server.client_training_transmissionTime}")
             fed_logger.info(f"Aggregation Time Simnet bw : {aggregation_time}")
             server_sequential_transmission_time = float(energy_estimation.get_transmission_time())
@@ -271,11 +279,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             else:
                 avgEnergy.append(0)
 
-            e_time = time.time()
-            process_time_end = time.process_time()
-
-            training_time = e_time - s_time
-            total_process_time = process_time_end - process_time_start
             tt.append(training_time)
 
             if server.simnet:

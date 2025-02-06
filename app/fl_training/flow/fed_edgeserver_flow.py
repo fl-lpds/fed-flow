@@ -59,13 +59,14 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
 
             fed_logger.info("start training")
             start_training = time.time()
-
             for clientips in config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]:
                 server.computation_time_of_each_client[clientips] = 0
+                server.process_wall_time[clientips] = 0
             with Manager() as manager:
                 shared_data = manager.dict()
                 shared_data['computation_time_of_each_client'] = server.communication_time_of_each_client
                 shared_data['current_round'] = config.current_round
+                shared_data['process_wall_time'] = server.process_wall_time
                 fed_logger.info(Fore.RED + f"shared data: {shared_data}")
 
                 processes = {}
@@ -74,17 +75,18 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
                                                        args=(client_ips[i], shared_data,),
                                                        name=client_ips[i])
                     processes[client_ips[i]].start()
-                    if options.get('splitting') == 'edge_based_heuristic':
-                        os.system(f"renice -n {server.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
+                    # if options.get('splitting') == 'edge_based_heuristic':
+                    #     os.system(f"renice -n {server.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
 
                 for process in processes.values():
                     process.join()
                 server.computation_time_of_each_client = shared_data['computation_time_of_each_client']
+                server.process_wall_time = shared_data['process_wall_time']
 
             total_training_time = time.time() - start_training
-            fed_logger.info(Fore.RED + f"Total training time: {total_training_time}")
-
-            server.total_computation_time_on_edge = sum(server.computation_time_of_each_client.values())
+            fed_logger.info(Fore.RED + f"Total training time(Wall-time): {total_training_time}")
+            fed_logger.info(Fore.RED + f"Each Process computation Wall Time: {server.process_wall_time}")
+            server.total_computation_time_on_edge = max(server.process_wall_time.values())
             fed_logger.info(
                 Fore.RED + f"each client communication time: {server.communication_time_of_each_client}")
             fed_logger.info(Fore.RED + f"computation time of each client: {server.computation_time_of_each_client}")

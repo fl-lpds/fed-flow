@@ -49,6 +49,7 @@ class FedServerInterface(ABC, Communicator):
         self.real_communication_time_of_each_client = {}
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
+        self.process_wall_time = {}
 
         self.computation_time_of_each_client_on_edges = {}
         self.total_computation_time_of_each_edge = {}
