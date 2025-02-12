@@ -15,7 +15,7 @@ from app.entity.node import Node
 
 
 def report_results(node: Node, training_times: list[float], client_bandwidths: list[float],
-                   accuracy: list[float], neighbor_bandwidths: Optional[list[float]] = None):
+                   accuracy: list[float], neighbor_bandwidths: Optional[list[float]] = None, accuracy_duration: bool = True):
     current_time = time.strftime("%Y-%m-%d %H:%M")
     runtime_config = f'{current_time} {config.SCENARIO_DESCRIPTION}'
     save_path = f"Results/{runtime_config}"
@@ -30,6 +30,12 @@ def report_results(node: Node, training_times: list[float], client_bandwidths: l
         draw_graph(10, 5, range(1, rounds_count + 1), neighbor_bandwidths, str(node), "FL Rounds",
                    "Neighbors Bandwidths (bytes/s)",
                    save_path, f"neighbor-bandwidths-{str(node)}")
+    if accuracy_duration:
+        timeline = [0]
+        for duration in training_times:
+            timeline.append(timeline[-1] + duration)
+        draw_graph(10, 5, timeline, accuracy, str(node), "Time (s)", "Accuracy (%)",
+                   save_path, f"accuracy-duration-{str(node)}")
     copy_compose_file_if_exists(save_path)
     fed_logger.info(f"Results created successfully at {save_path}")
 
