@@ -113,29 +113,29 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
 
-    # # low load on edge 90% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # medium load on edge 50% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # high load on edge 100% of each model on edge
-    # op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # low load on server 90% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # medium load on server 50% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # high load on server 100% of each model on edge
-    # op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    # low load on edge 90% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # medium load on edge 50% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # high load on edge 100% of each model on edge
+    op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # low load on server 90% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # medium load on server 50% of each model on client
+    op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+
+    # high load on server 100% of each model on edge
+    op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
+    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
     for layer in range(config.model_len - 1):
         test_load_on_edges_and_server.append(
@@ -184,7 +184,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             offloading = server.split_layers
 
             state = server.edge_based_state()
-            fed_logger.info(Fore.RED + f"STATE: {str(state)}")
 
             if r < len(test_load_on_edges_and_server) and options.get('splitting') == 'edge_based_heuristic':
                 server.split_layers = test_load_on_edges_and_server[r]
@@ -239,11 +238,15 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             aggregation_end_time = time.time()
             aggregation_time = aggregation_end_time - aggregation_start_time
 
-            fed_logger.info("receiving Energy, TT, Remaining-energy, Utilization")
+            fed_logger.info(Fore.GREEN + f"Receiving Clients' Attribute")
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
+            fed_logger.info(Fore.GREEN + f"==========================================================")
+            fed_logger.info(
+                Fore.GREEN + f"Clients    Comp Energy   Comm Energy   TT   Remaining Energy   Utilization   Comp On Edge   Total Comp On Edge")
+            for client in energy_tt_list.keys():
+                fed_logger.info(
+                    Fore.GREEN + f"{client}    {energy_tt_list[client][0]:.3f}   {energy_tt_list[client][1]:.3f}   {energy_tt_list[client][2]:.3f}   {energy_tt_list[client][3]:.3f}   {energy_tt_list[client][4]:.3f}   {energy_tt_list[client][5]:.3f}   {energy_tt_list[client][6]:.3f}")
 
-            fed_logger.info(f"Comp Energy, Comm Energy, TT, Remaining-energy, Utilization, computation on edge, "
-                            f"total comp on edge :{energy_tt_list}")
             server.e_client_attendance(config.CLIENTS_LIST)
 
             fed_logger.info(f"computation time of each client on server[wall-time]: {server.process_wall_time}")
@@ -308,7 +311,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info('Round Finish')
             fed_logger.info('==> Round Training Time: {:}'.format(training_time))
-            fed_logger.info(Fore.MAGENTA + f"Flop on server: {flop_on_server}")
+            # fed_logger.info(Fore.MAGENTA + f"Flop on server: {flop_on_server}")
             plot_graph(tt, simnet_tt, avgEnergy, clientConsumedEnergy, clientCompEnergy, clientCommEnergy, clientTT,
                        clientRemainingEnergy, clientBW, edge_server_BW, clientUtilization, res['test_acc_record'],
                        flop_on_each_edge, time_on_each_edge, flop_of_each_edge_on_server, flop_on_server,
@@ -549,8 +552,8 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         rl_utils.draw_graph(10, 5, accuracy, "Accuracy", "FL Rounds", "Accuracy", "/fed-flow/Graphs",
                             "accuracy", True)
 
-    fed_logger.info(Fore.MAGENTA + f"Approx. E: {approximated_energy}")
-    fed_logger.info(Fore.MAGENTA + f"Approx. tt: {approximated_tt}")
+    # fed_logger.info(Fore.MAGENTA + f"Approx. E: {approximated_energy}")
+    # fed_logger.info(Fore.MAGENTA + f"Approx. tt: {approximated_tt}")
 
     if approximated_energy:
         rl_utils.draw_graph(10, 5, approximated_energy, "Approximated energy", "FL Rounds",
