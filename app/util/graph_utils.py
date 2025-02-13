@@ -34,7 +34,7 @@ def report_results(node: Node, training_times: list[float], client_bandwidths: l
         timeline = [0]
         for duration in training_times:
             timeline.append(timeline[-1] + duration)
-        draw_graph(10, 5, timeline, accuracy, str(node), "Time (s)", "Accuracy (%)",
+        draw_graph(10, 5, timeline[1:], accuracy, str(node), "Time (s)", "Accuracy (%)",
                    save_path, f"accuracy-duration-{str(node)}")
     copy_compose_file_if_exists(save_path)
     fed_logger.info(f"Results created successfully at {save_path}")
