@@ -77,6 +77,21 @@ def edge_based_heuristic_splitting(state: dict, label):
     total_time_on_server = sum(comp_time_of_each_client_on_server.values())
     action = previous_action
 
+    fed_logger.info(Fore.GREEN + f"STATE:")
+    fed_logger.info(Fore.GREEN + f"=============================================================================")
+    fed_logger.info(Fore.GREEN + f"Previous action: {action}")
+    for client in state['client_bw'].keys():
+        fed_logger.info(Fore.GREEN + f"Client: {client}")
+        fed_logger.info(Fore.GREEN + f"   Client BW: {client_bw[client]}")
+        fed_logger.info(Fore.GREEN + f"   Client Comp Energy: {client_comp_energy[client]}")
+        fed_logger.info(Fore.GREEN + f"   Client Comm Energy: {client_comm_energy[client]}")
+        fed_logger.info(Fore.GREEN + f"   Client Comp Time: {client_comp_time[client]}")
+        fed_logger.info(Fore.GREEN + f"   Client Comm Time: {client_comm_time[client]}")
+        fed_logger.info(Fore.GREEN + f"   Edge Comp Time Of Client: {comp_time_of_each_client_on_edges[client]}")
+        fed_logger.info(Fore.GREEN + f"   Server Comp Time of Client: {comp_time_of_each_client_on_server[client]}")
+        fed_logger.info(Fore.GREEN + f"   Edge-Server Comm Time of Client: {edge_server_comm_time[client]}")
+        fed_logger.info(Fore.GREEN + f"-------------------------------------------------------------------------")
+
     batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / config.B
     score_estimation_action = [[4, config.model_len - 1] for client in config.CLIENTS_CONFIG.keys()]
 
@@ -138,7 +153,11 @@ def edge_based_heuristic_splitting(state: dict, label):
 
     currentAction = previous_action
 
+    fed_logger.info(Fore.GREEN + f"Splitting Map:")
+    fed_logger.info(Fore.GREEN + f"===============================================================================")
     for client, score in client_score.items():
+        fed_logger.info(Fore.GREEN + f"Client: {client}")
+
         client_op1_energy = []
         client_op1_time = []
         for layer in range(config.model_len):
@@ -156,8 +175,10 @@ def edge_based_heuristic_splitting(state: dict, label):
             client_op1_time.append((op1, total_time))
         min_energy_splitting_for_each_client[client] = sorted(client_op1_energy, key=lambda x: x[1])
         min_time_splitting_for_each_client[client] = sorted(client_op1_time, key=lambda x: x[1])
-    fed_logger.info(Fore.MAGENTA + f"Splitting-energy map: {min_energy_splitting_for_each_client}")
-    fed_logger.info(Fore.MAGENTA + f"Splitting-time map: {min_time_splitting_for_each_client}")
+
+        fed_logger.info(Fore.GREEN + f"   Energy[Ascending]: {min_energy_splitting_for_each_client[client]}")
+        fed_logger.info(Fore.GREEN + f"   Time[Ascending]: {min_time_splitting_for_each_client[client]}")
+        fed_logger.info(Fore.GREEN + f"---------------------------------------------------------------------------")
 
     splitting_score = 0
     splitting_energy_score = 0
@@ -226,15 +247,21 @@ def edge_based_heuristic_splitting(state: dict, label):
         best_tt_action = None
 
         clients_score = sorted(client_score.items(), key=lambda item: item[1], reverse=True)
-        action = [[op1s[0][0], random.randint(op1s[0][0], config.model_len - 1)] for client, op1s in
-                  min_energy_splitting_for_each_client.items()]
         fed_logger.info(Fore.MAGENTA + f"Current Round: {config.current_round}, model_len: {config.model_len}")
+
         if config.current_round == config.model_len:
+            action = [[op1s[0][0], random.randint(op1s[0][0], config.model_len - 1)] for client, op1s in
+                      min_energy_splitting_for_each_client.items()]
             return action, 0, 0, 0
         best_action_found = None
         best_score_found = 0
         satisfied = False
         notFound = False
+
+        new_action = [[op1s[0][0], previous_action[config.CLIENTS_CONFIG[client]][1] if
+        previous_action[config.CLIENTS_CONFIG[client]][1] >= op1s[0][0] else random.randint(op1s[0][0],
+                                                                                            config.model_len - 1)] for
+                      client, op1s in min_energy_splitting_for_each_client.items()]
         prev_action_tt, prev_action_each_client_total_tt, prev_action_each_client_tt, _, _, _, _, _ = (
             trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw, flops_of_each_layer,
                                   activation_size, total_model_size, batchNumber, edge_poly_model, server_poly_model,
@@ -257,6 +284,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.MAGENTA + f"Bad Clients: {bad_clients}")
         fed_logger.info(Fore.MAGENTA + f"Bad Clients' edge : {bad_clients_cluster}")
 
+        shares = {}
         # finding slow part of training of bad device and try to solve it
         for client in bad_clients.keys():
             op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
@@ -275,11 +303,11 @@ def edge_based_heuristic_splitting(state: dict, label):
             edge_server_comm_share = prev_action_each_client_tt[client]['edge_server_comm'] / \
                                      prev_action_each_client_total_tt[client]
 
-            shares = {'client_comp': client_comp_share,
-                      'edge_comp': edge_comp_share,
-                      'server_comp': server_comp_share,
-                      'client_comm': client_comm_share,
-                      'edge_server_comm': edge_server_comm_share}
+            shares[client] = {'client_comp': client_comp_share,
+                              'edge_comp': edge_comp_share,
+                              'server_comp': server_comp_share,
+                              'client_comm': client_comm_share,
+                              'edge_server_comm': edge_server_comm_share}
 
             fed_logger.info(Fore.MAGENTA + f"{client} SHARES: {shares}")
             fed_logger.info(Fore.MAGENTA + f"Client comp time: {prev_action_each_client_tt[client]['client_comp']}")
@@ -289,7 +317,7 @@ def edge_based_heuristic_splitting(state: dict, label):
             fed_logger.info(
                 Fore.MAGENTA + f"Edge-Server comm time: {prev_action_each_client_tt[client]['edge_server_comm']}")
 
-        return action, 0, 0, 0
+        return previous_action, 0, 0, 0
 
     elif ALPHA == 0:
         action = [[op1s[0][0], config.model_len - 1] for client, op1s in min_time_splitting_for_each_client.items()]
@@ -546,13 +574,14 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
             flop_of_each_edge_on_server[edgeIP] += sum(flops_of_each_layer[op2 + 1:])
 
     EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
-    comp_time_on_each_edge = {
-        edge: edge_flops_model.predict([[index, edge_flops[edge]]])[0]
-        for
-        edge, index in EDGE_INDEX}
+    comp_time_on_each_edge = {edge: edge_flops_model.predict([[index, edge_flops[edge]]])[0] for edge, index in
+                              EDGE_INDEX}
     comp_time_on_server = server_flops_model.predict([[server_flops]])
     # fed_logger.info(Fore.GREEN + f"Comp time on edges prediction: {comp_time_on_each_edge}")
 
+    fed_logger.info(Fore.GREEN + f"Client's TT Approximation:")
+    fed_logger.info(Fore.GREEN + f"Action: {action}")
+    fed_logger.info(Fore.GREEN + f"===============================================================================")
     for clientIP in config.CLIENTS_CONFIG.keys():
         op1 = action[config.CLIENTS_CONFIG[clientIP]][0]
         time_for_each_client[clientIP] = {'client_comp': comp_time_on_each_client[clientIP][op1],
@@ -562,8 +591,16 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
                                           'edge_comp': comp_time_on_edge_for_each_client[clientIP],
                                           'server_comp': comp_time_on_server_for_each_client[clientIP]
                                           }
-
         total_time_for_each_client[clientIP] = sum(time_for_each_client[clientIP].values())
+
+        fed_logger.info(Fore.GREEN + f"Client: {clientIP}:")
+        fed_logger.info(Fore.GREEN + f"     Client Comp: {time_for_each_client[clientIP]['client_comp']}")
+        fed_logger.info(Fore.GREEN + f"     Edge Comp: {time_for_each_client[clientIP]['edge_comp']}")
+        fed_logger.info(Fore.GREEN + f"     Server Comp: {time_for_each_client[clientIP]['server_comp']}")
+        fed_logger.info(Fore.GREEN + f"     Client Comm: {time_for_each_client[clientIP]['client_comm']}")
+        fed_logger.info(Fore.GREEN + f"     Edge-Server Comm: {time_for_each_client[clientIP]['edge_server_comm']}")
+        fed_logger.info(Fore.GREEN + f"     SUM: {total_time_for_each_client[clientIP]}")
+        fed_logger.info(Fore.GREEN + f"---------------------------------------------------------------------------")
 
     NICE_MIN = -20
     NICE_MAX = 19
@@ -579,6 +616,7 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
                    normalized_total_time_of_clients.items()}
 
     total_trainingTime = max(total_time_for_each_client.values())
+    fed_logger.info(Fore.GREEN + f"Action's Training Time: {total_trainingTime}")
 
     return (total_trainingTime, total_time_for_each_client, time_for_each_client, nice_values, comp_time_on_server,
             comp_time_on_each_edge, transmission_time_on_each_client, edge_server_transmission_time_for_each_client)
