@@ -853,37 +853,42 @@ class FedServer(FedServerInterface):
 
     def getFlopsOnEdgeAndServer(self):
         flop_on_server = 0
-        flop_on_each_edge = {}
-        flop_of_each_edge_on_server = {}
+        flop_on_each_edge = {edge: 0 for edge in config.EDGE_SERVER_LIST}
+        flop_of_each_edge_on_server = flop_on_each_edge
         flops_of_each_layer = self.model_flops_per_layer
         flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
         flops_of_each_layer = list(flops_of_each_layer.values())
 
         total_computation_time_on_server = self.total_computation_time
         if self.edge_based:
-            for edgeIP in config.EDGE_SERVER_LIST:
+            for clientIP in config.CLIENTS_LIST:
                 edge_flops = 0
                 flop_of_edge_on_server = 0
-                for clientIP in config.EDGE_MAP[edgeIP]:
-                    clientAction = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
-                    op1 = clientAction[0]
-                    op2 = clientAction[1]
+                edgeIP = config.CLIENT_MAP[clientIP]
+                clientAction = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
+                op1 = clientAction[0]
+                op2 = clientAction[1]
 
-                    # offloading on client, edge and server
-                    if op1 < op2 < config.model_len - 1:
-                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                        flop_of_edge_on_server += sum(flops_of_each_layer[op2 + 1:])
-                        flop_on_server += sum(flops_of_each_layer[op2 + 1:])
-                    # offloading on client and edge
-                    elif (op1 < op2) and op2 == config.model_len - 1:
-                        edge_flops += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-                    # offloading on client and server
-                    elif (op1 == op2) and op1 < config.model_len - 1:
-                        flop_on_server += sum(flops_of_each_layer[op2 + 1:])
-                        flop_of_edge_on_server += sum(flops_of_each_layer[op2 + 1:])
-                flop_on_each_edge[edgeIP] = edge_flops
-                flop_of_each_edge_on_server[edgeIP] = flop_of_edge_on_server
+                # offloading on client, edge and server
+                if op1 < op2 < config.model_len - 1:
+                    edge_flops = sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                    flop_of_edge_on_server = sum(flops_of_each_layer[op2 + 1:])
+                    flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+
+                # offloading on client and edge
+                elif (op1 < op2) and op2 == config.model_len - 1:
+                    edge_flops = sum(flops_of_each_layer[op1 + 1:op2 + 1])
+
+                # offloading on client and server
+                elif (op1 == op2) and op1 < config.model_len - 1:
+                    flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+                    flop_of_edge_on_server = sum(flops_of_each_layer[op2 + 1:])
+
+                flop_on_each_edge[edgeIP] += edge_flops
+                flop_of_each_edge_on_server[edgeIP] += flop_of_edge_on_server
+
             return flop_on_server, flop_on_each_edge, flop_of_each_edge_on_server
+
         else:
             for clientIP in config.CLIENTS_LIST:
                 clientOP = self.split_layers[config.CLIENTS_CONFIG[clientIP]]
