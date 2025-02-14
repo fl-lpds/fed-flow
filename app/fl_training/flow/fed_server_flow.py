@@ -113,29 +113,29 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
 
-    # low load on edge 90% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # medium load on edge 50% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # high load on edge 100% of each model on edge
-    op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # low load on server 90% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # medium load on server 50% of each model on client
-    op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
-    # high load on server 100% of each model on edge
-    op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
-    test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    # # low load on edge 90% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # medium load on edge 50% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # high load on edge 100% of each model on edge
+    # op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # low load on server 90% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # medium load on server 50% of each model on client
+    # op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+    #
+    # # high load on server 100% of each model on edge
+    # op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
+    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
     for layer in range(config.model_len - 1):
         test_load_on_edges_and_server.append(
@@ -240,12 +240,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info(Fore.GREEN + f"Receiving Clients' Attribute")
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
-            fed_logger.info(Fore.GREEN + f"==========================================================")
-            fed_logger.info(
-                Fore.GREEN + f"Clients    Comp Energy   Comm Energy   TT   Remaining Energy   Utilization   Comp On Edge   Total Comp On Edge")
-            for client in energy_tt_list.keys():
-                fed_logger.info(
-                    Fore.GREEN + f"{client}    {energy_tt_list[client][0]:.3f}   {energy_tt_list[client][1]:.3f}   {energy_tt_list[client][2]:.3f}   {energy_tt_list[client][3]:.3f}   {energy_tt_list[client][4]:.3f}   {energy_tt_list[client][5]:.3f}   {energy_tt_list[client][6]:.3f}")
 
             server.e_client_attendance(config.CLIENTS_LIST)
 
@@ -260,6 +254,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info(f"Server Sequential Transmission time: {server_sequential_transmission_time}")
             energy_estimation.reset_transmission_time()
 
+            fed_logger.info(Fore.GREEN + f"==========================================================")
+            fed_logger.info(
+                Fore.GREEN + f"Clients  CompE  CommE  CompTT CommTT  TotalTT  RemaiE  Utiliz  CompOnEdge  CompOnServer  TotalCompOnEdge")
             energy = 0
             for client in energy_tt_list.keys():
                 clientCompEnergy[client].append(energy_tt_list[client][0])
@@ -274,8 +271,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 clientRemainingEnergy[client].append(energy_tt_list[client][3])
                 clientUtilization[client].append(energy_tt_list[client][4])
                 comp_time_of_each_client_on_edge[client].append(server.computation_time_of_each_client_on_edges[client])
-                comp_time_of_each_client_on_server[client].append(server.computation_time_of_each_client[client])
+                comp_time_of_each_client_on_server[client].append(server.process_wall_time[client])
                 energy += (energy_tt_list[client][0] + energy_tt_list[client][1])
+
+                fed_logger.info(
+                    Fore.GREEN + f"{client}  {energy_tt_list[client][0]:.3f}  {energy_tt_list[client][1]:.3f}  {compTime:.3f}  {commTime:.3f}  {energy_tt_list[client][2]:.3f}  {energy_tt_list[client][3]:.3f}  {energy_tt_list[client][4]:.3f}  {energy_tt_list[client][5]:.3f}  {server.process_wall_time[client]:.3f}  {energy_tt_list[client][6]:.3f}")
 
             if config.K != 0:
                 avgEnergy.append(energy / int(config.K))
@@ -531,6 +531,9 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                flop_of_each_edge_on_server=None, flop_on_server=None, time_on_server=None, clientCompTime=None,
                clientCommTime=None, approximated_energy=None, approximated_tt=None,
                computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None):
+    device_colormap = plt.cm.get_cmap('tab10', len(config.CLIENTS_LIST))
+    edge_colormap = plt.cm.get_cmap('tab10', len(config.EDGE_SERVER_LIST))
+
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
         plt.title(f"Training time of FL Rounds")
@@ -565,14 +568,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientConsumedEnergy.keys():
             iotDevice_K = clientConsumedEnergy[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Consumed Energy of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Consumed Energy")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Consumed Energy"))
@@ -582,14 +581,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientCompEnergy.keys():
             iotDevice_K = clientCompEnergy[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Computation Energy of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Computation Energy consumed")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Computation Energy"))
@@ -599,14 +594,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientCommEnergy.keys():
             iotDevice_K = clientCommEnergy[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Communication energy of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("communication energy")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Communication Energy"))
@@ -616,14 +607,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientCompTime.keys():
             iotDevice_K = clientCompTime[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Computation Time of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Computation energy")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Computation time of client"))
@@ -633,14 +620,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientCommTime.keys():
             iotDevice_K = clientCommTime[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Communication Time of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Communication energy")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Communication time of client"))
@@ -650,14 +633,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientTT.keys():
             iotDevice_K = clientTT[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Total time on client")
             plt.xlabel("FL Round")
             plt.ylabel("total time")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"total time on each client"))
@@ -667,14 +646,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in remainingEnergy.keys():
             iotDevice_K = remainingEnergy[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Remaining Energy of iot devices")
             plt.xlabel("timestep")
             plt.ylabel("remaining energy")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Remaining Energies"))
@@ -684,14 +659,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientUtilization.keys():
             iotDevice_K = clientUtilization[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Mean Utilization of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Utilization")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"client utilization"))
@@ -701,14 +672,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientBW.keys():
             iotDevice_K = clientBW[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"BW of iot devices")
             plt.xlabel("timestep")
             plt.ylabel("BW")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"clientBW"))
@@ -718,14 +685,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in edge_serverBW.keys():
             edgeDevice_K = edge_serverBW[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"BW of edge devices")
             plt.xlabel("timestep")
             plt.ylabel("BW")
-            plt.plot(edgeDevice_K, color=color, linewidth='3', label=f"Edge Device: {k}")
+            plt.plot(edgeDevice_K, color=edge_colormap(config.EDGE_SERVER_LIST.index(k)), linewidth='3', label=f"Edge Device: {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"edge_serverBW"))
@@ -735,14 +698,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in computation_time_of_each_client_on_edge.keys():
             iotDevice_K = computation_time_of_each_client_on_edge[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Comp time of iot device on edge")
             plt.xlabel("Round")
             plt.ylabel("Time (S)")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Comp time on edge"))
@@ -752,14 +711,10 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in computation_time_of_each_client_on_server.keys():
             iotDevice_K = computation_time_of_each_client_on_server[k]
-            r = random.random()
-            b = random.random()
-            g = random.random()
-            color = (r, g, b)
             plt.title(f"Comp Time of each iot device on server")
             plt.xlabel("Round")
             plt.ylabel("Time (S)")
-            plt.plot(iotDevice_K, color=color, linewidth='3', label=f"Device {k}")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"Comp time on server"))
