@@ -595,6 +595,7 @@ class FedServer(FedServerInterface):
                  "edge_bw": self.edge_bandwidth,
                  "client_remaining_energy": client_remaining_energy,
                  "flops_of_each_layer": self.model_flops_per_layer,
+                 "best_tt_splitting_found": self.best_tt_splitting_found
                  }
 
         return state

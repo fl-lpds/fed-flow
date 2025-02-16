@@ -75,6 +75,8 @@ class FedServerInterface(ABC, Communicator):
         self.gradient_size = {}
         self.model_flops_per_layer = {}
 
+        self.best_tt_splitting_found = {'splitting': [], 'time': 0}
+
     @abstractmethod
     def edge_offloading_train(self, client_ips, hasPriority=False):
         pass
