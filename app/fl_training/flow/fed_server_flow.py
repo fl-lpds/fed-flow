@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import random
 import os
 import csv
+import json
 
 
 def run_edge_based_no_offload(server: FedServerInterface, LR, options):
@@ -183,6 +184,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             fed_logger.info("getting state")
             offloading = server.split_layers
 
+            fed_logger.info("creating state")
             state = server.edge_based_state()
 
             if r < len(test_load_on_edges_and_server) and options.get('splitting') == 'edge_based_heuristic':
@@ -190,9 +192,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 server.nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
             else:
                 fed_logger.info("splitting")
-                splitTime_start = time.process_time()
+                splitTime_start = time.time()
                 server.split(state, options)
-                splittingTime = time.process_time() - splitTime_start
+                splittingTime = time.time() - splitTime_start
                 fed_logger.info(Fore.MAGENTA + f"Splitting Time : {splittingTime}")
                 fed_logger.info(Fore.MAGENTA + f"Action : {server.split_layers}")
                 fed_logger.info(Fore.MAGENTA + f"Nice Value : {server.nice_value}")
@@ -285,11 +287,18 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             tt.append(training_time)
 
             if server.simnet:
-                simnet_tt.append(server.simnetTrainingTimeCalculation(aggregation_time,
-                                                                      server_sequential_transmission_time,
-                                                                      energy_tt_list))
+                simulatedTT = server.simnetTrainingTimeCalculation(aggregation_time,
+                                                                   server_sequential_transmission_time,
+                                                                   energy_tt_list)
+                simnet_tt.append(simulatedTT)
+                if simulatedTT < server.best_tt_splitting_found['time']:
+                    server.best_tt_splitting_found['time'] = simulatedTT
+                    server.best_tt_splitting_found['splitting'] = server.split_layers
 
-            fed_logger.info(f"Wall-time: {training_time}")
+                fed_logger.info(f"Simulated training time: {simulatedTT}")
+            else:
+                fed_logger.info(f"Training time: {training_time}")
+
             fed_logger.info(f"Process-Time: {total_process_time}")
 
             server_flop, each_edge_flop, flop_of_each_edges_on_server = server.getFlopsOnEdgeAndServer()
@@ -317,7 +326,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                        flop_on_each_edge, time_on_each_edge, flop_of_each_edge_on_server, flop_on_server,
                        time_on_server, clientCompTime, clientCommTime, server.approximated_energy_of_actions,
                        server.approximated_tt_of_actions, comp_time_of_each_client_on_edge,
-                       comp_time_of_each_client_on_server)
+                       comp_time_of_each_client_on_server, splitting=server.split_layers)
         else:
             break
 
@@ -530,9 +539,22 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                clientUtilization=None, accuracy=None, flop_on_each_edge=None, time_on_each_edge=None,
                flop_of_each_edge_on_server=None, flop_on_server=None, time_on_server=None, clientCompTime=None,
                clientCommTime=None, approximated_energy=None, approximated_tt=None,
-               computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None):
+               computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None,
+               splitting=None):
     device_colormap = plt.cm.get_cmap('tab10', len(config.CLIENTS_LIST))
     edge_colormap = plt.cm.get_cmap('tab10', len(config.EDGE_SERVER_LIST))
+
+    new_memory = {
+        'splitting': splitting,
+        'clientInfo': {client: {} for client in config.CLIENTS_LIST},
+        'edgeInfo': {edge: {} for edge in config.EDGE_SERVER_LIST},
+        'serverInfo': {}
+    }
+    for edge in config.EDGE_SERVER_LIST:
+        new_memory['edgeInfo'][edge]['flopOnEdge'] = flop_on_each_edge[edge][-1]
+        new_memory['edgeInfo'][edge]['timeOnEdge'] = time_on_each_edge[edge][-1]
+    new_memory['serverInfo']['flopOnServer'] = flop_on_server[-1]
+    new_memory['serverInfo']['timeOnServer'] = time_on_server[-1]
 
     if len(simnet_tt) > 0:
         plt.figure(figsize=(int(10), int(5)))
@@ -607,6 +629,9 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientCompTime.keys():
             iotDevice_K = clientCompTime[k]
+
+            new_memory['clientInfo'][k]['clientCompTime'] = iotDevice_K[-1]
+
             plt.title(f"Computation Time of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Computation energy")
@@ -620,6 +645,9 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in clientCommTime.keys():
             iotDevice_K = clientCommTime[k]
+
+            new_memory['clientInfo'][k]['clientCommTime'] = iotDevice_K[-1]
+
             plt.title(f"Communication Time of iot devices")
             plt.xlabel("FL Round")
             plt.ylabel("Communication energy")
@@ -688,7 +716,8 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             plt.title(f"BW of edge devices")
             plt.xlabel("timestep")
             plt.ylabel("BW")
-            plt.plot(edgeDevice_K, color=edge_colormap(config.EDGE_SERVER_LIST.index(k)), linewidth='3', label=f"Edge Device: {k}")
+            plt.plot(edgeDevice_K, color=edge_colormap(config.EDGE_SERVER_LIST.index(k)), linewidth='3',
+                     label=f"Edge Device: {k}")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"edge_serverBW"))
@@ -698,6 +727,9 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in computation_time_of_each_client_on_edge.keys():
             iotDevice_K = computation_time_of_each_client_on_edge[k]
+
+            new_memory['clientInfo'][k]['edgeCompTime'] = iotDevice_K[-1]
+
             plt.title(f"Comp time of iot device on edge")
             plt.xlabel("Round")
             plt.ylabel("Time (S)")
@@ -711,6 +743,9 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.figure(figsize=(int(25), int(5)))
         for k in computation_time_of_each_client_on_server.keys():
             iotDevice_K = computation_time_of_each_client_on_server[k]
+
+            new_memory['clientInfo'][k]['serverCompTime'] = iotDevice_K[-1]
+
             plt.title(f"Comp Time of each iot device on server")
             plt.xlabel("Round")
             plt.ylabel("Time (S)")
@@ -781,6 +816,22 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
             writer = csv.writer(file)
             writer.writerows(array)
         model_utils.createFlopsPredictionModel(flop_time_csv_path='/fed-flow/Graphs/server_flop_time.csv', isEdge=False)
+
+    # saving history
+    MEMORY_FILE = "/fed-flow/app/model/memory.json"
+    try:
+        # Load existing memory
+        with open(MEMORY_FILE, "r") as f:
+            memory = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        memory = {'history': []}  # Create new memory if file doesn't exist
+
+        # Append new decision
+    memory["history"].append(new_memory)
+
+    # Save back to JSON
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(memory, f, indent=4)
 
 
 def run(options_ins):
