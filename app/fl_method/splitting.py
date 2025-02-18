@@ -1,3 +1,5 @@
+import copy
+import json
 import random
 
 import joblib
@@ -77,6 +79,8 @@ def edge_based_heuristic_splitting(state: dict, label):
     total_time_on_server = sum(comp_time_of_each_client_on_server.values())
     action = previous_action
 
+    best_tt_splitting_found = state['best_tt_splitting_found']
+
     fed_logger.info(Fore.GREEN + f"STATE:")
     fed_logger.info(Fore.GREEN + f"=============================================================================")
     fed_logger.info(Fore.GREEN + f"Previous action: {action}")
@@ -95,14 +99,14 @@ def edge_based_heuristic_splitting(state: dict, label):
     batchNumber = (config.N / len(config.CLIENTS_CONFIG.keys())) / config.B
     score_estimation_action = [[4, config.model_len - 1] for client in config.CLIENTS_CONFIG.keys()]
 
-    each_splitting_share = {}
+    each_splitting_share = {op1: {op2: {} for op2 in range(op1, config.model_len)} for op1 in range(config.model_len)}
     max_computation_on_client = sum(flops_of_each_layer)
     max_computation_on_edge_and_server = sum(flops_of_each_layer[1:])
     max_comm = 2 * batchNumber * max(activation_size.values())
 
     for op1 in range(config.model_len):
         for op2 in range(op1, config.model_len):
-            each_splitting_share[f'{op1}, {op2}'] = {
+            each_splitting_share[op1][op2] = {
                 'client_comp': sum(flops_of_each_layer[:op1 + 1]) / max_computation_on_client,
                 'edge_comp': sum(flops_of_each_layer[op1 + 1:op2 + 1]) / max_computation_on_edge_and_server,
                 'server_comp': sum(flops_of_each_layer[op2 + 1:]) / max_computation_on_edge_and_server,
@@ -250,7 +254,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.MAGENTA + f"Current Round: {config.current_round}, model_len: {config.model_len}")
 
         if config.current_round == config.model_len:
-            action = [[op1s[0][0], random.randint(op1s[0][0], config.model_len - 1)] for client, op1s in
+            action = [[op1s[0][0], config.model_len - 1] for client, op1s in
                       min_energy_splitting_for_each_client.items()]
             return action, 0, 0, 0
         best_action_found = None
@@ -258,12 +262,8 @@ def edge_based_heuristic_splitting(state: dict, label):
         satisfied = False
         notFound = False
 
-        new_action = [[op1s[0][0], previous_action[config.CLIENTS_CONFIG[client]][1] if
-        previous_action[config.CLIENTS_CONFIG[client]][1] >= op1s[0][0] else random.randint(op1s[0][0],
-                                                                                            config.model_len - 1)] for
-                      client, op1s in min_energy_splitting_for_each_client.items()]
         prev_action_tt, prev_action_each_client_total_tt, prev_action_each_client_tt, _, _, _, _, _ = (
-            trainingTimeEstimator(action, client_comp_time, client_bw, edge_server_bw, flops_of_each_layer,
+            trainingTimeEstimator(previous_action, client_comp_time, client_bw, edge_server_bw, flops_of_each_layer,
                                   activation_size, total_model_size, batchNumber, edge_poly_model, server_poly_model,
                                   comp_time_of_each_client_on_edges, comp_time_of_each_client_on_server))
 
@@ -277,14 +277,18 @@ def edge_based_heuristic_splitting(state: dict, label):
 
         # Phase 1: Finding bottleneck devices
         bad_clients = {client: time for client, time in prev_action_each_client_total_tt.items() if time > baseline_tt}
-        bad_clients_cluster = {edge: [] for edge in config.EDGE_SERVER_LIST}
-        for bad_client in bad_clients:
-            bad_clients_cluster[config.CLIENT_MAP[bad_client]].append(bad_client)
+        bad_clients_cluster = {
+            edge: {'edge_comp': [], 'client_comp': [], 'server_comp': [], 'client_comm': [], 'edge_server_comm': []} for
+            edge in config.EDGE_SERVER_LIST}
+
+        # for bad_client in bad_clients:
+        #     bad_clients_cluster[config.CLIENT_MAP[bad_client]].append(bad_client)
 
         fed_logger.info(Fore.MAGENTA + f"Bad Clients: {bad_clients}")
         fed_logger.info(Fore.MAGENTA + f"Bad Clients' edge : {bad_clients_cluster}")
 
-        shares = {}
+        shares = {client: {} for client in config.CLIENTS_LIST}
+        bottlenecks = {client: [] for client in config.CLIENTS_LIST}
         # finding slow part of training of bad device and try to solve it
         for client in bad_clients.keys():
             op1 = previous_action[config.CLIENTS_CONFIG[client]][0]
@@ -308,6 +312,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                               'server_comp': server_comp_share,
                               'client_comm': client_comm_share,
                               'edge_server_comm': edge_server_comm_share}
+            bottlenecks[client] = sorted(shares[client].items(), key=lambda item: item[1], reverse=True)
 
             fed_logger.info(Fore.MAGENTA + f"{client} SHARES: {shares}")
             fed_logger.info(Fore.MAGENTA + f"Client comp time: {prev_action_each_client_tt[client]['client_comp']}")
@@ -316,6 +321,58 @@ def edge_based_heuristic_splitting(state: dict, label):
             fed_logger.info(Fore.MAGENTA + f"Client comm time: {prev_action_each_client_tt[client]['client_comm']}")
             fed_logger.info(
                 Fore.MAGENTA + f"Edge-Server comm time: {prev_action_each_client_tt[client]['edge_server_comm']}")
+            fed_logger.info(Fore.MAGENTA + f"Client Bottleneck: {bottlenecks[client]}")
+            bad_client_obj = {'client': client,
+                              'bottleneck_time': prev_action_each_client_tt[client][bottlenecks[client][0]]}
+            bad_clients_cluster[config.CLIENT_MAP[client]][bottlenecks[client][0]].append(bad_client_obj)
+
+        new_action = copy.deepcopy(previous_action)
+        for edgeCluster in bad_clients_cluster.keys():
+            for client in bad_clients_cluster[edgeCluster]['edge_comp']:
+
+                # we should try to reduce the load from this edge
+                currentOffloading = previous_action[config.CLIENTS_CONFIG[client]]
+                currentOffloadingShares = each_splitting_share[currentOffloading[0]][currentOffloading[1]]
+                sorted_op2_by_edge_comp = sorted(each_splitting_share[currentOffloading[0]].items(),
+                                                 key=lambda item: item[1]['edge_comp'], reverse=True)
+                for op2, shares in sorted_op2_by_edge_comp:
+                    if shares['edge_comp'] < currentOffloadingShares['edge_comp']:
+                        new_action[config.CLIENTS_CONFIG[client]][1] = op2
+
+            for client in bad_clients_cluster[edgeCluster]['server_comp']:
+                currentOffloading = previous_action[config.CLIENTS_CONFIG[client]]
+                currentOffloadingShares = each_splitting_share[currentOffloading[0]][currentOffloading[1]]
+                sorted_op2_by_server_comp = sorted(each_splitting_share[currentOffloading[0]].items(),
+                                                   key=lambda item: item[1]['server_comp'], reverse=True)
+                for op2, shares in sorted_op2_by_server_comp:
+                    if shares['server_comp'] < currentOffloadingShares['server_comp']:
+                        new_action[config.CLIENTS_CONFIG[client]][1] = op2
+            for client in bad_clients_cluster[edgeCluster]['client_comp']:
+                currentOffloading = previous_action[config.CLIENTS_CONFIG[client]]
+                currentOffloadingShares = each_splitting_share[currentOffloading[0]][currentOffloading[1]]
+
+                for optimalOp1, energy in min_energy_splitting_for_each_client[client]:
+                    if optimalOp1 < currentOffloading[0]:
+                        new_action[config.CLIENTS_CONFIG[client]] = [optimalOp1, config.model_len - 1]
+                # # Extract and sort based on 'edge_comp'
+                # sorted_op1_by_client_comp = sorted(
+                #     [(outer_k, inner_k, values) for outer_k, inner_dict in each_splitting_share.items() for
+                #      inner_k, values in
+                #      inner_dict.items()], key=lambda x: x[2]['client_comp'], reverse=True)
+                #
+                # # Convert to list format
+                # sorted_list = [{outer_k: {inner_k: values}} for outer_k, inner_k, values in sorted_op1_by_client_comp]
+                # for obj in sorted_list:
+                #     op1 = list(obj.keys())[0]
+                #     op2 = list(obj[op1].keys())[0]
+                #     for optimalOp1, energy in min_energy_splitting_for_each_client[client]:
+                #         if optimalOp1 < op1:
+                #             new_action[config.CLIENTS_CONFIG[client]] = [op1, op2]
+                #     if each_splitting_share[op1][op2]['client_comp'] < currentOffloadingShares['client_comp']:
+            for client in bad_clients_cluster[edgeCluster]['client_comm']:
+                pass
+            for client in bad_clients_cluster[edgeCluster]['edge_server_comm']:
+                pass
 
         return previous_action, 0, 0, 0
 
@@ -550,15 +607,18 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
 
         if op1 != config.model_len - 1:
             transmission_time_on_each_client[clientIP] = ((2 * (activation_size[op1]) * batchNumber)
-                                                          / clients_bw[clientIP])
+                                                          / clients_bw[clientIP]) + (
+                                                                 (2 * total_model_size) / clients_bw[clientIP])
         else:
-            transmission_time_on_each_client[clientIP] = total_model_size / clients_bw[clientIP]
+            transmission_time_on_each_client[clientIP] = 2 * (total_model_size / clients_bw[clientIP])
 
         if op2 != config.model_len - 1:
             edge_server_transmission_time_for_each_client[clientIP] = ((2 * (activation_size[op2]) * batchNumber) /
-                                                                       edge_server_bw[edgeIP])
+                                                                       edge_server_bw[edgeIP]) + (
+                                                                              (2 * total_model_size) / edge_server_bw[
+                                                                          clientIP])
         else:
-            edge_server_transmission_time_for_each_client[clientIP] = total_model_size / edge_server_bw[edgeIP]
+            edge_server_transmission_time_for_each_client[clientIP] = 2 * (total_model_size / edge_server_bw[edgeIP])
 
         # offloading on client, edge and server
         if op1 < op2 < config.model_len - 1:
@@ -620,3 +680,55 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
 
     return (total_trainingTime, total_time_for_each_client, time_for_each_client, nice_values, comp_time_on_server,
             comp_time_on_each_edge, transmission_time_on_each_client, edge_server_transmission_time_for_each_client)
+
+#
+# def triedBefore(current_splitting):
+#     memory = load_memory('/fed-flow/app/model/memory.json')['history']
+#     for item in memory:
+#         memory_splitting = item['splitting']
+#         if memory_splitting == current_splitting:
+#             client_info = item['client_info']
+#             edges_info = item['edge_info']
+#             server_info = item['server_info']
+#             return client_info, edges_info, server_info
+#     return None
+#
+#
+# def load_memory(memory_path):
+#     try:
+#         with open(memory_path, "r") as f:
+#             return json.load(f)
+#     except (FileNotFoundError, json.JSONDecodeError):
+#         return {"history": []}  # Return empty memory if file doesn't exist
+#
+#
+# def compareCurrentSplittingWithMemory(current_splitting: list, client_remaining_energy, flop_of_each_layer,
+#                                       compare_aspect: str, edge_name: str = None):
+#     memory = load_memory(memory_path='/fed-flow/app/model/memory.json')['history']
+#
+#     current_load_of_each_client_on_edge = {}
+#     current_total_load_on_edge = 0
+#     if compare_aspect == 'edge' and edge_name is None:
+#         for clientIP in config.EDGE_MAP[edge_name]:
+#             if client_remaining_energy[clientIP] > 1:
+#                 op1 = current_splitting[config.CLIENTS_CONFIG[clientIP]][0]
+#                 op2 = current_splitting[config.CLIENTS_CONFIG[clientIP]][1]
+#                 current_load_of_each_client_on_edge[clientIP] = sum(flop_of_each_layer[op1 + 1: op2 + 1])
+#         current_total_load_on_edge = sum(current_load_of_each_client_on_edge.values())
+#
+#     similar_splitting_in_memory = []
+#     memory_load_of_each_client_on_edge = {}
+#     for item in memory:
+#         memory_splitting = item['splitting']
+#         client_info = item['client_info']
+#         edges_info = item['edge_info']
+#         server_info = item['server_info']
+#
+#         if compare_aspect == 'edge':
+#             if edge_name is None:
+#                 raise Exception('Edge name cannot be None')
+#             memory_edge_load = edges_info[edge_name]['flopOnEdge']
+#             for clientIP in config.EDGE_MAP[edge_name]:
+#                 op1 = memory_splitting[config.CLIENTS_CONFIG[clientIP]][0]
+#                 op2 = memory_splitting[config.CLIENTS_CONFIG[clientIP]][1]
+#                 memory_load_of_each_client_on_edge[clientIP] = sum(flop_of_each_layer[op1 + 1: op2 + 1])
