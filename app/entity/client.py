@@ -357,7 +357,7 @@ class Client(FedClientInterface):
             msg = [message_utils.energy_client_to_server() + '_' + socket.gethostname(), comp_energy, comm_energy, tt,
                    remaining_energy, utilization]
 
-        fed_logger.debug(f"check message in client: {msg}")
+        fed_logger.info(Fore.GREEN + f"check message in client: {msg}, URL: {url}")
 
         self.send_msg(config.CLIENTS_INDEX[config.index], msg, url=url)
 

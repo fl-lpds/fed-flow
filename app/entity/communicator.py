@@ -67,7 +67,7 @@ class Communicator(object):
                 continue
         # self.connection = self.connect(url)
         # self.connection.ioloop.start()
-        fed_logger.debug("connection established")
+        fed_logger.info(Fore.YELLOW + f"connection to {url} established")
         return channel, connection
 
     def connect(self, url):

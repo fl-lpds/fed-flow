@@ -95,7 +95,7 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
             fed_logger.info(
                 "receiving Comp Energy, Comm Energy, TT, Remaining-energy, utilization from clients and sending to server")
             server.energy(client_ips)
-
+            fed_logger.info(Fore.GREEN + f"Clients' attributes received")
             if r > 49:
                 LR = config.LR * 0.1
 

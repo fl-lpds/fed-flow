@@ -56,6 +56,8 @@ class FedEdgeServer(FedEdgeServerInterface):
         config.current_round = sharedData['current_round']
         comp_time = 0
         wall_time_comp_time = 0
+        fed_logger.info(
+            Fore.GREEN + f"{str(client_ip)} offloading training started, splitting: {self.split_layers[config.CLIENTS_CONFIG.get(client_ip)]}")
 
         msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
                             url=config.EDGE_SERVER_CONFIG[config.index])
