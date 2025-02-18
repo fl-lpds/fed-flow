@@ -67,7 +67,7 @@ class FedEdgeServerInterface(ABC, Communicator):
         pass
 
     @abstractmethod
-    def local_weights(self, client_ip):
+    def local_weights(self, client_ip, sharedData):
         """
         receive and send final weights for aggregation
         """

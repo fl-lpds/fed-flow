@@ -56,9 +56,11 @@ class FedEdgeServer(FedEdgeServerInterface):
         config.current_round = sharedData['current_round']
         comp_time = 0
         wall_time_comp_time = 0
+        config.index = sharedData['edge_index']
         fed_logger.info(
             Fore.GREEN + f"{str(client_ip)} offloading training started, splitting: {self.split_layers[config.CLIENTS_CONFIG.get(client_ip)]}")
-
+        fed_logger.info(
+            Fore.GREEN + f"URL of rec msg: {config.EDGE_SERVER_CONFIG[config.index]}, index: {config.index}, EDGE_SERVER_CONFIG: {config.EDGE_SERVER_CONFIG}")
         msg = self.recv_msg(client_ip, f'{message_utils.local_iteration_flag_client_to_edge()}_{i}_{client_ip}',
                             url=config.EDGE_SERVER_CONFIG[config.index])
         flag = msg[1]
@@ -266,10 +268,11 @@ class FedEdgeServer(FedEdgeServerInterface):
         #         self.send_msg(self.socks[socket.gethostbyname(client_ip)], msg,
         #                       url=config.EDGE_SERVER_CONFIG[config.index])
 
-    def local_weights(self, client_ip):
+    def local_weights(self, client_ip, sharedData):
         """
         receive and send final weights for aggregation
         """
+        config.index = sharedData['edge_index']
         cweights = self.recv_msg(client_ip,
                                  message_utils.local_weights_client_to_edge(),
                                  True,
@@ -354,7 +357,7 @@ class FedEdgeServer(FedEdgeServerInterface):
     def thread_offload_training(self, client_ip, sharedData):
         start_time = time.time()
         self.forward_propagation(client_ip, sharedData)
-        self.local_weights(client_ip)
+        self.local_weights(client_ip, sharedData)
         process_wall_time = time.time() - start_time
         sharedData['process_wall_time'][client_ip] = process_wall_time
 

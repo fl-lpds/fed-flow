@@ -67,7 +67,9 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
                 shared_data['computation_time_of_each_client'] = server.communication_time_of_each_client
                 shared_data['current_round'] = config.current_round
                 shared_data['process_wall_time'] = server.process_wall_time
+                shared_data['edge_index'] = config.index
                 fed_logger.info(Fore.RED + f"shared data: {shared_data}")
+                fed_logger.info(Fore.RED + f"Edge Index: {config.index}")
 
                 processes = {}
                 for i in range(len(client_ips)):
