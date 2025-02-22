@@ -67,7 +67,7 @@ class Communicator(object):
                 continue
         # self.connection = self.connect(url)
         # self.connection.ioloop.start()
-        fed_logger.info(Fore.YELLOW + f"connection to {url} established")
+        # fed_logger.info(Fore.YELLOW + f"connection to {url} established")
         return channel, connection
 
     def connect(self, url):
@@ -80,9 +80,9 @@ class Communicator(object):
             pass
 
     def on_connection_open(self, _unused_connection):
-        fed_logger.info("opened")
+        fed_logger.debug("opened")
         self.channel = self.connection.channel()
-        fed_logger.info("connected")
+        fed_logger.debug("connected")
 
     def reconnect(self, _unused_connection: pika.BlockingConnection, channel):
         if _unused_connection is not None and not self.should_close and (_unused_connection.is_closed):
