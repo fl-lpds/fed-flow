@@ -679,7 +679,7 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
             edge_server_transmission_time_for_each_client[clientIP] = ((2 * (activation_size[op2]) * batchNumber) /
                                                                        edge_server_bw[edgeIP]) + (
                                                                               (2 * total_model_size) / edge_server_bw[
-                                                                          clientIP])
+                                                                          edgeIP])
         else:
             edge_server_transmission_time_for_each_client[clientIP] = 2 * (total_model_size / edge_server_bw[edgeIP])
 
