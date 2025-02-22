@@ -1,4 +1,3 @@
-import os
 import sys
 import threading
 import time
@@ -717,8 +716,6 @@ class FedServer(FedServerInterface):
         fed_logger.info(Fore.MAGENTA + f"Each layer activation (bit): {self.activation_size}")
         fed_logger.info(Fore.MAGENTA + f"Each layer gradient (bit): {self.gradient_size}")
 
-
-
     def calculate_each_layer_FLOP(self):
         def count_relu_flops(input_shape) -> int:
             """Calculate FLOPS for ReLU layer."""
@@ -860,6 +857,9 @@ class FedServer(FedServerInterface):
         flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
         flops_of_each_layer = list(flops_of_each_layer.values())
 
+        flop_of_each_client_on_edge = {client: 0 for client in config.CLIENTS_LIST}
+        flop_of_each_client_on_server = {client: 0 for client in config.CLIENTS_LIST}
+
         total_computation_time_on_server = self.total_computation_time
         if self.edge_based:
             for clientIP in config.CLIENTS_LIST:
@@ -875,20 +875,24 @@ class FedServer(FedServerInterface):
                     edge_flops = sum(flops_of_each_layer[op1 + 1:op2 + 1])
                     flop_of_edge_on_server = sum(flops_of_each_layer[op2 + 1:])
                     flop_on_server += sum(flops_of_each_layer[op2 + 1:])
+                    flop_of_each_client_on_edge[clientIP] = edge_flops
+                    flop_of_each_client_on_server[clientIP] = sum(flops_of_each_layer[op2 + 1:])
 
                 # offloading on client and edge
                 elif (op1 < op2) and op2 == config.model_len - 1:
                     edge_flops = sum(flops_of_each_layer[op1 + 1:op2 + 1])
+                    flop_of_each_client_on_edge[clientIP] = edge_flops
 
                 # offloading on client and server
                 elif (op1 == op2) and op1 < config.model_len - 1:
                     flop_on_server += sum(flops_of_each_layer[op2 + 1:])
                     flop_of_edge_on_server = sum(flops_of_each_layer[op2 + 1:])
+                    flop_of_each_client_on_server[clientIP] = sum(flops_of_each_layer[op2 + 1:])
 
                 flop_on_each_edge[edgeIP] += edge_flops
                 flop_of_each_edge_on_server[edgeIP] += flop_of_edge_on_server
 
-            return flop_on_server, flop_on_each_edge, flop_of_each_edge_on_server
+            return flop_on_server, flop_on_each_edge, flop_of_each_edge_on_server, flop_of_each_client_on_edge, flop_of_each_client_on_server
 
         else:
             for clientIP in config.CLIENTS_LIST:
@@ -898,7 +902,7 @@ class FedServer(FedServerInterface):
                 if clientOP < config.model_len - 1:
                     flop_on_server += sum(flops_of_each_layer[clientOP + 1:])
 
-            return flop_on_server, None, None
+            return flop_on_server, None, None, None, None
 
     def remove_non_pickleable(self):
         self.calculate_each_layer_activation_gradiant_size = None
