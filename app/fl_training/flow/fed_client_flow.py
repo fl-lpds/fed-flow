@@ -31,7 +31,7 @@ def run_edge_based(client: FedClientInterface, LR):
     for r in range(config.R):
         base_bw = 50_000_000
         if config.index == 0:
-            simnet_BW = 1_000_000
+            simnet_BW = 50_000_000
         else:
             simnet_BW = base_bw
         energy_estimation.set_simnet(simnet_BW)
