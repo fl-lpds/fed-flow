@@ -922,7 +922,7 @@ class FedServer(FedServerInterface):
                 trainingTime_simnetBW = max(total_time_for_each_client.values())
                 fed_logger.info(f"Training time of each client : {total_time_for_each_client}")
                 fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
-                return trainingTime_simnetBW
+                return trainingTime_simnetBW, total_time_for_each_client
             else:
                 fed_logger.info("All Clients had been Turned off.")
                 return 0
@@ -941,7 +941,7 @@ class FedServer(FedServerInterface):
                                          + aggregation_time + server_sequential_transmission_time)
 
                 fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
-                return trainingTime_simnetBW
+                return trainingTime_simnetBW, total_time_for_each_client
             else:
                 fed_logger.info("All Clients had been Turned off.")
                 return 0

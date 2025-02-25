@@ -276,7 +276,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 clientCompTime[client].append(compTime)
                 clientCommTime[client].append(commTime)
                 clientConsumedEnergy[client].append(energy_tt_list[client][0] + energy_tt_list[client][1])
-                clientTT[client].append(energy_tt_list[client][2])
                 clientRemainingEnergy[client].append(energy_tt_list[client][3])
                 clientUtilization[client].append(energy_tt_list[client][4])
                 comp_time_of_each_client_on_edge[client].append(server.computation_time_of_each_client_on_edges[client])
@@ -294,9 +293,11 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             tt.append(training_time)
 
             if server.simnet:
-                simulatedTT = server.simnetTrainingTimeCalculation(aggregation_time,
-                                                                   server_sequential_transmission_time,
-                                                                   energy_tt_list)
+                simulatedTT, total_tt_of_each_client = server.simnetTrainingTimeCalculation(aggregation_time,
+                                                                                            server_sequential_transmission_time,
+                                                                                            energy_tt_list)
+                for client in energy_tt_list.keys():
+                    clientTT[client].append(total_tt_of_each_client[client])
                 simnet_tt.append(simulatedTT)
                 if simulatedTT < server.best_tt_splitting_found['time']:
                     server.best_tt_splitting_found['time'] = simulatedTT
@@ -443,7 +444,6 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
                 clientCompTime[client].append(compTime)
                 clientCommTime[client].append(commTime)
                 clientConsumedEnergy[client].append(energy_tt_list[client][0] + energy_tt_list[client][1])
-                clientTT[client].append(energy_tt_list[client][2])
                 clientRemainingEnergy[client].append(energy_tt_list[client][3])
                 clientUtilization[client].append(energy_tt_list[client][4])
                 comp_time_of_each_client_on_server[client].append(server.computation_time_of_each_client[client])
@@ -456,9 +456,13 @@ def run_no_edge_offload(server: FedServerInterface, LR, options):
                 avgEnergy.append(0)
 
             if server.simnet:
-                simnet_tt.append(server.simnetTrainingTimeCalculation(aggregation_time,
-                                                                      0,
-                                                                      energy_tt_list, edgeBased=False))
+                simulatedTT, total_tt_of_each_client = server.simnetTrainingTimeCalculation(aggregation_time,
+                                                                                            0,
+                                                                                            energy_tt_list,
+                                                                                            edgeBased=False)
+                for client in energy_tt_list.keys():
+                    clientTT[client].append(total_tt_of_each_client[client])
+                simnet_tt.append(simulatedTT)
 
             server_flop, _, _ = server.getFlopsOnEdgeAndServer()
             flop_on_server.append(server_flop)
@@ -579,7 +583,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.xlabel("Round")
         plt.ylabel("Training time(s)")
         plt.plot(simnet_tt, color='blue', linewidth='3', label="SIMNET training time")
-        plt.plot(tt, color='red', linewidth='3', label="Real training time")
+        # plt.plot(tt, color='red', linewidth='3', label="Real training time")
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"trainingTime"))
