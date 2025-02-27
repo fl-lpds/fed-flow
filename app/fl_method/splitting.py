@@ -750,9 +750,9 @@ def triedBefore(current_splitting):
     for item in memory:
         memory_splitting = item['splitting']
         if memory_splitting == current_splitting:
-            client_info = item['client_info']
-            edges_info = item['edge_info']
-            server_info = item['server_info']
+            client_info = item['clientInfo']
+            edges_info = item['edgeInfo']
+            server_info = item['serverInfo']
             return client_info, edges_info, server_info
     return None
 
