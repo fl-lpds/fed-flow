@@ -27,15 +27,31 @@ class Communicator(object):
         self.send_bug = False
 
     def close_connection(self, ch, c):
-        self.should_close = True
-        if ch.is_open:
-            ch.close()
-        if c.is_open:
-            c.close()
-        while not (c.is_closed and ch.close):
-            pass
-        self.should_close = False
-        # self.connection = None
+        max_retries = 100
+        retry_delay = 5  # seconds
+        for attempt in range(max_retries):
+            try:
+                self.should_close = True
+                if ch.is_open:
+                    ch.close()
+                if c.is_open:
+                    c.close()
+                while not (c.is_closed and ch.close):
+                    pass
+                self.should_close = False
+            except pika.exceptions.ConnectionClosedByBroker as e:
+                fed_logger.warning(
+                    Fore.YELLOW + f"Error in closing connection. Attempt {attempt + 1}/{max_retries}. Retrying in {retry_delay}s.")
+                time.sleep(retry_delay)
+            except pika.exceptions.StreamLostError as e:
+                fed_logger.warning(
+                    Fore.YELLOW + f"Error in closing connection. Attempt {attempt + 1}/{max_retries}. Retrying in {retry_delay}s.")
+                time.sleep(retry_delay)
+            except Exception as e:
+                fed_logger.warning(
+                    Fore.YELLOW + f"Error in closing connection. Attempt {attempt + 1}/{max_retries}. Retrying in {retry_delay}s.")
+                time.sleep(retry_delay)
+                # self.connection = None
         # self.channel = None
 
     def open_connection(self, url=None):
@@ -103,7 +119,7 @@ class Communicator(object):
             try:
                 channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True,
                                          exchange_type='topic')
-                queue = channel.queue_declare(queue=config.cluster + "." + msg[0] + "." + exchange)
+                queue = channel.queue_declare(queue=config.cluster + "." + msg[0] + "." + exchange, durable=True)
                 channel.queue_bind(exchange=config.cluster + "." + exchange,
                                    queue=config.cluster + "." + msg[0] + "." + exchange,
                                    routing_key=config.cluster + "." + msg[0] + "." + exchange)
@@ -130,7 +146,7 @@ class Communicator(object):
                     self.reconnect(connection, channel)
                     fed_logger.debug(Fore.GREEN + f"publishing {config.cluster}.{msg[0]}.{exchange}")
                     properties = pika.BasicProperties(
-                        delivery_mode=pika.DeliveryMode.Transient,
+                        delivery_mode=pika.DeliveryMode.Persistent,
                         headers={
                             "message_id": message_id,
                             "chunk_index": idx,
@@ -163,46 +179,71 @@ class Communicator(object):
         channel, connection = self.open_connection(url)
         received_chunks = defaultdict(dict)  # Store chunks by message_id
         fed_logger.debug(Fore.YELLOW + f"Receiving {config.cluster}.{expect_msg_type}.{exchange}")
+        max_retries = 100
+        retry_delay = 5  # seconds
+        for attempt in range(max_retries):
+            try:
+                channel, connection = self.reconnect(connection, channel)
+                # self.reconnect(connection, channel)
+                queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange,
+                                              durable=True)
+                channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True, exchange_type='topic')
+                channel.queue_bind(
+                    exchange=config.cluster + "." + exchange,
+                    queue=config.cluster + "." + expect_msg_type + "." + exchange,
+                    routing_key=config.cluster + "." + expect_msg_type + "." + exchange
+                )
 
-        try:
-            self.reconnect(connection, channel)
-            queue = channel.queue_declare(queue=config.cluster + "." + expect_msg_type + "." + exchange)
-            channel.exchange_declare(exchange=config.cluster + "." + exchange, durable=True, exchange_type='topic')
-            channel.queue_bind(
-                exchange=config.cluster + "." + exchange,
-                queue=config.cluster + "." + expect_msg_type + "." + exchange,
-                routing_key=config.cluster + "." + expect_msg_type + "." + exchange
-            )
+                consumer = channel.consume(queue=config.cluster + "." + expect_msg_type + "." + exchange)
+                for method_frame, properties, body in consumer:
+                    if method_frame is None:  # Connection lost mid-consumption
+                        raise pika.exceptions.StreamLostError("Stream interrupted during consumption")
 
-            for method_frame, properties, body in channel.consume(
-                    queue=config.cluster + "." + expect_msg_type + "." + exchange):
-                message_id = properties.headers["message_id"]
-                chunk_index = properties.headers["chunk_index"]
-                total_chunks = properties.headers["total_chunks"]
+                    message_id = properties.headers["message_id"]
+                    chunk_index = properties.headers["chunk_index"]
+                    total_chunks = properties.headers["total_chunks"]
 
-                # Save the chunk
-                received_chunks[message_id][chunk_index] = body
+                    # Save the chunk
+                    received_chunks[message_id][chunk_index] = body
 
-                # Check if all chunks are received
-                if len(received_chunks[message_id]) == total_chunks:
-                    all_chunks = [received_chunks[message_id][i] for i in range(total_chunks)]
-                    full_message = b"".join(all_chunks)
-                    del received_chunks[message_id]  # Cleanup
+                    # Check if all chunks are received
+                    if len(received_chunks[message_id]) == total_chunks:
+                        all_chunks = [received_chunks[message_id][i] for i in range(total_chunks)]
+                        full_message = b"".join(all_chunks)
+                        del received_chunks[message_id]  # Cleanup
 
-                    res = self.deserialize_message(full_message, is_weight)
-                    channel.basic_ack(method_frame.delivery_tag)
-                    channel.stop_consuming()
-                    self.close_connection(channel, connection)
+                        res = self.deserialize_message(full_message, is_weight)
+                        channel.basic_ack(method_frame.delivery_tag)
+                        channel.stop_consuming()
+                        channel.queue_delete(queue=config.cluster + "." + expect_msg_type + "." + exchange)
+                        self.close_connection(channel, connection)
 
-                    msg = [expect_msg_type]
-                    msg.extend(res)
-                    fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
-                    return msg
+                        msg = [expect_msg_type]
+                        msg.extend(res)
+                        fed_logger.debug(Fore.CYAN + f"received {msg[0]},{type(msg[1])},{is_weight}")
+                        return msg
+            except pika.exceptions.ConnectionClosedByBroker as e:
+                fed_logger.warning(
+                    Fore.YELLOW + f"Stream lost: {e}. Attempt {attempt + 1}/{max_retries}. Retrying in {retry_delay}s...")
+                self.close_connection(channel, connection)
+                time.sleep(retry_delay)
+                channel, connection = self.open_connection(url)  # Re-establish connection
+            except pika.exceptions.StreamLostError as e:
+                fed_logger.warning(
+                    Fore.YELLOW + f"Stream lost: {e}. Attempt {attempt + 1}/{max_retries}. Retrying in {retry_delay}s...")
+                self.close_connection(channel, connection)
+                time.sleep(retry_delay)
+                channel, connection = self.open_connection(url)  # Re-establish connection
+            except Exception as e:
+                fed_logger.exception(Fore.RED + f"Error receiving message: {e}")
+                self.close_connection(channel, connection)
+                time.sleep(retry_delay)
+                channel, connection = self.open_connection(url)
 
-        except Exception as e:
-            fed_logger.exception(Fore.RED + f"Error receiving message: {e}")
-            self.close_connection(channel, connection)
-            raise
+        # If all retries fail
+        fed_logger.error(Fore.RED + f"Failed to receive message after {max_retries} attempts.")
+        self.close_connection(channel, connection)
+        raise Exception("Max retries exceeded for message consumption")
 
     @staticmethod
     def serialize_message(msg, is_weight=False):
