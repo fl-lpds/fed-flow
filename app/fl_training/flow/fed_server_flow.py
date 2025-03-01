@@ -19,6 +19,7 @@ import random
 import os
 import csv
 import json
+import numpy as np
 
 
 def run_edge_based_no_offload(server: FedServerInterface, LR, options):
@@ -558,6 +559,36 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None,
                flop_of_each_client_on_edge=None, flop_of_each_client_on_server=None, edge_server_comm_time=None,
                splitting=None):
+    base_dir = "/fed-flow/Graphs/results_npy"
+    if not os.path.exists(base_dir):
+        os.makedirs(base_dir)
+
+    np.save(f"{base_dir}/simnet_tt.npy", simnet_tt)
+    np.save(f"{base_dir}/tt.npy", tt)
+    np.save(f"{base_dir}/avgEnergy.npy", avgEnergy)
+    np.save(f"{base_dir}/accuracy.npy", accuracy)
+    np.save(f"{base_dir}/flop_on_server.npy", flop_on_server)
+    np.save(f"{base_dir}/time_on_server.npy", time_on_server)
+    np.save(f"{base_dir}/splitting.npy", splitting)
+
+    np.savez(f"{base_dir}/clientConsumedEnergy.npz", **clientConsumedEnergy)
+    np.savez(f"{base_dir}/clientCompEnergy.npz", **clientCompEnergy)
+    np.savez(f"{base_dir}/clientCommEnergy.npz", **clientCommEnergy)
+    np.savez(f"{base_dir}/remainingEnergy.npz", **remainingEnergy)
+    np.savez(f"{base_dir}/clientUtilization.npz", **clientUtilization)
+
+    np.savez(f"{base_dir}/clientCompTime.npz", **clientCompTime)
+    np.savez(f"{base_dir}/clientCommTime.npz", **clientCommTime)
+
+    np.savez(f"{base_dir}/clientBW.npz", **clientBW)
+    np.savez(f"{base_dir}/edge_serverBW.npz", **edge_serverBW)
+    np.savez(f"{base_dir}/edge_server_comm_time.npz", **edge_server_comm_time)
+
+    np.savez(f"{base_dir}/computation_time_of_each_client_on_edge.npz", **computation_time_of_each_client_on_edge)
+    np.savez(f"{base_dir}/computation_time_of_each_client_on_server.npz", **computation_time_of_each_client_on_server)
+
+    np.savez(f"{base_dir}/clientTT.npz", **clientTT)
+
     device_colormap = plt.cm.get_cmap('tab10', len(config.CLIENTS_LIST))
     edge_colormap = plt.cm.get_cmap('tab10', len(config.EDGE_SERVER_LIST))
 
