@@ -174,10 +174,12 @@ class FedServer(FedBaseNodeInterface):
     def d2d_aggregate(self, client_local_weights: dict[str, BaseModel]) -> None:
         w_local_list = []
         client_neighbors = self.get_neighbors([NodeType.CLIENT])
+        num_leaders = sum(1 for n in client_neighbors if HTTPCommunicator.get_is_leader(n))
+
         for neighbor in client_neighbors:
             if HTTPCommunicator.get_is_leader(neighbor):
                 HTTPCommunicator.set_leader(neighbor, neighbor.ip, neighbor.port, False)
-                w_local = (client_local_weights[str(neighbor)], config.N / len(client_neighbors))
+                w_local = (client_local_weights[str(neighbor)], config.N / num_leaders)
                 w_local_list.append(w_local)
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, w_local_list)
