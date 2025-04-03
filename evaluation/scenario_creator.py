@@ -1,4 +1,3 @@
-# -- scenario_creator.py --
 
 import os
 import sys
@@ -30,13 +29,27 @@ def d2d_cluster_topology_prompt(cluster_number):
     return click.prompt(f'Topology for Cluster {cluster_number}', type=click.Choice(['ring', 'star']), default='ring')
 
 
-def select_clients_for_cluster(available_clients, cluster_number):
+def select_clients_interactive(available_clients, edge_or_cluster_number):
     choices = [questionary.Choice(title=f"Client {c}", value=c) for c in available_clients]
     selected = questionary.checkbox(
-        f"Select clients for Cluster {cluster_number}:",
+        f"Select clients for Edge/Cluster {edge_or_cluster_number}:",
         choices=choices,
     ).ask()
     return selected or []
+
+
+def select_clients_non_interactive(available_clients, edge_or_cluster_number):
+    print(f"Selecting clients for Edge/Cluster {edge_or_cluster_number}")
+    print("Available clients:", ", ".join(map(str, available_clients)))
+    selected = input("Enter client numbers separated by spaces: ").split()
+    return [int(c) for c in selected if c.isdigit() and int(c) in available_clients]
+
+
+def select_clients(available_clients, edge_or_cluster_number):
+    if is_interactive():
+        return select_clients_interactive(available_clients, edge_or_cluster_number)
+    else:
+        return select_clients_non_interactive(available_clients, edge_or_cluster_number)
 
 
 def create_edge_neighbors_by_topology(num_edges, topology):
@@ -44,10 +57,7 @@ def create_edge_neighbors_by_topology(num_edges, topology):
         if num_edges == 1:
             return {}
         if num_edges == 2:
-            return {
-                'edge1': ['edge2'],
-                'edge2': ['edge1']
-            }
+            return {'edge1': ['edge2'], 'edge2': ['edge1']}
         neighbors = {
             f'edge{i}': [f'edge{i - 1}', f'edge{i + 1}'] for i in range(2, num_edges)
         }
@@ -108,7 +118,6 @@ def create_node(port: int, decentralized: bool, offloading: bool, splitting_meth
         'scenario_description': scenario_description,
         'cpu_limit': cpu_limit,
         'memory_limit': memory_limit,
-        # New key: include the d2d argument if d2d is enabled
         'd2d_arg': "-d2d True" if d2d else ""
     }
 
@@ -125,11 +134,11 @@ def render_docker_compose_template(data):
 @click.option('--decentralized', is_flag=True, default=False, prompt='Is it decentralized?')
 @click.option('--offloading', is_flag=True, default=True, prompt='Is offloading enabled?')
 @click.option('--splitting-method', default='fake_decentralized_splitting',
-              prompt='Splitting method (find the list of available methods in the splitting.py file)')
+              prompt='Splitting method (check splitting.py)')
 @click.option('--topology', default=None, callback=topology_prompt)
-@click.option('--round-count', default=2, prompt='Enter number of FL round')
-@click.option('--client-cpu-limit', default='2', prompt='Enter CPU limit for clients')
-@click.option('--client-memory-limit', default='512M', prompt='Enter memory limit for clients')
+@click.option('--round-count', default=2, prompt='Enter number of FL rounds')
+@click.option('--client-cpu-limit', default='2', prompt='CPU limit for clients')
+@click.option('--client-memory-limit', default='512M', prompt='Memory limit for clients')
 @click.option('--d2d', is_flag=True, default=False, prompt='Is D2D enabled?')
 @click.option('--num-clusters', default=1, prompt='Number of D2D clusters')
 def create_docker_compose(num_clients, num_edges, decentralized, offloading, splitting_method,
@@ -139,17 +148,13 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
         'edges': [],
         'servers': [],
         'broker': None,
-        'd2d': d2d  # passed to template
+        'd2d': d2d
     }
 
-    scenario_description = f"{'Decentralized' if decentralized else 'Centralized'} " + \
-                           f"{'D2D' if d2d else topology if decentralized else ''} " + \
-                           f"{num_edges} {num_clients} " + \
-                           f"{'Offloading' if offloading else 'No Offloading'}"
+    scenario_description = f"{'Decentralized' if decentralized else 'Centralized'} " +                            f"{'D2D' if d2d else topology if decentralized else ''} " +                            f"{num_edges} {num_clients} " +                            f"{'Offloading' if offloading else 'No Offloading'}"
     current_port = 8080
 
     if d2d:
-        # D2D broker
         data['broker'] = {
             'image': 'rabbitmq:3-management',
             'container_name': 'rabbitmq',
@@ -162,19 +167,17 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
         }
 
         available_clients = list(range(1, num_clients + 1))
-        client_ports, client_cluster_map = {}, {}
+        client_ports = {}
         clusters = []
 
         for cluster_index in range(1, num_clusters + 1):
-            click.echo(f"\nAssigning clients to Cluster {cluster_index}")
-            cluster_clients = select_clients_for_cluster(available_clients, cluster_index)
+            cluster_clients = select_clients(available_clients, cluster_index)
             if not cluster_clients:
                 print_with_color(f"Warning: Cluster {cluster_index} has no clients!", Fore.YELLOW)
                 continue
             for cid in cluster_clients:
                 available_clients.remove(cid)
                 client_ports[cid] = current_port
-                client_cluster_map[cid] = cluster_index
                 current_port += 1
             clusters.append((cluster_index, cluster_clients))
 
@@ -187,13 +190,9 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             cluster_neighbors = create_d2d_cluster_neighbors(cluster_clients, cluster_topology, client_ports, server_port)
             all_neighbors.update(cluster_neighbors)
 
-        for i in range(1, num_clients + 1):
-            port = client_ports.get(i)
-            neighbors = all_neighbors.get(i, [])
-            if port is None:
-                print_with_color(f"Skipping unassigned client{i}", Fore.YELLOW)
-                continue
-            client = create_node(port, decentralized, offloading, splitting_method, i, 'client', round_count,
+        for cid, port in client_ports.items():
+            neighbors = all_neighbors.get(cid, [])
+            client = create_node(port, decentralized, offloading, splitting_method, cid, 'client', round_count,
                                  num_clients, neighbors, scenario_description,
                                  client_cpu_limit, client_memory_limit, d2d)
             data['clients'].append(client)
@@ -204,10 +203,10 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
         data['servers'].append(server)
 
     else:
-        # Centralized or decentralized with edge topology
         available_clients = list(range(1, num_clients + 1))
         edge_clients = {}
         client_ports = {}
+
         for i in range(1, num_clients + 1):
             client = create_node(current_port, decentralized, offloading, splitting_method, i, 'client', round_count,
                                  num_clients, [], scenario_description, client_cpu_limit, client_memory_limit)
@@ -221,8 +220,7 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             data['edges'].append(edge)
             current_port += 1
 
-            click.echo(f"\nAssigning clients to Edge {i}")
-            assigned_clients = select_clients_for_cluster(available_clients, i)
+            assigned_clients = select_clients(available_clients, i)
             edge_clients[i] = assigned_clients
             for cid in assigned_clients:
                 available_clients.remove(cid)
@@ -233,7 +231,6 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             data['servers'].append(server)
             current_port += 1
 
-            # link edges to server
             server_neighbors = []
             for edge_index in range(1, num_edges + 1):
                 edge_port = data['edges'][edge_index - 1]['port']
@@ -248,7 +245,6 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
                 edge_node['neighbors'] = ' '.join(
                     [f"{n},{data['edges'][int(n[4:]) - 1]['port']}" for n in neighbors])
 
-        # link clients to edges
         for edge_index, client_list in edge_clients.items():
             edge_node = data['edges'][edge_index - 1]
             edge_clients_str = [f"client{c},{client_ports[c]}" for c in client_list]
