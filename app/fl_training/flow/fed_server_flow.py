@@ -67,9 +67,11 @@ def run_centralized(server: FedServer, learning_rate: float, options):
 
 
 def run_d2d(server: FedServer, options):
-    training_times = []
+    training_time = []
     accuracy = []
     rounds = []
+    transferred_data = []
+
     for r in range(config.R):
         config.current_round = r
         rounds.append(r)
@@ -84,8 +86,8 @@ def run_d2d(server: FedServer, options):
         server.d2d_aggregate(local_weights)
 
         e_time = time.time()
-        training_time = e_time - s_time
-        training_times.append(training_time)
+        elapsed_time = e_time - s_time
+        training_time.append(elapsed_time)
 
         fed_logger.info("testing accuracy")
         test_acc = model_utils.test(server.uninet, server.testloader, server.device, server.criterion)
@@ -93,7 +95,9 @@ def run_d2d(server: FedServer, options):
         accuracy.append(test_acc)
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
-        fed_logger.info('==> Round Training Time: {:}'.format(training_time))
+        fed_logger.info('==> Round Training Time: {:}'.format(elapsed_time))
+
+    graph_utils.report_results(server, training_time, [0] * len(training_time), accuracy)
 
 
 def run(options_ins):

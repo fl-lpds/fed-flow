@@ -25,6 +25,7 @@ node_base: &node_base
       bash -c "python3 /fed-flow/main.py
       --aggregation $$AGGREGATION
       --decentralized $$DECENTRALIZED
+      --d2d $$D2D
       --mobility $$MOBILITY
       --clustering $$CLUSTERING
       -o $$OFFLOADING
