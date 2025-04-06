@@ -3,7 +3,8 @@ from torch import optim
 import tqdm
 from app.config import config
 from app.config.logger import fed_logger
-from app.dto.message import GlobalWeightMessage, NetworkTestMessage, SplitLayerConfigMessage, IterationFlagMessage
+from app.dto.message import GlobalWeightMessage, NetworkTestMessage, SplitLayerConfigMessage, IterationFlagMessage, \
+    DataSizeMessage
 from app.dto.received_message import ReceivedMessage
 from app.entity.aggregators.base_aggregator import BaseAggregator
 from app.entity.fed_base_node_interface import FedBaseNodeInterface
@@ -110,7 +111,10 @@ class FedClient(FedBaseNodeInterface):
             self.scatter_msg(IterationFlagMessage(False), [NodeType.EDGE])
 
     def scatter_local_weights(self):
-        self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()]), [NodeType.EDGE])
+        self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()], config.N), [NodeType.EDGE])
+
+    # def scatter_data_size(self, node_type: NodeType):
+    #     self.scatter_msg(DataSizeMessage(config.N), [node_type])
 
     def scatter_random_local_weights(self):
         is_leader = HTTPCommunicator.get_is_leader(self)
@@ -134,6 +138,7 @@ class FedClient(FedBaseNodeInterface):
         self.scatter_msg(msg, [NodeType.CLIENT])
         gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.CLIENT])
         gathered_models = [(msg.message.weights[0], config.N / len(edge_neighbors)) for msg in gathered_msgs]
+        fed_logger.info(f"gathered_models {gathered_models[0][1]}")
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)

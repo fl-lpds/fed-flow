@@ -250,8 +250,10 @@ class FedEdgeServer(FedBaseNodeInterface):
         fed_logger.info(str(neighbor) + ' offloading training end')
 
     def _send_back_local_weight(self, neighbor: NodeIdentifier):
-        cweights = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url,
-                                 GlobalWeightMessage.MESSAGE_TYPE).weights[0]
+        msg = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url, GlobalWeightMessage.MESSAGE_TYPE)
+        cweights = msg.weights[0]
+        dataset_size = msg.dataset_len
+
         server_neighbor = self.get_neighbors([NodeType.SERVER])[0]
         split_point = self.split_layers[neighbor][0]
         if split_point != (config.model_len - 1):
@@ -259,7 +261,7 @@ class FedEdgeServer(FedBaseNodeInterface):
                                                  self.nets[neighbor].state_dict())
         else:
             w_local = cweights
-        msg = GlobalWeightMessage([w_local])
+        msg = GlobalWeightMessage([w_local], dataset_size)
         self.send_msg(self.get_exchange_name(neighbor), HTTPCommunicator.get_rabbitmq_url(server_neighbor), msg)
 
     def gather_local_weights(self) -> dict[str, BaseModel]:
@@ -267,7 +269,7 @@ class FedEdgeServer(FedBaseNodeInterface):
         for neighbor in self.get_neighbors([NodeType.CLIENT]):
             msg: GlobalWeightMessage = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url,
                                                      GlobalWeightMessage.MESSAGE_TYPE)
-            client_local_weights[neighbor] = msg.weights[0]
+            client_local_weights[neighbor] = (msg.weights[0], msg.dataset_len)
         return client_local_weights
 
     def aggregate(self, client_local_weights: dict[str, BaseModel]) -> None:
@@ -304,3 +306,5 @@ class FedEdgeServer(FedBaseNodeInterface):
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)
+
+

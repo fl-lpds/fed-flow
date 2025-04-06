@@ -123,20 +123,27 @@ class FedServer(FedBaseNodeInterface):
 
     def aggregate(self, clients_local_weights):
         w_local_list = []
-        for client, weight in clients_local_weights.items():
+        total_data_size = 0
+
+        for client, (weights, dataset_size) in clients_local_weights.items():
+            total_data_size += dataset_size
+
+        for client, (weights, dataset_size) in clients_local_weights.items():
             split_point = self.split_layers[client][0]
+            weight_ratio = dataset_size / total_data_size
             if split_point != (config.model_len - 1):
                 w_local = (
-                    model_utils.concat_weights(self.uninet.state_dict(), clients_local_weights[client],
-                                               self.nets[client].state_dict()),
-                    config.N / config.K)
-                w_local_list.append(w_local)
+                    model_utils.concat_weights(self.uninet.state_dict(), weights, self.nets[client].state_dict()),
+                    weight_ratio)
             else:
-                w_local = (clients_local_weights[client], config.N / config.K)
+                w_local = (weights, weight_ratio)
             w_local_list.append(w_local)
+
         zero_model = model_utils.zero_init(self.uninet).state_dict()
+
         aggregated_model = self.aggregator.aggregate(zero_model, w_local_list)
         self.uninet.load_state_dict(aggregated_model)
+
         return aggregated_model
 
     def _concat_clients_local_weights(self, clients_local_weights) -> list:
@@ -161,8 +168,9 @@ class FedServer(FedBaseNodeInterface):
                 edge_exchange = edge.get_exchange_name(client)
                 msg: GlobalWeightMessage = self.recv_msg(edge_exchange, config.current_node_mq_url,
                                                          GlobalWeightMessage.MESSAGE_TYPE)
-                clients_local_weights[client] = msg.weights[0]
+                clients_local_weights[client] = (msg.weights[0], msg.dataset_len)
         return clients_local_weights
+
 
     def split(self, state, options: dict):
         self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels, self)
