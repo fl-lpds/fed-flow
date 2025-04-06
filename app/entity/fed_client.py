@@ -45,7 +45,7 @@ class FedClient(FedBaseNodeInterface):
         self.moon_lambda = 1.0
         self.old_net = None
 
-        self.use_fedprox = True
+        self.use_fedprox = False
         self.mu_fedprox = 0.1
         self.global_net = None
 

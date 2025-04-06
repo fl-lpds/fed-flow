@@ -8,10 +8,8 @@ from app.config.logger import fed_logger
 from app.entity.aggregators.factory import create_aggregator
 from app.entity.fed_client import FedClient
 from app.entity.node_type import NodeType
-from app.util import data_utils, energy_estimation, model_utils
+from app.util import data_utils, energy_estimation
 from app.util.mobility_data_utils import start_mobility_simulation_thread
-from collections import Counter
-
 
 warnings.filterwarnings('ignore')
 logging.getLogger("requests").setLevel(logging.WARNING)
@@ -127,4 +125,4 @@ def run(options_ins):
     else:
         run_client(client, learning_rate)
     time.sleep(10)
-    client.stop_server()
+    # client.stop_server()

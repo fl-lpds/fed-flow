@@ -81,6 +81,8 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(training_time))
+        graph_utils.log_round_csv(str(edge_server), r, training_time, client_bw[-1], test_acc)
+
     graph_utils.report_results(edge_server, training_times, client_bw, accuracy, edge_bw)
 
 
@@ -103,6 +105,8 @@ def run_centralized(edge_server: FedEdgeServer, learning_rate):
 
 
 def run(options_ins):
+    runtime_config = f"{time.strftime('%Y-%m-%d %H:%M')} {config.SCENARIO_DESCRIPTION}"
+    graph_utils.set_runtime_config(runtime_config)
     LR = config.learning_rate
     fed_logger.info('Preparing Sever.')
     offload = options_ins.get('offload')
@@ -120,4 +124,4 @@ def run(options_ins):
     else:
         run_centralized(edge_server, LR)
     time.sleep(10)
-    edge_server.stop_server()
+    # edge_server.stop_server()

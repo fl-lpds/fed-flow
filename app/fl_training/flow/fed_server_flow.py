@@ -62,6 +62,7 @@ def run_centralized(server: FedServer, learning_rate: float, options):
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(elapsed_time))
+        graph_utils.log_round_csv(str(server), r, elapsed_time, transferred_data[-1], test_acc)
 
     graph_utils.report_results(server, training_time, transferred_data, accuracy)
 
@@ -96,11 +97,14 @@ def run_d2d(server: FedServer, options):
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(elapsed_time))
+        graph_utils.log_round_csv(str(server), r, elapsed_time, transferred_data[-1], test_acc)
 
     graph_utils.report_results(server, training_time, [0] * len(training_time), accuracy)
 
 
 def run(options_ins):
+    runtime_config = f"{time.strftime('%Y-%m-%d %H:%M')} {config.SCENARIO_DESCRIPTION}"
+    graph_utils.set_runtime_config(runtime_config)
     learning_rate = config.learning_rate
     fed_logger.info('Preparing Sever.')
     fed_logger.info("start mode: " + str(options_ins.values()))
@@ -113,4 +117,4 @@ def run(options_ins):
     else:
         run_centralized(fed_server, learning_rate, options_ins)
     time.sleep(10)
-    fed_server.stop_server()
+    # fed_server.stop_server()
