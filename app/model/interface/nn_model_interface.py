@@ -84,3 +84,11 @@ class NNModel(ABC, nn.Module):
         :return: the configuration of each layer in a list  of (Type, in_channels, out_channels, kernel_size, out_size(c_out*h*w), flops(c_out*h*w*k*k*c_in))
         """
         pass
+
+    @abstractmethod
+    def get_representation(self, x):
+        """
+
+        :return: the configuration of each layer in a list  of (Type, in_channels, out_channels, kernel_size, out_size(c_out*h*w), flops(c_out*h*w*k*k*c_in))
+        """
+        pass
