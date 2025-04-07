@@ -41,12 +41,12 @@ class FedClient(FedBaseNodeInterface):
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, config.lr_step_size, config.lr_gamma)
 
-        self.use_moon = False
+        self.use_moon = True
         self.moon_lambda = 1.0
         self.old_net = None
 
         self.use_fedprox = False
-        self.mu_fedprox = 0.1
+        self.mu_fedprox = 0.5
         self.global_net = None
 
     def initialize(self, learning_rate):

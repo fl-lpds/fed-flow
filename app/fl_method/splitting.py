@@ -49,6 +49,21 @@ def fake_decentralized(state, labels, node: FedBaseNodeInterface):
     return split_layers
 
 
+def half_split_decentralized(state, labels, node: FedBaseNodeInterface):
+    split_layers = {}
+    total_layers = len(node.uninet.cfg)
+    half_layer = total_layers // 2
+    if node.is_edge_based:
+        for edge in node.get_neighbors([NodeType.EDGE]):
+            for client in HTTPCommunicator.get_neighbors_from_neighbor(edge, [NodeType.CLIENT]):
+                split_layers[client] = [half_layer - 1, total_layers - 1]
+    else:
+        for neighbor in node.get_neighbors([NodeType.CLIENT]):
+            split_layers[neighbor] = [half_layer - 1, total_layers - 1]
+
+    return split_layers
+
+
 def no_splitting(state, labels, **kwargs):
     split_list = []
     for i in range(config.K):

@@ -67,7 +67,7 @@ def run(options_ins):
         total_samples = len(dataset)
 
         # 1. Compute the global non-IID pool (20% of the data).
-        non_iid_total = int(total_samples * 0.7)
+        non_iid_total = int(total_samples * 0.8)
         # Sort all indices by label to create a skewed (non-IID) ordering.
         labels = [dataset[i][1] for i in range(total_samples)]
         sorted_indices = sorted(range(total_samples), key=lambda i: labels[i])
