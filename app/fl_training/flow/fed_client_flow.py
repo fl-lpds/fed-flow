@@ -61,7 +61,7 @@ def run(options_ins):
     dataset = data_utils.get_trainset()
     if True:
         part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
-        train::_loader = data_utils.get_trainloader(dataset, part_tr, 0)
+        train_loader = data_utils.get_trainloader(dataset, part_tr, 0)
     else:
         # Non-IID (20% non-IID + 80% IID):
         total_samples = len(dataset)
