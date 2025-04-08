@@ -1,6 +1,10 @@
+import copy
+
+import torch
 import torch.nn as nn
 from torch import optim
-import tqdm
+from tqdm import tqdm
+
 from app.config import config
 from app.config.logger import fed_logger
 from app.dto.message import GlobalWeightMessage, NetworkTestMessage, SplitLayerConfigMessage, IterationFlagMessage
@@ -30,10 +34,20 @@ class FedClient(FedBaseNodeInterface):
         self.criterion = nn.CrossEntropyLoss()
         self.mobility_manager = MobilityManager(self)
         self.aggregator = aggregator
+
+        # Standard model setup
         self.uninet = model_utils.get_model('Unit', None, self.device, self.is_edge_based)
         self.net = self.uninet
         self.optimizer = optim.SGD(self.net.parameters(), lr=LR, momentum=0.9, weight_decay=5e-4)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, config.lr_step_size, config.lr_gamma)
+
+        self.use_moon = False
+        self.moon_lambda = 1.0
+        self.old_net = None
+
+        self.use_fedprox = False
+        self.mu_fedprox = 0.5
+        self.global_net = None
 
     def initialize(self, learning_rate):
         self.net = model_utils.get_model('Client', self.split_layers, self.device, self.is_edge_based)
@@ -43,6 +57,16 @@ class FedClient(FedBaseNodeInterface):
         msgs: list[ReceivedMessage] = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [node_type])
         msg: GlobalWeightMessage = msgs[0].message
         pweights = model_utils.split_weights_client(msg.weights[0], self.net.state_dict())
+
+        if self.use_moon:
+            if self.old_net is None:
+                self.old_net = copy.deepcopy(self.net)
+            self.old_net.load_state_dict(self.net.state_dict())
+
+        if self.global_net is None:
+            self.global_net = copy.deepcopy(self.net)
+        self.global_net.load_state_dict(pweights)
+
         self.net.load_state_dict(pweights)
 
     def scatter_network_speed_to_edges(self):
@@ -61,51 +85,95 @@ class FedClient(FedBaseNodeInterface):
     def start_offloading_train(self):
         self.net.to(self.device)
         self.net.train()
+
         i = 0
+
         split_point = self.split_layers
         if isinstance(self.split_layers, list):
             split_point = self.split_layers[0]
+
+        # 1) No Offloading
         if split_point == model_utils.get_unit_model_len() - 1:
             fed_logger.info("no offloding training start----------------------------")
             self.scatter_msg(IterationFlagMessage(False), [NodeType.EDGE])
+
             i += 1
+
             for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
+
                 outputs = self.net(inputs)
-                loss = self.criterion(outputs, targets)
-                loss.backward()
+                ce_loss = self.criterion(outputs, targets)
+
+                # MOON
+                moon_loss = 0.0
+                if self.use_moon and self.old_net and self.global_net is not None:
+                    with torch.no_grad():
+                        prev_rep = self.old_net.get_representation(inputs)  # w^k_prev
+                        glob_rep = self.global_net.get_representation(inputs)  # w^glob_t
+                    new_rep = self.net.get_representation(inputs)  # w^k_t
+                    moon_loss = self._compute_moon_loss(new_rep, glob_rep, prev_rep)
+
+                # FedProx
+                fedprox_loss = 0.0
+                if self.use_fedprox and self.global_net is not None:
+                    fedprox_loss = self._compute_fedprox_loss()
+
+                total_loss = ce_loss + (self.moon_lambda * moon_loss) + fedprox_loss
+                total_loss.backward()
                 self.optimizer.step()
+
             self.scheduler.step()
 
+        # 2) Partial Offloading
         elif split_point < model_utils.get_unit_model_len() - 1:
             fed_logger.info(f"offloding training start {self.split_layers}----------------------------")
             self.scatter_msg(IterationFlagMessage(True), [NodeType.EDGE])
+
             i += 1
 
             for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
-
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 if self.optimizer is not None:
                     self.optimizer.zero_grad()
+
                 outputs = self.net(inputs)
 
-                self.scatter_msg(IterationFlagMessage(True), [NodeType.EDGE])
+                # MOON
+                if self.use_moon and self.old_net and self.global_net is not None:
+                    with torch.no_grad():
+                        prev_rep = self.old_net.get_representation(inputs)
+                        glob_rep = self.global_net.get_representation(inputs)
+                    new_rep = self.net.get_representation(inputs)
+                    moon_loss = self._compute_moon_loss(new_rep, glob_rep, prev_rep)
+                    (moon_loss * self.moon_lambda).backward(retain_graph=True)
 
-                msg = GlobalWeightMessage([outputs.to(self.device),
-                                           targets.to(self.device)])
+                # FedProx partial
+                if self.use_fedprox and self.global_net is not None:
+                    fedprox_loss = self._compute_fedprox_loss()
+                    fedprox_loss.backward(retain_graph=True)
+
+                # Send partial output & target to the Edge
+                self.scatter_msg(IterationFlagMessage(True), [NodeType.EDGE])
+                msg = GlobalWeightMessage([outputs.to(self.device), targets.to(self.device)])
                 self.scatter_msg(msg, [NodeType.EDGE])
 
+                # Receive gradient
                 fed_logger.info("receiving gradients")
                 msgs: list[ReceivedMessage] = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.EDGE])
                 msg: GlobalWeightMessage = msgs[0].message
                 gradients = msg.weights[0].to(self.device)
                 fed_logger.info("received gradients")
 
+                # Backprop partial gradient
                 outputs.backward(gradients)
+
                 if self.optimizer is not None:
                     self.optimizer.step()
+
                 i += 1
+
             self.scheduler.step()
             self.scatter_msg(IterationFlagMessage(False), [NodeType.EDGE])
 
@@ -123,9 +191,26 @@ class FedClient(FedBaseNodeInterface):
         for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
+
             outputs = self.net(inputs)
-            loss = self.criterion(outputs, targets)
-            loss.backward()
+            ce_loss = self.criterion(outputs, targets)
+
+            # MOON
+            moon_loss = 0.0
+            if self.use_moon and self.old_net is not None and self.global_net is not None:
+                with torch.no_grad():
+                    prev_rep = self.old_net.get_representation(inputs)
+                    glob_rep = self.global_net.get_representation(inputs)
+                new_rep = self.net.get_representation(inputs)
+                moon_loss = self._compute_moon_loss(new_rep, glob_rep, prev_rep)
+
+            # FedProx
+            fedprox_loss = 0.0
+            if self.use_fedprox and self.global_net is not None:
+                fedprox_loss = self._compute_fedprox_loss()
+
+            total_loss = ce_loss + (self.moon_lambda * moon_loss) + fedprox_loss
+            total_loss.backward()
             self.optimizer.step()
 
     def gossip_with_neighbors(self):
@@ -137,3 +222,49 @@ class FedClient(FedBaseNodeInterface):
         zero_model = model_utils.zero_init(self.uninet).state_dict()
         aggregated_model = self.aggregator.aggregate(zero_model, gathered_models)
         self.uninet.load_state_dict(aggregated_model)
+
+    def _compute_moon_loss(self,
+                           new_rep: torch.Tensor,
+                           global_rep: torch.Tensor,
+                           prev_rep: torch.Tensor,
+                           tau: float = 1.0) -> torch.Tensor:
+        """
+            l_con = - log(
+              exp( sim(w^k_t, w^glob_t) / τ )
+              /
+              [ exp( sim(w^k_t, w^glob_t) / τ ) + exp( sim(w^k_t, w^k_prev) / τ ) ]
+            )
+
+        Args:
+            new_rep    (Tensor): w^k_t      (current local representation)
+            global_rep (Tensor): w^glob_t   (current global/server representation)
+            prev_rep   (Tensor): w^k_prev   (previous local representation)
+            tau        (float):  temperature scale
+        """
+        fed_logger.info("Calculating moon loss")
+        cos = nn.CosineSimilarity(dim=1)
+        pos_sim = cos(new_rep, global_rep)  # sim(w^k_t, w^glob_t)
+        neg_sim = cos(new_rep, prev_rep)  # sim(w^k_t, w^k_prev)
+
+        # exponentials of the scaled similarities
+        pos_exp = torch.exp(pos_sim / tau)
+        neg_exp = torch.exp(neg_sim / tau)
+
+        # denominator = exp(...) + exp(...)
+        denominator = pos_exp + neg_exp
+
+        # final loss = - log( pos_exp / denominator )
+        loss = -torch.log(pos_exp / denominator)
+        return loss.mean()
+
+    def _compute_fedprox_loss(self) -> torch.Tensor:
+        """
+        FedProx penalty:
+        mu_fedprox/2 * sum(||W_local - W_global||^2).
+        """
+        fed_logger.info("Calculating fedprox loss")
+        loss = torch.tensor(0.0, device=self.device)
+        for param_local, param_global in zip(self.net.parameters(), self.global_net.parameters()):
+            loss += torch.sum((param_local - param_global.detach()) ** 2)
+        loss = 0.5 * self.mu_fedprox * loss
+        return loss

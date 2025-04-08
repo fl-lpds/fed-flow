@@ -7,6 +7,7 @@ fl_methods = {
     "none_splitting": splitting.none,
     "fake_splitting": splitting.fake,
     "fake_decentralized_splitting": splitting.fake_decentralized,
+    "half_split_decentralized": splitting.half_split_decentralized,
     "no_splitting": splitting.no_splitting,
     "no_edge_fake_splitting": splitting.no_edge_fake,
     "only_edge_splitting": splitting.only_edge_splitting,
