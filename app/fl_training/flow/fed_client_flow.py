@@ -29,11 +29,8 @@ def run_edge_based(client: FedClientInterface, LR):
     client.send_power_to_edge()
 
     for r in range(config.R):
-        base_bw = 50_000_000
-        if config.index == 0:
-            simnet_BW = 50_000_000
-        else:
-            simnet_BW = base_bw
+
+        simnet_BW = config.CLIENTS_BANDWIDTH[config.index]
         energy_estimation.set_simnet(simnet_BW)
 
         config.current_round = r

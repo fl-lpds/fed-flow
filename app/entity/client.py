@@ -228,7 +228,8 @@ class Client(FedClientInterface):
                 fed_logger.info(
                     Fore.RED + f"Split Point: {self.split_layers}, Gradient Size(Mbit): {int(data_utils.sizeofmessage(msg)) / (1024 * 1024)}")
                 end_transmission(data_utils.sizeofmessage(msg))
-
+                fed_logger.info(
+                    Fore.GREEN + f"Gradient receiving: {message_utils.server_gradients_edge_to_client() + socket.gethostname()}_{i}")
                 gradients = msg[1].to(self.device)
 
                 # fed_logger.info("received gradients")

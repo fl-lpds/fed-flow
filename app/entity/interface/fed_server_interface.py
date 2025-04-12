@@ -63,7 +63,8 @@ class FedServerInterface(ABC, Communicator):
         self.approximated_tt_of_actions = []
         self.approximated_energy_of_actions = []
         self.actions = []
-        self.nice_value = {}
+        self.edge_nice_value = {}
+        self.server_nice_value = {}
 
         self.uninet = model_utils.get_model('Unit', None, self.device, self.edge_based)
         self.testset = data_utils.get_testset()

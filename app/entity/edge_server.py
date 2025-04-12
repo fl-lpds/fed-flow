@@ -353,6 +353,7 @@ class FedEdgeServer(FedEdgeServerInterface):
         self.scatter(msg, True)
 
     def thread_offload_training(self, client_ip, sharedData):
+        time.sleep(1)
         start_time = time.time()
         self.forward_propagation(client_ip, sharedData)
         self.local_weights(client_ip, sharedData)

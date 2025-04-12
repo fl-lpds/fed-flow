@@ -59,7 +59,7 @@ def run_edge_based_no_offload(server: FedServerInterface, LR, options):
 
 
 def run_edge_based_offload(server: FedServerInterface, LR, options):
-    avgEnergy, tt, simnet_tt = [], [], []
+    avgEnergy, tt, simnet_tt, splitting_list = [], [], [], []
     clientBW, edge_server_BW = {}, {}
     clientRemainingEnergy = {}
     clientConsumedEnergy = {}
@@ -71,6 +71,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     clientCommTime = {}
     clientUtilization = {}
     clientTT = {}
+    comp_time_of_each_layer_on_client = {client: [] for client in config.CLIENTS_LIST}
 
     edge_server_comm_time_list = {}
 
@@ -155,6 +156,10 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     fed_logger.info('Getting power usage from edge servers')
     server.get_power_of_client()
 
+    simulated_edge_server_bw = {}
+    if server.simnet:
+        simulated_edge_server_bw = np.load(f"/fed-flow/app/config/edge_server_bw.npz")
+
     for r in range(config.R):
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
         if config.K > 0:
@@ -174,7 +179,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             else:
                 # setting BW between each edge and sever
                 for edge in config.EDGE_SERVER_LIST:
-                    server.edge_bandwidth[edge] = 1_000_000_000
+                    server.edge_bandwidth[edge] = simulated_edge_server_bw[edge][r]
                 fed_logger.info("receiving client simnet network info")
                 server.client_network(config.EDGE_SERVER_LIST)
 
@@ -193,11 +198,16 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             offloading = server.split_layers
 
             fed_logger.info("creating state")
+            for client, index in config.CLIENTS_CONFIG.items():
+                if client not in config.CLIENTS_LIST:
+                    server.split_layers[index] = [config.model_len, config.model_len]
             state = server.edge_based_state()
 
             if r < len(test_load_on_edges_and_server) and options.get('splitting') == 'edge_based_heuristic':
                 server.split_layers = test_load_on_edges_and_server[r]
-                server.nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+                server.server_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+                server.edge_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+                splitting_list.append(server.split_layers)
             else:
                 fed_logger.info("splitting")
                 splitTime_start = time.time()
@@ -205,7 +215,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 splittingTime = time.time() - splitTime_start
                 fed_logger.info(Fore.MAGENTA + f"Splitting Time : {splittingTime}")
                 fed_logger.info(Fore.MAGENTA + f"Action : {server.split_layers}")
-                fed_logger.info(Fore.MAGENTA + f"Nice Value : {server.nice_value}")
+                splitting_list.append(server.split_layers)
+                fed_logger.info(Fore.MAGENTA + f"SERVER Nice Value : {server.server_nice_value}")
+                fed_logger.info(Fore.MAGENTA + f"EDGE Nice Value : {server.edge_nice_value}")
 
             fed_logger.info("Scattering splitting info to edges.")
             server.send_split_layers_config()
@@ -252,6 +264,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             energy_tt_list = server.e_energy_tt(config.CLIENTS_LIST)
 
             server.e_client_attendance(config.CLIENTS_LIST)
+
 
             fed_logger.info(f"computation time of each client on server[wall-time]: {server.process_wall_time}")
             fed_logger.info(
@@ -340,7 +353,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                        time_on_server, clientCompTime, clientCommTime, server.approximated_energy_of_actions,
                        server.approximated_tt_of_actions, comp_time_of_each_client_on_edge,
                        comp_time_of_each_client_on_server, flop_of_each_client_on_edge_list,
-                       flop_of_each_client_on_server_list, edge_server_comm_time_list, splitting=server.split_layers)
+                       flop_of_each_client_on_server_list, edge_server_comm_time_list, splitting=splitting_list,
+                       splitting_method=options.get('splitting'))
         else:
             break
 
@@ -558,42 +572,44 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                clientCommTime=None, approximated_energy=None, approximated_tt=None,
                computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None,
                flop_of_each_client_on_edge=None, flop_of_each_client_on_server=None, edge_server_comm_time=None,
-               splitting=None):
+               splitting=None, splitting_method=None):
     base_dir = "/fed-flow/Graphs/results_npy"
     if not os.path.exists(base_dir):
         os.makedirs(base_dir)
 
-    np.save(f"{base_dir}/simnet_tt.npy", simnet_tt)
-    np.save(f"{base_dir}/tt.npy", tt)
-    np.save(f"{base_dir}/avgEnergy.npy", avgEnergy)
-    np.save(f"{base_dir}/accuracy.npy", accuracy)
-    np.save(f"{base_dir}/flop_on_server.npy", flop_on_server)
-    np.save(f"{base_dir}/time_on_server.npy", time_on_server)
-    np.save(f"{base_dir}/splitting.npy", splitting)
+    np.save(f"{base_dir}/simnet_tt_{splitting_method}.npy", simnet_tt)
+    np.save(f"{base_dir}/tt_{splitting_method}.npy", tt)
+    np.save(f"{base_dir}/avgEnergy_{splitting_method}.npy", avgEnergy)
+    np.save(f"{base_dir}/accuracy_{splitting_method}.npy", accuracy)
+    np.save(f"{base_dir}/flop_on_server_{splitting_method}.npy", flop_on_server)
+    np.save(f"{base_dir}/time_on_server_{splitting_method}.npy", time_on_server)
+    np.save(f"{base_dir}/splitting_{splitting_method}.npy", splitting)
 
-    np.savez(f"{base_dir}/clientConsumedEnergy.npz", **clientConsumedEnergy)
-    np.savez(f"{base_dir}/clientCompEnergy.npz", **clientCompEnergy)
-    np.savez(f"{base_dir}/clientCommEnergy.npz", **clientCommEnergy)
-    np.savez(f"{base_dir}/remainingEnergy.npz", **remainingEnergy)
-    np.savez(f"{base_dir}/clientUtilization.npz", **clientUtilization)
+    np.savez(f"{base_dir}/clientConsumedEnergy_{splitting_method}.npz", **clientConsumedEnergy)
+    np.savez(f"{base_dir}/clientCompEnergy_{splitting_method}.npz", **clientCompEnergy)
+    np.savez(f"{base_dir}/clientCommEnergy_{splitting_method}.npz", **clientCommEnergy)
+    np.savez(f"{base_dir}/remainingEnergy_{splitting_method}.npz", **remainingEnergy)
+    np.savez(f"{base_dir}/clientUtilization_{splitting_method}.npz", **clientUtilization)
 
-    np.savez(f"{base_dir}/clientCompTime.npz", **clientCompTime)
-    np.savez(f"{base_dir}/clientCommTime.npz", **clientCommTime)
+    np.savez(f"{base_dir}/clientCompTime_{splitting_method}.npz", **clientCompTime)
+    np.savez(f"{base_dir}/clientCommTime_{splitting_method}.npz", **clientCommTime)
 
-    np.savez(f"{base_dir}/clientBW.npz", **clientBW)
-    np.savez(f"{base_dir}/edge_serverBW.npz", **edge_serverBW)
-    np.savez(f"{base_dir}/edge_server_comm_time.npz", **edge_server_comm_time)
+    np.savez(f"{base_dir}/clientBW_{splitting_method}.npz", **clientBW)
+    np.savez(f"{base_dir}/edge_serverBW_{splitting_method}.npz", **edge_serverBW)
+    np.savez(f"{base_dir}/edge_server_comm_time_{splitting_method}.npz", **edge_server_comm_time)
 
-    np.savez(f"{base_dir}/computation_time_of_each_client_on_edge.npz", **computation_time_of_each_client_on_edge)
-    np.savez(f"{base_dir}/computation_time_of_each_client_on_server.npz", **computation_time_of_each_client_on_server)
+    np.savez(f"{base_dir}/computation_time_of_each_client_on_edge_{splitting_method}.npz",
+             **computation_time_of_each_client_on_edge)
+    np.savez(f"{base_dir}/computation_time_of_each_client_on_server_{splitting_method}.npz",
+             **computation_time_of_each_client_on_server)
 
-    np.savez(f"{base_dir}/clientTT.npz", **clientTT)
+    np.savez(f"{base_dir}/clientTT_{splitting_method}.npz", **clientTT)
 
     device_colormap = plt.cm.get_cmap('tab10', len(config.CLIENTS_LIST))
     edge_colormap = plt.cm.get_cmap('tab10', len(config.EDGE_SERVER_LIST))
 
     new_memory = {
-        'splitting': splitting,
+        'splitting': splitting[-1],
         'clientInfo': {client: {} for client in config.CLIENTS_LIST},
         'edgeInfo': {edge: {} for edge in config.EDGE_SERVER_LIST},
         'serverInfo': {}

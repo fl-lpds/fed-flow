@@ -1,7 +1,7 @@
 import sys
 import threading
 import time
-
+import os
 import numpy as np
 import torch
 import torch.nn as nn
@@ -94,10 +94,11 @@ class FedServer(FedServerInterface):
                 processes[client_ips[i]] = Process(target=self._thread_edge_training,
                                                    args=(client_ips[i], shared_data,),
                                                    name=client_ips[i])
+            for i in range(len(client_ips)):
                 fed_logger.info(str(client_ips[i]) + ' offloading training start')
                 processes[client_ips[i]].start()
-                # if hasPriority:
-                    # os.system(f"renice -n {self.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
+                if hasPriority:
+                    os.system(f"renice -n {self.server_nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
 
                 self.tt_start[client_ips[i]] = time.time()
 
@@ -195,6 +196,7 @@ class FedServer(FedServerInterface):
         return 'Finish'
 
     def _thread_edge_training(self, client_ip, sharedData):
+        time.sleep(1)
         config.current_round = sharedData['current_round']
         communication_time = 0
         comp_time = 0
@@ -408,7 +410,7 @@ class FedServer(FedServerInterface):
         """
         send splitting data
         """
-        msg = [message_utils.split_layers_server_to_edge(), self.split_layers, self.nice_value]
+        msg = [message_utils.split_layers_server_to_edge(), self.split_layers, self.edge_nice_value]
 
         if self.simnet:
             for edge in config.EDGE_SERVER_LIST:
@@ -558,12 +560,13 @@ class FedServer(FedServerInterface):
 
     def split(self, state, options: dict):
         if options.get('splitting') == 'edge_based_heuristic':
-            self.split_layers, approximated_energy, approximated_tt, nice_value = fl_method_parser.fl_methods.get(
+            self.split_layers, approximated_energy, approximated_tt, edge_nice_value, server_nice_value = fl_method_parser.fl_methods.get(
                 options.get('splitting'))(state, self.group_labels)
             self.actions.append(self.split_layers)
             self.approximated_energy_of_actions.append(approximated_energy)
             self.approximated_tt_of_actions.append(approximated_tt)
-            self.nice_value = nice_value
+            self.server_nice_value = server_nice_value
+            self.edge_nice_value = edge_nice_value
         else:
             self.split_layers = fl_method_parser.fl_methods.get(options.get('splitting'))(state, self.group_labels)
         fed_logger.info('Next Round OPs: ' + str(self.split_layers))
@@ -594,7 +597,10 @@ class FedServer(FedServerInterface):
                  "edge_bw": self.edge_bandwidth,
                  "client_remaining_energy": client_remaining_energy,
                  "flops_of_each_layer": self.model_flops_per_layer,
-                 "best_tt_splitting_found": self.best_tt_splitting_found
+                 "best_tt_splitting_found": self.best_tt_splitting_found,
+                 "prev_edge_nice_value": self.edge_nice_value,
+                 "prev_server_nice_value": self.server_nice_value,
+                 "current_round": config.current_round
                  }
 
         return state

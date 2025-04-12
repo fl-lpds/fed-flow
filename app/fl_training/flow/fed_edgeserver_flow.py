@@ -76,9 +76,10 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
                     processes[client_ips[i]] = Process(target=server.thread_offload_training,
                                                        args=(client_ips[i], shared_data,),
                                                        name=client_ips[i])
+                for i in range(len(client_ips)):
                     processes[client_ips[i]].start()
-                    # if options.get('splitting') == 'edge_based_heuristic':
-                    #     os.system(f"renice -n {server.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
+                    if options.get('splitting') == 'edge_based_heuristic':
+                        os.system(f"renice -n {server.nice_value[client_ips[i]]} -p {processes[client_ips[i]].pid}")
 
                 for process in processes.values():
                     process.join()
@@ -103,9 +104,6 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
 
             server.client_attendance(client_ips)
             client_ips = config.EDGE_MAP[config.EDGE_SERVER_CONFIG[config.index]]
-            # energy = float(energy_estimation.energy())
-            # energy /= batch_num
-            # fed_logger.info(Fore.LIGHTBLUE_EX + f"Energy : {energy}")
         else:
             break
     fed_logger.info(f"{socket.gethostname()} quit")

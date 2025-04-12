@@ -1,6 +1,5 @@
 import sys
 
-CLIENTS_BANDWIDTH = []
 index = 0
 simnet = False
 # Dataset configration
@@ -18,7 +17,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 50  # data length
+N = 5  # data length
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
@@ -38,7 +37,7 @@ model_len = 7
 
 R = 100  # FL rounds
 LR = 0.01  # Learning rate
-B = 10  # Batch size
+B = 1  # Batch size
 
 # RL training configration
 max_episodes = 2000  # max training episodes
@@ -66,6 +65,8 @@ EDGESERVER_PORT = {'edge1': 5001}
 K = 5  # Number of devices
 G = 1  # Number of groups
 S = 1  # Number of server connecting devices
+
+CLIENTS_BANDWIDTH = [1_000_000, 2_000_000, 10_000_000, 10_000_000, 40_000_000]
 
 # Unique clients order
 HOST2IP = {}
