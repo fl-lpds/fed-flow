@@ -371,17 +371,25 @@ def edge_based_heuristic_splitting(state: dict, label):
             isBadClient = True if prev_action_each_client_total_tt[client] > baseline_tt else False
             total_client_time = prev_action_each_client_total_tt[client]
 
+            clientOP1 = previous_action[config.CLIENTS_CONFIG[client]][0]
+            clientOP2 = previous_action[config.CLIENTS_CONFIG[client]][1]
+
             client_comp_share = prev_action_each_client_tt[client]['client_comp'] / total_client_time
             edge_comp_share = prev_action_each_client_tt[client]['edge_comp'] / total_client_time
             server_comp_share = prev_action_each_client_tt[client]['server_comp'] / total_client_time
             client_comm_share = prev_action_each_client_tt[client]['client_comm'] / total_client_time
             edge_server_comm_share = prev_action_each_client_tt[client]['edge_server_comm'] / total_client_time
 
+            op2_bigger_than_op1 = {layer: size for layer, size in activation_size.items() if layer >= clientOP1}
+            layer_with_min_size = min(op2_bigger_than_op1, key=op2_bigger_than_op1.get)
+
             shares[client] = {'client_comp': 0,
                               'edge_comp': edge_comp_share,
                               'server_comp': server_comp_share,
                               'client_comm': 0,
                               'edge_server_comm': edge_server_comm_share}
+            if clientOP2 == layer_with_min_size:
+                shares[client]['edge_server_comm'] = 0
 
             bottlenecks[client] = sorted(shares[client].items(), key=lambda item: item[1], reverse=True)
 
@@ -1195,6 +1203,32 @@ def edge_based_heuristic_splitting(state: dict, label):
             current_bad_device.remove(badClient)
             bad_tt_device_and_bad_energy.remove(badClient)
 
+            for client in runningClients:
+                total_client_time = total_time_for_each_client[client]
+
+                clientOP1 = new_action[config.CLIENTS_CONFIG[client]][0]
+                clientOP2 = new_action[config.CLIENTS_CONFIG[client]][1]
+                edgeIP = config.CLIENT_MAP[client]
+
+                client_comp_share = time_for_each_client[client]['client_comp'] / total_client_time
+                edge_comp_share = time_for_each_client[client]['edge_comp'] / total_client_time
+                server_comp_share = time_for_each_client[client]['server_comp'] / total_client_time
+                client_comm_share = time_for_each_client[client]['client_comm'] / total_client_time
+                edge_server_comm_share = time_for_each_client[client]['edge_server_comm'] / total_client_time
+
+                op2_bigger_than_op1 = {layer: size for layer, size in activation_size.items() if layer >= clientOP1}
+                layer_with_min_size = min(op2_bigger_than_op1, key=op2_bigger_than_op1.get)
+
+                shares[client] = {'client_comp': 0,
+                                  'edge_comp': edge_comp_share,
+                                  'server_comp': server_comp_share,
+                                  'client_comm': 0,
+                                  'edge_server_comm': edge_server_comm_share}
+                if clientOP2 == layer_with_min_size:
+                    shares[client]['edge_server_comm'] = 0
+
+                bottlenecks[client] = sorted(shares[client].items(), key=lambda item: item[1], reverse=True)
+
         return new_action, 0, 0, new_edge_nice_value, new_server_nice_value
 
     elif ALPHA == 0:
@@ -1406,6 +1440,8 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
     edge_memory = triedBefore(currentAction, config.CLIENT_MAP[changedClient])
     server_memory = triedBefore(currentAction)
 
+    temp_time_for_each_client = copy.deepcopy(time_for_each_client)
+
     for client in active_clients:
         edgeIP = config.CLIENT_MAP[client]
         ClientOP1 = currentAction[config.CLIENTS_CONFIG[client]][0]
@@ -1423,18 +1459,18 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
         else:
             edge_server_transmission_time_for_each_client = (2 * total_model_size) / edge_server_bw[edgeIP]
 
-        time_for_each_client[client] = {'client_comp': comp_time_on_each_client[client][ClientOP1],
+        temp_time_for_each_client[client] = {'client_comp': comp_time_on_each_client[client][ClientOP1],
                                         'client_comm': transmission_time_on_each_client,
                                         'edge_server_comm': edge_server_transmission_time_for_each_client}
         if ClientOP1 == ClientOP2:
-            time_for_each_client[client]['edge_comp'] = 0
+            temp_time_for_each_client[client]['edge_comp'] = 0
         if ClientOP2 == config.model_len - 1:
-            time_for_each_client[client]['server_comp'] = 0
+            temp_time_for_each_client[client]['server_comp'] = 0
 
     if (edge_memory is None) and (server_memory is None):
-        if ((time_for_each_client[changedClient]['client_comp'] +
-             time_for_each_client[changedClient]['client_comm'] +
-             time_for_each_client[changedClient]['edge_server_comm']) < baseline_tt):
+        if ((temp_time_for_each_client[changedClient]['client_comp'] +
+             temp_time_for_each_client[changedClient]['client_comm'] +
+             temp_time_for_each_client[changedClient]['edge_server_comm']) < baseline_tt):
             return False, 'NONE', None, None
         else:
             return True, 'NONE', None, None
@@ -1451,15 +1487,15 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
                     clientOP1 = currentAction[clientIndex][0]
                     clientOP2 = currentAction[clientIndex][1]
                     client_edge_comp = load_tt_map[f'{clientOP1},{clientOP2}']
-                    time_for_each_client[neighbour_client]['edge_comp'] = client_edge_comp
+                    temp_time_for_each_client[neighbour_client]['edge_comp'] = client_edge_comp
 
-                    total_time_for_each_client[neighbour_client] = (time_for_each_client[neighbour_client]['edge_comp'] +
-                                                                    time_for_each_client[neighbour_client]['client_comp'] +
-                                                                    time_for_each_client[neighbour_client]['client_comm'] +
-                                                                    time_for_each_client[neighbour_client]['edge_server_comm'])
+                    total_time_for_each_client[neighbour_client] = (temp_time_for_each_client[neighbour_client]['edge_comp'] +
+                                                                    temp_time_for_each_client[neighbour_client]['client_comp'] +
+                                                                    temp_time_for_each_client[neighbour_client]['client_comm'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm'])
                     if total_time_for_each_client[neighbour_client] > baseline_tt:
                         return True, 'EDGE', None, None
-            return False, 'EDGE', time_for_each_client, None
+            return False, 'EDGE', temp_time_for_each_client, None
 
         elif (edge_memory is None) and (server_memory is not None):
             load_tt_map_on_server, _, _, _ = server_memory
@@ -1470,15 +1506,15 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
                     clientIndex = config.CLIENTS_CONFIG[neighbour_client]
                     clientOP2 = currentAction[clientIndex][1]
                     client_server_comp = load_tt_map_on_server[f'{clientOP2}']
-                    time_for_each_client[neighbour_client]['server_comp'] = client_server_comp
+                    temp_time_for_each_client[neighbour_client]['server_comp'] = client_server_comp
 
-                    total_time_for_each_client[neighbour_client] = (time_for_each_client[neighbour_client]['server_comp'] +
-                                                                    time_for_each_client[neighbour_client]['client_comp'] +
-                                                                    time_for_each_client[neighbour_client]['client_comm'] +
-                                                                    time_for_each_client[neighbour_client]['edge_server_comm'])
+                    total_time_for_each_client[neighbour_client] = (temp_time_for_each_client[neighbour_client]['server_comp'] +
+                                                                    temp_time_for_each_client[neighbour_client]['client_comp'] +
+                                                                    temp_time_for_each_client[neighbour_client]['client_comm'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm'])
                     if total_time_for_each_client[neighbour_client] > baseline_tt:
                         return True, 'SERVER', None, None
-            return False, 'SERVER', time_for_each_client, None
+            return False, 'SERVER', temp_time_for_each_client, None
 
         elif (edge_memory is not None) and (server_memory is not None):
             neighbour_client_on_edge = [client for client in config.EDGE_MAP[changedClient] if client in active_clients]
@@ -1492,13 +1528,13 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
                 clientOP1 = currentAction[clientIndex][0]
                 clientOP2 = currentAction[clientIndex][1]
                 client_edge_comp = load_tt_map[f'{clientOP1},{clientOP2}']
-                time_for_each_client[neighbour_client]['edge_comp'] = client_edge_comp
+                temp_time_for_each_client[neighbour_client]['edge_comp'] = client_edge_comp
 
             for neighbour_client in active_clients:
                 clientIndex = config.CLIENTS_CONFIG[neighbour_client]
                 clientOP2 = currentAction[clientIndex][1]
                 client_server_comp = load_tt_map_on_server[f'{clientOP2}']
-                time_for_each_client[neighbour_client]['server_comp'] = client_server_comp
+                temp_time_for_each_client[neighbour_client]['server_comp'] = client_server_comp
 
             for modified_client in active_clients:
                 total_time_for_each_client[modified_client] = sum(time_for_each_client[modified_client].values())
@@ -1507,7 +1543,7 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
                 if (client not in bad_clients) or (client == changedClient):
                     if total_time_for_each_client[client] > baseline_tt:
                         return True, 'BOTH', None, None
-            return False, 'BOTH', time_for_each_client, total_time_for_each_client
+            return False, 'BOTH', temp_time_for_each_client, total_time_for_each_client
         else:
             raise Exception("Exception in checking TT violation")
 
@@ -1685,7 +1721,7 @@ def triedBefore(current_splitting, edgeName=None):
                 edges_info = item['edgeInfo']
                 server_info = item['serverInfo']
                 for clientIndex in clients_index:
-                    if current_splitting[clientIndex[0]] != current_splitting[clientIndex][1]:
+                    if current_splitting[clientIndex][0] != current_splitting[clientIndex][1]:
                         load_time_map[f'{current_splitting[clientIndex][0]},{current_splitting[clientIndex][1]}'] = \
                             client_info[config.CLIENTS_INDEX[matched_device_index[clientIndex]]]['edgeCompTime']
                     else:

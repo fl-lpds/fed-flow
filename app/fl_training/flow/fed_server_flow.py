@@ -265,7 +265,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             server.e_client_attendance(config.CLIENTS_LIST)
 
-
             fed_logger.info(f"computation time of each client on server[wall-time]: {server.process_wall_time}")
             fed_logger.info(
                 f"computation time of each client on edge[wall-time]: {server.computation_time_of_each_client_on_edges}")
