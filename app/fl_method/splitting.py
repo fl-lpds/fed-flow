@@ -313,8 +313,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                 else:
                     edge_server_comm_time_temp = (2 * total_model_size) / edge_server_bw[edgeIP]
 
-                if ((filtered_min_time_splitting_for_each_client[client][clientOP1][1] + edge_server_comm_time_temp)
-                        < classicFL_tt):
+                if (min_energy_trainingTime_splitting_for_each_client[client][0][2] + edge_server_comm_time_temp) < classicFL_tt:
                     action[config.CLIENTS_CONFIG[client]][1] = layer_with_min_size
             edge_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
             server_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
