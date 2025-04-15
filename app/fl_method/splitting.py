@@ -1459,8 +1459,8 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
             edge_server_transmission_time_for_each_client = (2 * total_model_size) / edge_server_bw[edgeIP]
 
         temp_time_for_each_client[client] = {'client_comp': comp_time_on_each_client[client][ClientOP1],
-                                        'client_comm': transmission_time_on_each_client,
-                                        'edge_server_comm': edge_server_transmission_time_for_each_client}
+                                             'client_comm': transmission_time_on_each_client,
+                                             'edge_server_comm': edge_server_transmission_time_for_each_client}
         if ClientOP1 == ClientOP2:
             temp_time_for_each_client[client]['edge_comp'] = 0
         if ClientOP2 == config.model_len - 1:
@@ -1516,7 +1516,7 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
             return False, 'SERVER', temp_time_for_each_client, None
 
         elif (edge_memory is not None) and (server_memory is not None):
-            neighbour_client_on_edge = [client for client in config.EDGE_MAP[changedClient] if client in active_clients]
+            neighbour_client_on_edge = [client for client in config.EDGE_MAP[edgeIP] if client in active_clients]
             neighbour_client_on_server = active_clients
 
             load_tt_map, _, _, _ = edge_memory
