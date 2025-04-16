@@ -206,17 +206,14 @@ def edge_based_heuristic_splitting(state: dict, label):
         filtered_min_time_splitting_for_each_client[client] = [item for item in
                                                                min_time_splitting_for_each_client[client] if
                                                                item[1] <= classicFL_tt]
-        fed_logger.info(Fore.GREEN + f"filtered_min_time_splitting_for_each_client: {filtered_min_time_splitting_for_each_client}")
-        fed_logger.info(Fore.GREEN + f"min_energy_splitting_for_each_client: {min_energy_splitting_for_each_client}")
-
         for op1, energy in min_energy_splitting_for_each_client[client]:
             if clients_time_for_each_op1[client][op1] < classicFL_tt:
                 min_energy_trainingTime_splitting_for_each_client[client].append((op1, energy, clients_time_for_each_op1[client][op1]))
 
-        fed_logger.info(Fore.GREEN + f"   Energy[Ascending]: {min_energy_splitting_for_each_client[client]}")
-        fed_logger.info(Fore.GREEN + f"   Time[Ascending]: {min_time_splitting_for_each_client[client]}")
-        fed_logger.info(
-            Fore.GREEN + f"   Energy-TrainingTime[Ascending]: {min_energy_trainingTime_splitting_for_each_client[client]}")
+        # fed_logger.info(Fore.GREEN + f"   Energy[Ascending]: {min_energy_splitting_for_each_client[client]}")
+        # fed_logger.info(Fore.GREEN + f"   Time[Ascending]: {min_time_splitting_for_each_client[client]}")
+        # fed_logger.info(
+        #     Fore.GREEN + f"   Energy-TrainingTime[Ascending]: {min_energy_trainingTime_splitting_for_each_client[client]}")
         fed_logger.info(Fore.GREEN + f"---------------------------------------------------------------------------")
 
     isEnergyEfficient = {client: tuple() for client in runningClients}
@@ -436,7 +433,7 @@ def edge_based_heuristic_splitting(state: dict, label):
             currentOffloadingShares = each_splitting_share[currentOffloading[0]][currentOffloading[1]]
             fed_logger.info(Fore.GREEN + f"Bad Client: {badClient}")
             fed_logger.info(Fore.GREEN + f"Bad Client Bottleneck: {bottleneck}")
-            fed_logger.info(Fore.GREEN + f"Bad Client times: {time_for_each_client}")
+            fed_logger.info(Fore.GREEN + f"Bad Client times: {time_for_each_client[badClient]}")
 
             if badClient in high_prio_bad_energy_consuming_client and badClient not in current_bad_device:
                 best_time_section = sorted(((k, v) for k, v in time_for_each_client[badClient].items() if k != 'client_comp' or k != 'client_comm'),
@@ -1661,6 +1658,9 @@ def triedBefore(current_splitting, edgeName=None):
     Example:
         >>> triedBefore([[1,2]], 'edge1')
     """
+    fed_logger.info(Fore.GREEN + f"MEMORY LOADING")
+    fed_logger.info(Fore.GREEN + f"=======================================")
+    fed_logger.info(Fore.GREEN + f"CURRENT SPLITTING: {current_splitting}")
 
     memory = load_memory('/fed-flow/app/model/memory.json')['history']
     load_time_map = {}
@@ -1714,17 +1714,30 @@ def triedBefore(current_splitting, edgeName=None):
                     memory_edges_splitting.append(memory_splitting[client_index])
 
             if Counter(map(tuple, edges_splitting)) == Counter(map(tuple, memory_edges_splitting)):
+                fed_logger.info(Fore.GREEN + f"CURRENT SPLITTING ON EDGE: {edges_splitting}")
+                fed_logger.info(Fore.GREEN + f"MATCHED SPLITTING: {memory_edges_splitting}")
+
                 value_to_index = {tuple(value): idx for idx, value in enumerate(memory_splitting)}
                 matched_device_index = {i: value_to_index[tuple(val)] for i, val in enumerate(current_splitting)}
+
+                fed_logger.info(Fore.GREEN + f"VALUE TO INDEX: {value_to_index}")
+                fed_logger.info(Fore.GREEN + f"MATCHED DEVICE INDEX: {matched_device_index}")
+
                 client_info = item['clientInfo']
                 edges_info = item['edgeInfo']
                 server_info = item['serverInfo']
+
+                fed_logger.info(Fore.GREEN + f"CLIENT INFO: {client_info}")
+
                 for clientIndex in clients_index:
                     if current_splitting[clientIndex][0] != current_splitting[clientIndex][1]:
                         load_time_map[f'{current_splitting[clientIndex][0]},{current_splitting[clientIndex][1]}'] = \
                             client_info[config.CLIENTS_INDEX[matched_device_index[clientIndex]]]['edgeCompTime']
                     else:
                         load_time_map[f'{current_splitting[clientIndex][0]},{current_splitting[clientIndex][1]}'] = 0
+
+                fed_logger.info(Fore.GREEN + f"LOAD TIME MAP: {load_time_map}")
+
                 return load_time_map, client_info, edges_info, server_info
         return None
     else:
