@@ -1683,7 +1683,7 @@ def triedBefore(current_splitting, edgeName=None):
                 currentSplitting_op2 = [client_splitting[1] for client_splitting in current_splitting]
                 memorySplitting_op2 = [client_splitting[1] for client_splitting in splitting]
                 value_to_index = {value: idx for idx, value in enumerate(memorySplitting_op2)}
-                matched_device_index = {i: value_to_index[val] for i, val in enumerate(currentSplitting_op2)}
+                matched_device_index = {i: value_to_index[val] for i, val in enumerate(currentSplitting_op2) if val != config.model_len - 1}
                 client_info = item['clientInfo']
                 edges_info = item['edgeInfo']
                 server_info = item['serverInfo']
@@ -1714,11 +1714,11 @@ def triedBefore(current_splitting, edgeName=None):
                     memory_edges_splitting.append(memory_splitting[client_index])
 
             if Counter(map(tuple, edges_splitting)) == Counter(map(tuple, memory_edges_splitting)):
-                fed_logger.info(Fore.GREEN + f"CURRENT SPLITTING ON EDGE: {edges_splitting}")
-                fed_logger.info(Fore.GREEN + f"MATCHED SPLITTING: {memory_edges_splitting}")
+                fed_logger.info(Fore.GREEN + f"CURRENT SPLITTING ON EDGE: {memory_edges_splitting}")
+                fed_logger.info(Fore.GREEN + f"MATCHED SPLITTING: {memory_splitting}")
 
                 value_to_index = {tuple(value): idx for idx, value in enumerate(memory_splitting)}
-                matched_device_index = {i: value_to_index[tuple(val)] for i, val in enumerate(current_splitting)}
+                matched_device_index = {i: value_to_index[tuple(val)] for i, val in enumerate(current_splitting) if val[0] != val[1]}
 
                 fed_logger.info(Fore.GREEN + f"VALUE TO INDEX: {value_to_index}")
                 fed_logger.info(Fore.GREEN + f"MATCHED DEVICE INDEX: {matched_device_index}")
