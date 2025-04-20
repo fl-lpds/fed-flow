@@ -26,6 +26,10 @@ docker_compose_configs = [
         "compose_name": "Random",
     },
     {
+        "compose_file": "test_fedmec_offloading_simnet_1_2_10.yaml",
+        "compose_name": "FedMec",
+    },
+    {
         "compose_file": "test_heuristic_offloading_simnet_1_2_10.yaml",
         "compose_name": "OurMethod",
     },
@@ -130,6 +134,13 @@ def main():
 
         # Copy the config file
         copy_config_file()
+        logger.info(f"Deleting cached data at brokers' folder")
+        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker1_data/mnesia"], check=True)
+        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker1_data/.erlang.cookie"], check=True)
+
+        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker2_data/mnesia"], check=True)
+        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker2_data/.erlang.cookie"], check=True)
+        logger.info(f"cached deleted.")
 
         # Start the current compose file
         up_compose(compose_file)

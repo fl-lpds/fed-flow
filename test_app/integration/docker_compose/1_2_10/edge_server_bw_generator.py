@@ -17,7 +17,7 @@ for r in range(100):
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 15 <= r < 20:
         for edgeIndex in range(edge_number):
-            bw = random.randint(5_000_000, 10_000_000)
+            bw = random.randint(50_000, 500_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 20 <= r < 45:
         for edgeIndex in range(edge_number):

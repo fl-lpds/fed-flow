@@ -1,6 +1,7 @@
 import sys
 
-CLIENTS_BANDWIDTH = []
+CLIENTS_BANDWIDTH = [1_000_000, 2_000_000, 10_000_000, 10_000_000, 40_000_000,
+                     15_000_000, 500_000, 20_000_000, 10_000_000, 40_000_000]
 index = 0
 simnet = False
 # Dataset configration
@@ -18,7 +19,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 50000  # data length
+N = 20000  # data length
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
