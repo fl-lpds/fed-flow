@@ -187,6 +187,7 @@ services:
   client3:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -210,6 +211,7 @@ services:
   client4:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -233,6 +235,7 @@ services:
   client5:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -303,6 +306,7 @@ services:
   client8:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -326,6 +330,7 @@ services:
   client9:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -349,6 +354,7 @@ services:
   client10:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
