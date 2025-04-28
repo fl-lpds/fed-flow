@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 
 # List your Docker Compose file paths and corresponding config file paths
 docker_compose_configs = [
-    {
-        "compose_file": "test_classicFL_simnet_1_2_10.yaml",
-        "compose_name": "ClassicFL",
-    },
-    {
-        "compose_file": "test_only_edge_simnet_1_2_10.yaml",
-        "compose_name": "OnlyEdge",
-    },
+    # {
+    #     "compose_file": "test_classicFL_simnet_1_2_10.yaml",
+    #     "compose_name": "ClassicFL",
+    # },
+    # {
+    #     "compose_file": "test_only_edge_simnet_1_2_10.yaml",
+    #     "compose_name": "OnlyEdge",
+    # },
     {
         "compose_file": "test_only_server_simnet_1_2_10.yaml",
         "compose_name": "OnlyServer",
@@ -65,7 +65,7 @@ def down_compose(compose_file):
     Bring down the Docker Compose stack.
     """
     logger.info(f"Stopping containers for {compose_file}")
-    subprocess.run(["docker", "compose", "-f", compose_file, "down"], check=True)
+    subprocess.run(["docker", "compose", "-f", compose_file, "down", "--timeout", "0"], check=True)
 
 
 def copy_config_file():
@@ -135,11 +135,11 @@ def main():
         # Copy the config file
         copy_config_file()
         logger.info(f"Deleting cached data at brokers' folder")
-        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker1_data/mnesia"], check=True)
-        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker1_data/.erlang.cookie"], check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/mnesia/', shell=True, check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/.erlang.cookie', shell=True, check=True)
 
-        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker2_data/mnesia"], check=True)
-        subprocess.run(["echo", "Alireza@123", "|", "sudo", "-S", "rm", "-r", "./broker2_data/.erlang.cookie"], check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker2_data/mnesia/', shell=True, check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker2_data/.erlang.cookie', shell=True, check=True)
         logger.info(f"cached deleted.")
 
         # Start the current compose file
