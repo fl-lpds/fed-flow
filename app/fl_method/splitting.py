@@ -123,7 +123,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     each_splitting_share = {op1: {op2: {} for op2 in range(op1, config.model_len)} for op1 in range(config.model_len)}
     max_computation_on_client = sum(flops_of_each_layer)
     max_computation_on_edge_and_server = sum(flops_of_each_layer[1:])
-    max_comm = 2 * batchNumber * max(activation_size.values()) + 2 * total_model_size
+    max_comm = (2 * batchNumber * max(activation_size.values())) + (2 * total_model_size)
 
     for op1 in range(config.model_len):
         for op2 in range(op1, config.model_len):
@@ -131,11 +131,10 @@ def edge_based_heuristic_splitting(state: dict, label):
                 'client_comp': sum(flops_of_each_layer[:op1 + 1]) / max_computation_on_client,
                 'edge_comp': sum(flops_of_each_layer[op1 + 1:op2 + 1]) / max_computation_on_edge_and_server,
                 'server_comp': sum(flops_of_each_layer[op2 + 1:]) / max_computation_on_edge_and_server,
-                'client_comm': (2 * batchNumber * activation_size[
-                    op1]) + total_model_size / max_comm if (
-                        op1 != config.model_len - 1) else total_model_size / max_comm,
-                'edge_server_comm': (2 * batchNumber * activation_size[
-                    op2]) + total_model_size / max_comm if op2 != config.model_len - 1 else total_model_size / max_comm,
+                'client_comm': (2 * batchNumber * activation_size[op1]) + (2 * total_model_size) / max_comm if (op1 != config.model_len - 1)
+                else (2 * total_model_size) / max_comm,
+                'edge_server_comm': (2 * batchNumber * activation_size[op2]) + (2 * total_model_size) / max_comm if op2 != config.model_len - 1
+                else (2 * total_model_size) / max_comm,
             }
 
     clients_computation_e, clients_communication_e, clients_totals_e = energyEstimator(previous_action,
@@ -368,7 +367,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.GREEN + f"High Priority Energy: {high_prio_bad_energy_consuming_client}")
         fed_logger.info(Fore.GREEN + f"IsEnergy Efficient: {isEnergyEfficient}")
 
-        if badClient in high_prio_bad_energy_consuming_client and badClient not in current_bad_device:
+        if (badClient in high_prio_bad_energy_consuming_client) and (badClient not in current_bad_device):
             best_time_section = sorted(((k, v) for k, v in time_for_each_client[badClient].items() if k != 'client_comp' or k != 'client_comm'),
                                        key=lambda item: item[1])
 
@@ -399,31 +398,32 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                        batchNumber)
                             if not isViolated:
                                 if memoryAvailability == 'BOTH':
-                                    if ((clients_time_for_each_op1[badClient][currentOffloading[0]] +
-                                         newTimes[badClient]['edge_comp'] + newTimes[badClient]['server_comp'] +
-                                         newTimes[badClient]['edge_server_comm']) < baseline_tt):
-                                        new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if ((clients_time_for_each_op1[badClient][op1] +
+                                         newTimes[badClient]['edge_comp'] +
+                                         newTimes[badClient]['server_comp'] +
+                                         edge_server_comm_time_temp) < baseline_tt):
+                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                         time_for_each_client = newTimes
                                         total_time_for_each_client = newTotalTimes
                                         deviceChanged = True
                                         break
                                 elif memoryAvailability == 'EDGE':
-                                    if ((newTimes[badClient]['edge_comp'] + edge_server_comm_time_temp) <
-                                            time_for_each_client[badClient]['edge_comp'] +
-                                            time_for_each_client[badClient]['edge_server_comm']):
-                                        new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if ((clients_time_for_each_op1[badClient][op1] +
+                                         newTimes[badClient]['edge_comp'] +
+                                         edge_server_comm_time_temp) < baseline_tt):
+                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                         deviceChanged = True
                                         break
                                 elif memoryAvailability == 'SERVER':
-                                    if ((newTimes[badClient]['server_comp'] + edge_server_comm_time_temp) <
-                                            time_for_each_client[badClient]['server_comp'] +
-                                            time_for_each_client[badClient]['edge_server_comm']):
-                                        new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if ((newTimes[badClient]['server_comp'] +
+                                         edge_server_comm_time_temp +
+                                         clients_time_for_each_op1[badClient][op1]) < baseline_tt):
+                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                         deviceChanged = True
                                         break
                                 elif memoryAvailability == 'NONE':
-                                    if edge_server_comm_time_temp < time_for_each_client[badClient]['edge_comp']:
-                                        new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if (clients_time_for_each_op1[badClient][op1] + edge_server_comm_time_temp) < baseline_tt:
+                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                         deviceChanged = True
                                         break
                                 else:
