@@ -107,14 +107,15 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     res = {}
     res['training_time'], res['test_acc_record'], res['bandwidth_record'] = [], [], []
-    fed_logger.info(f"OPTION: {options}")
+    fed_logger.info(Fore.YELLOW + f"OPTION: {options}")
 
-    fed_logger.info(Fore.RED + f"PID of process: {os.getpid()}")
+    fed_logger.info(Fore.YELLOW + f"PID of process: {os.getpid()}")
     if os.getpid() > 0:
-        fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's activation and gradient size started on server")
+        fed_logger.info(Fore.YELLOW + f"Calculation of Each layer's activation and gradient size started on server")
         server.calculate_each_layer_activation_gradiant_size()
         server.remove_non_pickleable()
-    fed_logger.info(Fore.MAGENTA + f"Calculation of Each layer's FLOP started on server")
+
+    fed_logger.info(Fore.YELLOW + f"Calculation of Each layer's FLOP started on server")
     server.calculate_each_layer_FLOP()
 
     flops_of_each_layer = server.model_flops_per_layer
@@ -123,37 +124,12 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
 
-    # # low load on edge 90% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.9, 1.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # medium load on edge 50% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.5, 1.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # high load on edge 100% of each model on edge
-    # op1, op2 = rl_utils.actionToLayer([0.0, 1.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # low load on server 90% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.9, 0.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # medium load on server 50% of each model on client
-    # op1, op2 = rl_utils.actionToLayer([0.5, 0.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    #
-    # # high load on server 100% of each model on edge
-    # op1, op2 = rl_utils.actionToLayer([0.0, 0.0], flops_of_each_layer)
-    # test_load_on_edges_and_server.append([[op1, op2] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-
     for layer in range(config.model_len - 1):
-        test_load_on_edges_and_server.append(
-            [[layer, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
+        test_load_on_edges_and_server.append([[layer, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
-    fed_logger.info(Fore.RED + f"Load testing: {test_load_on_edges_and_server}")
+    fed_logger.info(Fore.YELLOW + f"Energy Testing: {test_load_on_edges_and_server}")
 
-    fed_logger.info('Getting power usage from edge servers')
+    fed_logger.info(Fore.YELLOW + f'Getting power usage from edge servers')
     server.get_power_of_client()
 
     simulated_edge_server_bw = {}
@@ -165,12 +141,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
         if config.K > 0:
 
             config.current_round = r
-            fed_logger.info('====================================>')
-            fed_logger.info('==> Round {:} Start'.format(r))
+            fed_logger.info(Fore.YELLOW + f'====================================>')
+            fed_logger.info(Fore.YELLOW + f'==> Round {r} Start')
 
             s_time = time.time()
             process_time_start = time.process_time()
 
+            fed_logger.info(Fore.YELLOW + f"Measuring clients and edges BW")
             if not server.simnet:
                 fed_logger.info("receiving client network info")
                 server.client_network(config.EDGE_SERVER_LIST)
@@ -188,27 +165,33 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
             for edge_server in server.edge_bandwidth.keys():
                 edge_server_BW[edge_server].append(server.edge_bandwidth[edge_server])
 
-            # fed_logger.info("preparing state...")
-            # server.offloading = server.get_offloading(server.split_layers)
-
-            fed_logger.info("clustering")
-            server.cluster(options)
-
-            fed_logger.info("getting state")
-            offloading = server.split_layers
-
-            fed_logger.info("creating state")
             for client, index in config.CLIENTS_CONFIG.items():
                 if client not in config.CLIENTS_LIST:
                     server.split_layers[index] = [config.model_len, config.model_len]
-            state = server.edge_based_state()
 
             if r < len(test_load_on_edges_and_server) and options.get('splitting') == 'edge_based_heuristic':
                 server.split_layers = test_load_on_edges_and_server[r]
                 server.server_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
                 server.edge_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
-                splitting_list.append(server.split_layers)
+
+            elif options.get('splitting') == 'edge_rl_splitting' and r == 0:
+                server.split_layers = config.split_layer
+            elif options.get('splitting') == 'edge_rl_splitting':
+
+                fed_logger.info(Fore.YELLOW + f"Clustering based on BW")
+                server.cluster(options)
+
+                fed_logger.info("Creating state")
+                server.offloading = server.get_offloading(server.split_layers)
+                ttpi_of_each_client = {client: clientTT[client][-1] for client in config.CLIENTS_LIST}
+                ttpi = server.ttpi(config.CLIENTS_LIST, ttpi_of_each_client)
+                state = server.concat_norm(ttpi, server.offloading)
+
+                fed_logger.info("splitting")
+                server.split(state, options)
             else:
+
+                state = server.edge_based_state()
                 fed_logger.info("splitting")
                 splitTime_start = time.time()
                 server.split(state, options)
@@ -218,6 +201,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 splitting_list.append(server.split_layers)
                 fed_logger.info(Fore.MAGENTA + f"SERVER Nice Value : {server.server_nice_value}")
                 fed_logger.info(Fore.MAGENTA + f"EDGE Nice Value : {server.edge_nice_value}")
+
+            splitting_list.append(server.split_layers)
 
             fed_logger.info("Scattering splitting info to edges.")
             server.send_split_layers_config()
@@ -573,6 +558,8 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                flop_of_each_client_on_edge=None, flop_of_each_client_on_server=None, edge_server_comm_time=None,
                splitting=None, splitting_method=None):
     base_dir = "/fed-flow/Graphs/results_npy"
+    MEMORY_FILE = "/fed-flow/app/model/memory.json"
+
     if not os.path.exists(base_dir):
         os.makedirs(base_dir)
 
@@ -609,6 +596,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
 
     new_memory = {
         'splitting': splitting[-1],
+        'repeat_count': 0,
         'clientInfo': {client: {} for client in config.CLIENTS_LIST},
         'edgeInfo': {edge: {} for edge in config.EDGE_SERVER_LIST},
         'serverInfo': {}
@@ -901,20 +889,46 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         model_utils.createFlopsPredictionModel(flop_time_csv_path='/fed-flow/Graphs/server_flop_time.csv', isEdge=False)
 
     # saving history
-    MEMORY_FILE = "/fed-flow/app/model/memory.json"
     try:
         # Load existing memory
         with open(MEMORY_FILE, "r") as f:
             memory = json.load(f)
+            isDuplicated = False
+            for prev_records in memory['history']:
+                if prev_records['splitting'] == splitting[-1]:
+                    isDuplicated = True
+                    repeat_count = prev_records['repeat_count'] + 1
+                    for client in prev_records['clientInfo']:
+
+                        prev_average = prev_records['clientInfo'][client]['serverCompTime']
+                        new_number = new_memory['clientInfo'][client]['serverCompTime']
+                        new_average = prev_average + (new_number - prev_average) / repeat_count
+                        prev_records['clientInfo'][client]['serverCompTime'] = new_average
+
+                        prev_average = prev_records['clientInfo'][client]['edgeCompTime']
+                        new_number = new_memory['clientInfo'][client]['edgeCompTime']
+                        new_average = prev_average + (new_number - prev_average) / repeat_count
+                        prev_records['clientInfo'][client]['edgeCompTime'] = new_average
+
+                        prev_average = prev_records['clientInfo'][client]['clientCompTime']
+                        new_number = new_memory['clientInfo'][client]['clientCompTime']
+                        new_average = prev_average + (new_number - prev_average) / repeat_count
+                        prev_records['clientInfo'][client]['clientCompTime'] = new_average
+
+                    prev_records['repeat_count'] = repeat_count
+                    with open(MEMORY_FILE, "w") as f:
+                        json.dump(memory, f, indent=4)
+                    break
+
+            if not isDuplicated:
+                memory["history"].append(new_memory)
+                with open(MEMORY_FILE, "w") as f:
+                    json.dump(memory, f, indent=4)
     except (FileNotFoundError, json.JSONDecodeError):
         memory = {'history': []}  # Create new memory if file doesn't exist
-
-        # Append new decision
-    memory["history"].append(new_memory)
-
-    # Save back to JSON
-    with open(MEMORY_FILE, "w") as f:
-        json.dump(memory, f, indent=4)
+        memory["history"].append(new_memory)
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(memory, f, indent=4)
 
 
 def run(options_ins):

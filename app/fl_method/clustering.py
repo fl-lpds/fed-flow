@@ -30,7 +30,6 @@ def bandwidth(edge_server_BW):
 
     # Print device clusters
     device_clusters = list(zip(client_edge_BW, edge_server_bw_list, clusters))
-    print("Device Clusters (Device↔Edge BW, Edge↔Server BW, Cluster ID):")
     for dc in device_clusters:
         labels.append(dc[2])
 
