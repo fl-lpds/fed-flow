@@ -264,8 +264,8 @@ def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.MAGENTA + f"Action's training time per client[per section]: {prev_action_each_client_tt}")
 
     baseline_tt *= 1.05
-    if prev_action_tt <= baseline_tt:
-        return previous_action, 0, 0, previous_edge_nice_value, previous_server_nice_value
+    # if prev_action_tt <= baseline_tt:
+    #     return previous_action, 0, 0, previous_edge_nice_value, previous_server_nice_value
 
     # Phase 1: Finding bottleneck devices
     bad_clients = {client: time for client, time in prev_action_each_client_total_tt.items() if time > baseline_tt}
@@ -1252,7 +1252,7 @@ def action_to_layer(action):  # Expanding group actions to each device
         idx = idx[0][-1]
         if idx >= 5:  # all FC layers combine to one option
             idx = 6
-        split_layer.append(int(idx))
+        split_layer.append([int(idx), int(idx)])
     return split_layer
 
 
@@ -1590,25 +1590,23 @@ def triedBefore(current_splitting, edgeName=None):
             if Counter(map(tuple, edges_splitting)) == Counter(map(tuple, memory_edges_splitting)):
                 fed_logger.info(Fore.GREEN + f"CURRENT SPLITTING ON EDGE: {memory_edges_splitting}")
                 fed_logger.info(Fore.GREEN + f"MATCHED SPLITTING: {memory_splitting}")
-
-                value_to_index = {tuple(value): idx for idx, value in enumerate(memory_splitting)}
-                matched_device_index = {i: value_to_index[tuple(val)] for i, val in enumerate(current_splitting) if val[0] != val[1]}
-
-                fed_logger.info(Fore.GREEN + f"VALUE TO INDEX: {value_to_index}")
-                fed_logger.info(Fore.GREEN + f"MATCHED DEVICE INDEX: {matched_device_index}")
-
                 client_info = item['clientInfo']
                 edges_info = item['edgeInfo']
                 server_info = item['serverInfo']
 
-                fed_logger.info(Fore.GREEN + f"CLIENT INFO: {client_info}")
+                for load in memory_edges_splitting:
+                    clientID_with_this_load = [i for i, val in enumerate(memory_splitting) if val == load]
+                    times_with_this_load = []
+                    for clientID in clientID_with_this_load:
+                        if clientID in clients_index:
+                            times_with_this_load.append(client_info[config.CLIENTS_INDEX[clientID]]['edgeCompTime'])
+                    load_time_map[f'{load[0]},{load[1]}'] = sum(times_with_this_load) / len(times_with_this_load)
 
-                for clientIndex in clients_index:
-                    if current_splitting[clientIndex][0] != current_splitting[clientIndex][1]:
-                        load_time_map[f'{current_splitting[clientIndex][0]},{current_splitting[clientIndex][1]}'] = \
-                            client_info[config.CLIENTS_INDEX[matched_device_index[clientIndex]]]['edgeCompTime']
-                    else:
-                        load_time_map[f'{current_splitting[clientIndex][0]},{current_splitting[clientIndex][1]}'] = 0
+                for index in clients_index:
+                    if current_splitting[index][0] == current_splitting[index][1]:
+                        load_time_map[f'{current_splitting[index][0]},{current_splitting[index][1]}'] = 0
+
+                fed_logger.info(Fore.GREEN + f"CLIENT INFO: {client_info}")
 
                 fed_logger.info(Fore.GREEN + f"LOAD TIME MAP: {load_time_map}")
 
