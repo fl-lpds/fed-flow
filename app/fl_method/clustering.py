@@ -1,17 +1,38 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+
 from app.config import config
 
 
-def bandwidth():
-    # sort bandwidth in test_config.CLIENTS_LIST order
-    bandwidth = config.CLIENTS_BANDWIDTH
-    bandwidth_order = []
-    for c in config.CLIENTS_LIST:
-        bandwidth_order.append(bandwidth[c])
+def bandwidth(edge_server_BW):
+    edge_server_bw_list = []
 
-    labels = [0, 0, 1, 0, 0]  # Previous clustering results in RL
-    for i in range(len(bandwidth_order)):
-        if bandwidth_order[i] < 5:
-            labels[i] = 2  # If network speed is limited under 5Mbps, we assign the device into group 2
+    # Constant: Bandwidth between device and edge
+    client_edge_BW = config.CLIENTS_BANDWIDTH
+
+    for client in config.CLIENTS_LIST:
+        edge_server_bw_list.append(edge_server_BW[config.CLIENT_MAP[client]])
+
+    # Stack features into a 2D array
+    features = np.column_stack((client_edge_BW, edge_server_bw_list))
+
+    # Normalize
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(features)
+
+    # KMeans clustering
+    kmeans = KMeans(n_clusters=3, random_state=0)
+    clusters = kmeans.fit_predict(features_scaled)
+
+    labels = []
+
+    # Print device clusters
+    device_clusters = list(zip(client_edge_BW, edge_server_bw_list, clusters))
+    print("Device Clusters (Device↔Edge BW, Edge↔Server BW, Cluster ID):")
+    for dc in device_clusters:
+        labels.append(dc[2])
 
     return labels
 
