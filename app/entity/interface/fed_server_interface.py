@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import torch
 from torch import nn
+from colorama import Fore
 
 from app.config import config
 from app.config.logger import fed_logger
@@ -179,6 +180,8 @@ class FedServerInterface(ABC, Communicator):
             ttpi_order.append(ttpi[c])
             offloading_order.append(offloading[c])
 
+        fed_logger.info(Fore.YELLOW + f"concat norm:\n ttpi: {ttpi}\n offloading: {offloading}\n labels: {self.group_labels}")
+
         group_max_index = [0 for i in range(config.G)]
         group_max_value = [0 for i in range(config.G)]
         for c in config.CLIENTS_LIST:
@@ -195,17 +198,15 @@ class FedServerInterface(ABC, Communicator):
     def get_offloading(self, split_layer):
         offloading = {}
         workload = 0
-        # assert len(split_layer) == len(config.CLIENTS_LIST)
+        flops_of_each_layer = {key: self.model_flops_per_layer[key] for key in sorted(self.model_flops_per_layer)}
+        flops_of_each_layer = list(flops_of_each_layer.values())
         for c in config.CLIENTS_LIST:
-            for l in range(model_utils.get_unit_model_len()):
-                split_point = split_layer[config.CLIENTS_CONFIG[c]]
-                if self.edge_based:
-                    split_point = split_layer[config.CLIENTS_CONFIG[c]][0]
-                if l <= split_point:
-                    workload += model_utils.get_class()().cfg[l][5]
-            offloading[c] = workload / config.total_flops
+            split_point = split_layer[config.CLIENTS_CONFIG[c]]
+            if self.edge_based:
+                split_point = split_layer[config.CLIENTS_CONFIG[c]][0]
+            workload = sum(flops_of_each_layer[:split_point + 1])
+            offloading[c] = workload / sum(flops_of_each_layer)
             workload = 0
-
         return offloading
 
     def ttpi(self, client_ips, clients_TT):
