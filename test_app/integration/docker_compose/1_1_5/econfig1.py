@@ -1,8 +1,8 @@
 import logging
 
-init_energy = 500000
+init_energy = 500_000
 tx_power = 0.15849
-power = 15
+power = 150
 counter = 0
 process = None
 simulate_network = False

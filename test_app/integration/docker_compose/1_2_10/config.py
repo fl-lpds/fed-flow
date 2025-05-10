@@ -19,7 +19,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 20000  # data length
+N = 10000  # data length
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
@@ -65,7 +65,7 @@ SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001, 'edge2': 5003}
 
 K = 10  # Number of devices
-G = 1  # Number of groups
+G = 3  # Number of groups
 S = 1  # Number of server connecting devices
 
 # Unique clients order

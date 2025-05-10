@@ -23,7 +23,7 @@ def bandwidth(edge_server_BW):
     features_scaled = scaler.fit_transform(features)
 
     # KMeans clustering
-    kmeans = KMeans(n_clusters=3, random_state=0)
+    kmeans = KMeans(n_clusters=config.G, random_state=0)
     clusters = kmeans.fit_predict(features_scaled)
 
     labels = []
