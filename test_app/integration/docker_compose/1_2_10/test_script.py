@@ -17,22 +17,26 @@ docker_compose_configs = [
     #     "compose_file": "test_only_edge_simnet_1_2_10.yaml",
     #     "compose_name": "OnlyEdge",
     # },
+    # {
+    #     "compose_file": "test_only_server_simnet_1_2_10.yaml",
+    #     "compose_name": "OnlyServer",
+    # },
+    # {
+    #     "compose_file": "test_random_splitting_simnet_1_2_10.yaml",
+    #     "compose_name": "Random",
+    # },
+    # {
+    #     "compose_file": "test_fedmec_offloading_simnet_1_2_10.yaml",
+    #     "compose_name": "FedMec",
+    # },
+    # {
+    #     "compose_file": "test_heuristic_offloading_simnet_1_2_10.yaml",
+    #     "compose_name": "OurMethod",
+    # },
     {
-        "compose_file": "test_only_server_simnet_1_2_10.yaml",
-        "compose_name": "OnlyServer",
-    },
-    {
-        "compose_file": "test_random_splitting_simnet_1_2_10.yaml",
-        "compose_name": "Random",
-    },
-    {
-        "compose_file": "test_fedmec_offloading_simnet_1_2_10.yaml",
-        "compose_name": "FedMec",
-    },
-    {
-        "compose_file": "test_heuristic_offloading_simnet_1_2_10.yaml",
-        "compose_name": "OurMethod",
-    },
+        "compose_file": "test_fedadapt_offloading_simnet_1_10.yaml",
+        "compose_name": "FedAdapt",
+    }
 ]
 
 SRC_CONFIG_FILE = 'config.py'
@@ -135,10 +139,10 @@ def main():
         # Copy the config file
         copy_config_file()
         logger.info(f"Deleting cached data at brokers' folder")
-        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/mnesia/', shell=True, check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/mnesia', shell=True, check=True)
         subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/.erlang.cookie', shell=True, check=True)
 
-        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker2_data/mnesia/', shell=True, check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker2_data/mnesia', shell=True, check=True)
         subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker2_data/.erlang.cookie', shell=True, check=True)
         logger.info(f"cached deleted.")
 

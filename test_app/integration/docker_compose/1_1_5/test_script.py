@@ -3,32 +3,35 @@ import os
 import subprocess
 import time
 
-logging.basicConfig(filename='test_script.log', level=logging.INFO,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # List your Docker Compose file paths and corresponding config file paths
 docker_compose_configs = [
+    # {
+    #     "compose_file": "test_classicFL_simnet_1_1_5.yaml",
+    #     "compose_name": "ClassicFL",
+    # },
+    # {
+    #     "compose_file": "test_only_edge_simnet_1_1_5.yaml",
+    #     "compose_name": "OnlyEdge",
+    # },
+    # {
+    #     "compose_file": "test_only_server_simnet_1_1_5.yaml",
+    #     "compose_name": "OnlyServer",
+    # },
+    # {
+    #     "compose_file": "test_random_splitting_simnet_1_1_5.yaml",
+    #     "compose_name": "Random",
+    # },
+    # {
+    #     "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
+    #     "compose_name": "OurMethod",
+    # },
     {
-        "compose_file": "test_classicFL_simnet_1_1_5.yaml",
-        "compose_name": "ClassicFL",
-    },
-    {
-        "compose_file": "test_only_edge_simnet_1_1_5.yaml",
-        "compose_name": "OnlyEdge",
-    },
-    {
-        "compose_file": "test_only_server_simnet_1_1_5.yaml",
-        "compose_name": "OnlyServer",
-    },
-    {
-        "compose_file": "test_random_splitting_simnet_1_1_5.yaml",
-        "compose_name": "Random",
-    },
-    {
-        "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
-        "compose_name": "OurMethod",
-    },
+        "compose_file": "test_fedadapt_offloading_simnet_1_10.yaml",
+        "compose_name": "FedAdapt",
+    }
 ]
 
 SRC_CONFIG_FILE = 'config.py'
@@ -61,7 +64,7 @@ def down_compose(compose_file):
     Bring down the Docker Compose stack.
     """
     logger.info(f"Stopping containers for {compose_file}")
-    subprocess.run(["docker", "compose", "-f", compose_file, "down"], check=True)
+    subprocess.run(["docker", "compose", "-f", compose_file, "down", "--timeout", "0"], check=True)
 
 
 def copy_config_file():
@@ -130,6 +133,11 @@ def main():
 
         # Copy the config file
         copy_config_file()
+
+        logger.info(f"Deleting cached data at brokers' folder")
+        subprocess.run('echo "Hm0132113" | sudo -S rm -rf ./broker1_data/mnesia', shell=True, check=True)
+        subprocess.run('echo "Hm0132113" | sudo -S rm -rf ./broker1_data/.erlang.cookie', shell=True, check=True)
+        logger.info(f"cached deleted.")
 
         # Start the current compose file
         up_compose(compose_file)
