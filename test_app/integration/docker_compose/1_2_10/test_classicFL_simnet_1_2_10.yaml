@@ -211,7 +211,7 @@ services:
   client4:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
-      - - ./econfig1.py:/fed-flow/energy/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"

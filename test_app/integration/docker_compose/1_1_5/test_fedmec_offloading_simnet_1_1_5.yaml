@@ -3,8 +3,8 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./../../../../Graphs:/fed-flow/Graphs
-    #  - ./../../../../app/model:/fed-flow/app/model
-    #  - ./../../../../app/logs:/fed-flow/app/logs
+      - ./../../../../app/model:/fed-flow/app/model
+      - ./../../../../app/logs:/fed-flow/app/logs
       - ./edge_server_bw.npz:/fed-flow/app/config/edge_server_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
@@ -20,14 +20,14 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '36'
+          cpus: '32'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
       - broker1
       - broker2
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -c bandwidth -sb True -s edge_rl_splitting -e True & python3 /fed-flow/energy/service.py  "
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -s fedmec_splitting -e True & python3 /fed-flow/energy/service.py  "
 
   edge1:
     volumes:
@@ -46,16 +46,16 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '4'
         reservations:
-          cpus: '2'
+          cpus: '4'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
     depends_on:
       - server
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -c bandwidth -sb True -s edge_rl_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -sb True -s fedmec_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
 
   broker1:
     attach: false
@@ -104,7 +104,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -c bandwidth -sb True -s edge_rl_splitting -en True -e True -iid True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -s fedmec_splitting -en True -e True -iid True & wait -n"
 
 
   client2:
@@ -128,7 +128,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -c bandwidth -sb True -s edge_rl_splitting -en True -e True -iid True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -s fedmec_splitting -en True -e True -iid True & wait -n"
 
   client3:
     volumes:
@@ -152,7 +152,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -c bandwidth -sb True -s edge_rl_splitting -en True -e True -iid True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb True -s fedmec_splitting -en True -e True -iid True & wait -n"
 
   client4:
     volumes:
@@ -176,7 +176,7 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 3 -o True -c bandwidth -sb True -s edge_rl_splitting -en True -e True -iid True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 3 -o True -sb True -s fedmec_splitting -en True -e True -iid True & wait -n"
 
   client5:
     volumes:
@@ -200,4 +200,4 @@ services:
       - server
       - edge1
       - broker1
-    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 4 -o True -c bandwidth -sb True -s edge_rl_splitting -en True -e True -iid True & wait -n"
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 4 -o True -sb True -s fedmec_splitting -en True -e True -iid True & wait -n"

@@ -3,33 +3,36 @@ import os
 import subprocess
 import time
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename='test_script.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# List your Docker Compose file paths and corresponding config file paths
 docker_compose_configs = [
-    # {
-    #     "compose_file": "test_classicFL_simnet_1_1_5.yaml",
-    #     "compose_name": "ClassicFL",
-    # },
-    # {
-    #     "compose_file": "test_only_edge_simnet_1_1_5.yaml",
-    #     "compose_name": "OnlyEdge",
-    # },
-    # {
-    #     "compose_file": "test_only_server_simnet_1_1_5.yaml",
-    #     "compose_name": "OnlyServer",
-    # },
-    # {
-    #     "compose_file": "test_random_splitting_simnet_1_1_5.yaml",
-    #     "compose_name": "Random",
-    # },
-    # {
-    #     "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
-    #     "compose_name": "OurMethod",
-    # },
     {
-        "compose_file": "test_fedadapt_offloading_simnet_1_10.yaml",
+        "compose_file": "test_classicFL_simnet_1_5.yaml",
+        "compose_name": "ClassicFL",
+    },
+    {
+        "compose_file": "test_only_edge_simnet_1_1_5.yaml",
+        "compose_name": "OnlyEdge",
+    },
+    {
+        "compose_file": "test_only_server_simnet_1_5.yaml",
+        "compose_name": "OnlyServer",
+    },
+    {
+        "compose_file": "test_random_splitting_simnet_1_1_5.yaml",
+        "compose_name": "Random",
+    },
+    {
+        "compose_file": "test_fedmec_offloading_simnet_1_1_5.yaml",
+        "compose_name": "FedMec",
+    },
+    {
+        "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
+        "compose_name": "OurMethod",
+    },
+    {
+        "compose_file": "test_fedadapt_offloading_simnet_1_5.yaml",
         "compose_name": "FedAdapt",
     }
 ]
@@ -38,7 +41,7 @@ SRC_CONFIG_FILE = 'config.py'
 DST_CONFIG_FILE = './../../../../app/config/config.py'
 
 # Folder to archive images
-ARCHIVE_BASE_FOLDER = './../../../../../results/1_1_5/'
+ARCHIVE_BASE_FOLDER = './../../../../../results/1_1_5/vgg5/'
 
 
 def get_running_containers_with_name(substring):
@@ -134,9 +137,9 @@ def main():
         # Copy the config file
         copy_config_file()
 
-        logger.info(f"Deleting cached data at brokers' folder")
-        subprocess.run('echo "Hm0132113" | sudo -S rm -rf ./broker1_data/mnesia', shell=True, check=True)
-        subprocess.run('echo "Hm0132113" | sudo -S rm -rf ./broker1_data/.erlang.cookie', shell=True, check=True)
+        logger.info(f"Deleting cached data at broker's folder")
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/mnesia', shell=True, check=True)
+        subprocess.run('echo "Alireza@123" | sudo -S rm -rf ./broker1_data/.erlang.cookie', shell=True, check=True)
         logger.info(f"cached deleted.")
 
         # Start the current compose file
@@ -157,6 +160,7 @@ def main():
                 break
 
             logger.info(f"Running 'client' containers: {running_clients}")
+
             # Wait and check again
             time.sleep(60)
 

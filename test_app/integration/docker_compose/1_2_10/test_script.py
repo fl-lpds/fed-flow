@@ -39,6 +39,7 @@ docker_compose_configs = [
     }
 ]
 
+
 SRC_CONFIG_FILE = 'config.py'
 DST_CONFIG_FILE = './../../../../app/config/config.py'
 

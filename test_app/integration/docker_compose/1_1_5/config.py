@@ -17,7 +17,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 5  # data length
+N = 5000  # data length
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
@@ -37,7 +37,7 @@ model_len = 7
 
 R = 100  # FL rounds
 LR = 0.01  # Learning rate
-B = 1  # Batch size
+B = 100  # Batch size
 
 # RL training configration
 max_episodes = 2000  # max training episodes
@@ -63,10 +63,10 @@ SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001}
 
 K = 5  # Number of devices
-G = 1  # Number of groups
+G = 3  # Number of groups
 S = 1  # Number of server connecting devices
 
-CLIENTS_BANDWIDTH = [1_000_000, 2_000_000, 10_000_000, 10_000_000, 40_000_000]
+CLIENTS_BANDWIDTH = [40_000_000, 2_000_000, 10_000_000, 1_000_000, 5_000_000]
 
 # Unique clients order
 HOST2IP = {}
