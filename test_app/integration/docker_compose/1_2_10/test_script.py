@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # List your Docker Compose file paths and corresponding config file paths
 docker_compose_configs = [
     # {
-    #     "compose_file": "test_classicFL_simnet_1_2_10.yaml",
+    #     "compose_file": "test_classicFL_simnet_1_10.yaml",
     #     "compose_name": "ClassicFL",
     # },
     # {
