@@ -136,6 +136,12 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     if server.simnet:
         simulated_edge_server_bw = np.load(f"/fed-flow/app/config/edge_server_bw.npz")
 
+    config.R = 10
+    if (options['splitting'] != 'edge_base_heuristic' or
+            options['splitting'] == 'edge_rl_splitting' or
+            options['splitting'] == 'random_splitting'):
+        config.R = 100
+
     for r in range(config.R):
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
         if config.K > 0:
@@ -899,7 +905,6 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                     isDuplicated = True
                     repeat_count = prev_records['repeat_count'] + 1
                     for client in prev_records['clientInfo']:
-
                         prev_average = prev_records['clientInfo'][client]['serverCompTime']
                         new_number = new_memory['clientInfo'][client]['serverCompTime']
                         new_average = prev_average + (new_number - prev_average) / repeat_count
