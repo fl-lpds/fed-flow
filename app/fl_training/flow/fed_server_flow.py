@@ -940,7 +940,7 @@ def run(options_ins):
     simnet = options_ins.get("simulatebandwidth") == "True"
 
     config.R = 10
-    if (options_ins.get('splitting') == 'edge_base_heuristic' or
+    if (options_ins.get('splitting') == 'edge_based_heuristic' or
             options_ins.get('splitting') == 'edge_rl_splitting' or
             options_ins.get('splitting') == 'random_splitting'):
         config.R = 100
