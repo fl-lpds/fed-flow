@@ -1,7 +1,8 @@
+import os
 import sys
 import threading
 import time
-import os
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -600,7 +601,8 @@ class FedServer(FedServerInterface):
                  "best_tt_splitting_found": self.best_tt_splitting_found,
                  "prev_edge_nice_value": self.edge_nice_value,
                  "prev_server_nice_value": self.server_nice_value,
-                 "current_round": config.current_round
+                 "current_round": config.current_round,
+                 "model": self.model_name
                  }
 
         return state
@@ -661,6 +663,7 @@ class FedServer(FedServerInterface):
     def calculate_each_layer_activation_gradiant_size(self):
         split_layer = [[config.model_len - 1, config.model_len - 1]] * len(config.CLIENTS_CONFIG.keys())
         model = model_utils.get_model('Client', split_layer[0], self.device, self.edge_based)
+        fed_logger.info(Fore.MAGENTA + f"Total model structure: {model}, {split_layer}")
 
         total_bits = 0
         for param_name, param in model.cpu().state_dict().items():
@@ -670,7 +673,7 @@ class FedServer(FedServerInterface):
         fed_logger.info(Fore.MAGENTA + f"Total Model Size (bit): {total_bits}")
         self.total_model_size = total_bits
 
-        def calculate_size_in_megabits(tensor):
+        def calculate_size_in_bits(tensor):
             num_elements = tensor.numel()
             size_in_bits = num_elements * 32  # assuming float32
             return size_in_bits
@@ -679,23 +682,26 @@ class FedServer(FedServerInterface):
         gradient_sizes = {}
 
         def forward_hook(module, input, output):
-            activation_size = calculate_size_in_megabits(output)
+            activation_size = calculate_size_in_bits(output)
             activation_sizes[module] = activation_size
 
         def backward_hook(module, grad_input, grad_output):
             if grad_output[0] is not None:
-                gradient_size_mb = calculate_size_in_megabits(grad_output[0])
+                gradient_size_mb = calculate_size_in_bits(grad_output[0])
                 gradient_sizes[module] = gradient_size_mb
 
         hooks = []
         for layer in model.modules():
-            if isinstance(layer, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU, nn.MaxPool2d, nn.Linear)):
+            if isinstance(layer, (nn.Conv2d, nn.BatchNorm2d, nn.ReLU, nn.MaxPool2d, nn.Linear, nn.Dropout)):
                 hooks.append(layer.register_forward_hook(forward_hook))
                 hooks.append(layer.register_backward_hook(backward_hook))
                 # layer.register_forward_hook(forward_hook)
                 # layer.register_backward_hook(backward_hook)
 
-        input_data = torch.randn(config.B, 3, 32, 32)
+        if self.model_name == 'alexnet':
+            input_data = torch.randn(config.B, 3, 227, 227)
+        else:
+            input_data = torch.randn(config.B, 3, 32, 32)
 
         output = model(input_data)
         output.mean().backward()
@@ -706,19 +712,25 @@ class FedServer(FedServerInterface):
 
         layer_activation = {}
         layer_gradient = {}
-        layer_num = 0
-        current = None
-        for num in list(activation_sizes.values()):
-            if num != current:
-                layer_activation[layer_num] = num
-                layer_num += 1
-                current = num
-            elif num == 13107200 and current == 13107200 and 4 not in layer_activation:
-                # Special case for the second occurrence of 12.5
-                layer_activation[layer_num] = num
-                layer_num += 1
+
+        fed_logger.info(Fore.MAGENTA + f"Activation Size: {activation_sizes}")
+
+        activation_layer_types = list(activation_sizes.keys())
+        activation_layer_sizes = [activation_sizes[layer] for layer in activation_layer_types]
+        fed_logger.info(Fore.MAGENTA + f"Layer Sizes: {activation_layer_sizes}")
+
+        if self.model_name == 'alexnet':
+            layer_index_map = {0: 3, 1: 7, 2: 10, 3: 13, 4: 17, 5: 20, 6: 23, 7: 24}
+        elif self.model_name == 'vgg':
+            layer_index_map = {0: 2, 1: 3, 2: 6, 3: 7, 4: 10, 5: 11, 6: 12}
+        else:
+            raise Exception("Model type not supported")
+
+        for layer, actual_layer_num in layer_index_map.items():
+            layer_activation[layer] = activation_layer_sizes[actual_layer_num]
+
         self.activation_size = layer_activation
-        self.gradient_size = gradient_sizes
+        self.gradient_size = layer_activation
         fed_logger.info(Fore.MAGENTA + f"Each layer activation (bit): {self.activation_size}")
         fed_logger.info(Fore.MAGENTA + f"Each layer gradient (bit): {self.gradient_size}")
 
@@ -748,6 +760,11 @@ class FedServer(FedServerInterface):
             bias_flops = batch_size * out_channels * height * width if layer.bias is not None else 0
 
             return conv_flops + bias_flops
+
+        def count_dropout_flops(input_shape):
+            batch_size, channels, height, width = input_shape
+            # One comparison operation per element
+            return batch_size * channels * height * width
 
         def count_batchnorm2d_flops(layer: nn.BatchNorm2d, input_shape) -> int:
             """Calculate FLOPS for a BatchNorm2d layer."""
@@ -788,6 +805,12 @@ class FedServer(FedServerInterface):
                     layer_flops[module] = flops
                     total_flops += flops
 
+                elif isinstance(module, nn.Dropout):
+                    # Dropout doesn't do computation at inference, but for training we can assume same cost as ReLU (optional)
+                    flops = count_dropout_flops(current_shape)
+                    layer_flops[module] = flops
+                    total_flops += flops
+
                 elif isinstance(module, nn.BatchNorm2d):
                     flops = count_batchnorm2d_flops(module, current_shape)
                     layer_flops[module] = flops
@@ -812,28 +835,32 @@ class FedServer(FedServerInterface):
 
         split_layer = [[config.model_len - 1, config.model_len - 1]] * len(config.CLIENTS_CONFIG.keys())
         model: nn.Module = model_utils.get_model('Client', split_layer[0], self.device, self.edge_based)
-        input_data = (config.B, 3, 32, 32)
+        if self.model_name == 'alexnet':
+            input_data = (config.B, 3, 227, 227)
+        else:
+            input_data = (config.B, 3, 32, 32)
         layer_flops, total_flops = analyze_model_flops(model, input_data)
 
-        flops_per_layer = {}
-        for i in range(config.model_len):
-            flops_per_layer[i] = 0
+        fed_logger.info(Fore.MAGENTA + f"Layer Flop: {layer_flops}, total Flops: {total_flops}")
+
+        flops_per_layer = {i: 0 for i in range(config.model_len)}
         layer_num = -1
         convLayerDependency = 2
-        for name, module in model.named_modules():
-            if (isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear) or
-                    isinstance(module, nn.MaxPool2d) or isinstance(module, nn.BatchNorm2d) or
-                    isinstance(module, nn.ReLU)):
-                if isinstance(module, nn.Conv2d):
-                    layer_num += 1
-                    flops_per_layer[layer_num] += layer_flops[module]
-                    convLayerDependency = 2
-                elif convLayerDependency != 0:
-                    flops_per_layer[layer_num] += layer_flops[module]
-                    convLayerDependency -= 1
-                elif convLayerDependency == 0:
-                    layer_num += 1
-                    flops_per_layer[layer_num] += layer_flops[module]
+
+        layer_flop_list = list(layer_flops.values())
+        if self.model_name == 'alexnet':
+            layer_index_map = {0: 3, 1: 7, 2: 10, 3: 13, 4: 17, 5: 20, 6: 23, 7: 24}
+
+        elif self.model_name == 'vgg':
+            layer_index_map = {0: 2, 1: 3, 2: 6, 3: 7, 4: 10, 5: 11, 6: 12}
+        else:
+            raise Exception("Model type not supported")
+
+        for layer in layer_index_map.keys():
+            if layer == 0:
+                flops_per_layer[layer] = sum(layer_flop_list[:layer_index_map[layer] + 1])
+            else:
+                flops_per_layer[layer] = sum(layer_flop_list[layer_index_map[layer - 1] + 1:layer_index_map[layer] + 1])
         fed_logger.info(Fore.MAGENTA + f"FLOPS PER LAYER: {flops_per_layer}")
         self.model_flops_per_layer = flops_per_layer
 
