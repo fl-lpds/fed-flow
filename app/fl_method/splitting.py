@@ -1214,11 +1214,14 @@ def randomSplitting(state, labels):
 # FedMec: which empirically deploys the convolutional layers of a DNN on the device-side while
 # assigning the remaining part to the edge server
 def FedMec(state, labels):
-    lastConvolutionalLayerIndex = 0
-    for i in config.model_cfg["VGG5"]:
-        """ C means convolutional layer """
-        if i[0] == 'C':
-            lastConvolutionalLayerIndex = config.model_cfg["VGG5"].index(i)
+    modelName = state['model']
+
+    if modelName == 'vgg':
+        lastConvolutionalLayerIndex = 4
+    elif modelName == 'alexnet':
+        lastConvolutionalLayerIndex = 4
+    else:
+        raise Exception("Invalid model name in splitting method")
 
     splittingArray = [[lastConvolutionalLayerIndex, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
     return splittingArray
