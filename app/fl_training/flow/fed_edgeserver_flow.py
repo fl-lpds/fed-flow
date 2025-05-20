@@ -25,6 +25,7 @@ def run_offload(server: FedEdgeServerInterface, LR, options):
 
     fed_logger.info('Getting power usage from clients and sending to server.')
     server.get_power_and_send_to_server()
+    fed_logger.info(Fore.LIGHTGREEN_EX + f"TOTAL ROUND: {config.R}")
 
     for r in range(config.R):
         fed_logger.info(Fore.LIGHTRED_EX + f" left clients {client_ips}")
@@ -151,6 +152,13 @@ def run(options_ins):
     offload = options_ins.get('offload')
     simnet = options_ins.get("simulatebandwidth") == "True"
     estimate_energy = options_ins.get("energy") == "True"
+
+    config.R = 10
+    if (options_ins.get('splitting') == 'edge_base_heuristic' or
+            options_ins.get('splitting') == 'edge_rl_splitting' or
+            options_ins.get('splitting') == 'random_splitting'):
+        config.R = 100
+
     if estimate_energy:
         energy_estimation.init(os.getpid())
     if offload:

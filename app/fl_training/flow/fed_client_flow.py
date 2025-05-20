@@ -27,6 +27,7 @@ def run_edge_based(client: FedClientInterface, LR):
 
     fed_logger.info('Sending power usage to edge.')
     client.send_power_to_edge()
+    fed_logger.info(Fore.LIGHTGREEN_EX + f"TOTAL ROUND: {config.R}")
 
     for r in range(config.R):
 
@@ -238,6 +239,12 @@ def run(options_ins):
     index = config.index
     datalen = config.N / config.K
     LR = config.LR
+
+    config.R = 10
+    if (options_ins.get('splitting') == 'edge_base_heuristic' or
+            options_ins.get('splitting') == 'edge_rl_splitting' or
+            options_ins.get('splitting') == 'random_splitting'):
+        config.R = 100
 
     fed_logger.info('Preparing Client')
     fed_logger.info('Preparing Data.')
