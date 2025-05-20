@@ -7,6 +7,7 @@ services:
       - ./../../../../app/logs:/fed-flow/app/logs
       - ./edge_server_bw.npz:/fed-flow/app/config/edge_server_bw.npz
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -20,7 +21,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '32'
+          cpus: '20'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -32,6 +33,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -45,9 +47,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '16'
         reservations:
-          cpus: '4'
+          cpus: '16'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -86,6 +88,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -95,7 +98,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: '4'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -109,6 +112,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -118,7 +122,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: '4'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -133,6 +137,7 @@ services:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -142,7 +147,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '8'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -157,6 +162,7 @@ services:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -166,7 +172,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '8'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -181,6 +187,7 @@ services:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -190,7 +197,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '8'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
