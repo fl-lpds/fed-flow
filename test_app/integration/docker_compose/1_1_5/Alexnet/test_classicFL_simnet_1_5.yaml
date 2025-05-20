@@ -7,6 +7,7 @@ services:
       #- ./../../../../app/logs:/fed-flow/app/logs
       - ./edge_server_bw.npz:/fed-flow/app/config/edge_server_bw.npz
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -32,6 +33,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -86,6 +88,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -110,6 +113,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -134,6 +138,7 @@ services:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -158,6 +163,7 @@ services:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
@@ -182,6 +188,7 @@ services:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
     image: autlpdslab/fedflow:rabbitmq
+    shm_size: '4g'
     logging:
       driver: "json-file"
       options:
