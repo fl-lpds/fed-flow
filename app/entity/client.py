@@ -39,6 +39,7 @@ class Client(FedClientInterface):
         msg = [message_utils.local_weights_client_to_edge(), self.net.cpu().state_dict()]
         self.send_msg(config.CLIENTS_INDEX[config.index], msg, True,
                       url=config.CLIENT_MAP[config.CLIENTS_INDEX[config.index]])
+        fed_logger.info(Fore.LIGHTGREEN_EX + f"Sending local model, size(bits): {data_utils.sizeofmessage(msg)}")
         return msg
 
     def send_local_weights_to_server(self):
