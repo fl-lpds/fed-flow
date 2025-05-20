@@ -3,7 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 from torch import optim
-from tqdm import tqdm
+import tqdm
 
 from app.config import config
 from app.config.logger import fed_logger
@@ -99,7 +99,7 @@ class FedClient(FedBaseNodeInterface):
 
             i += 1
 
-            for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
+            for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 self.optimizer.zero_grad()
 
@@ -133,7 +133,7 @@ class FedClient(FedBaseNodeInterface):
 
             i += 1
 
-            for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
+            for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
                 inputs, targets = inputs.to(self.device), targets.to(self.device)
                 if self.optimizer is not None:
                     self.optimizer.zero_grad()

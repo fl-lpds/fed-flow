@@ -85,8 +85,8 @@ def run_d2d(server: FedServer, options):
         server.choose_random_leader_per_cluster()
         local_weights = server.receive_leaders_local_weights()
         server.d2d_aggregate(local_weights)
-
         e_time = time.time()
+
         elapsed_time = e_time - s_time
         training_time.append(elapsed_time)
 
@@ -97,6 +97,8 @@ def run_d2d(server: FedServer, options):
         fed_logger.info('Round Finish')
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(elapsed_time))
+
+        transferred_data.append(0)
         graph_utils.log_round_csv(str(server), r, elapsed_time, transferred_data[-1], test_acc)
 
     graph_utils.report_results(server, training_time, [0] * len(training_time), accuracy)
