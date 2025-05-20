@@ -1,0 +1,202 @@
+services:
+  server:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./../../../../Graphs:/fed-flow/Graphs
+      #- ./../../../../app/model:/fed-flow/app/model
+      #- ./../../../../app/logs:/fed-flow/app/logs
+      - ./edge_server_bw.npz:/fed-flow/app/config/edge_server_bw.npz
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    cap_add: # Add specific capabilities
+      - SYS_NICE
+    ports:
+      - "5002:5002"
+    hostname: server
+    deploy:
+      resources:
+        limits:
+          cpus: '36'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_server_run.py -o True -sb True -m alexnet -s no_splitting -e True & python3 /fed-flow/energy/service.py  "
+
+  edge1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    cap_add: # Add specific capabilities
+      - SYS_NICE
+    ports:
+      - "5001:5001"
+    hostname: edge1
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+        reservations:
+          cpus: '2'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py -i 0 -o True -sb True -m alexnet -s no_splitting -e True & python3 /fed-flow/energy/service.py & wait -n"
+
+  broker1:
+    attach: false
+    image: rabbitmq:3.13-management
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+    hostname: broker1
+    volumes:
+      - ./broker1_data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+    deploy:
+      resources:
+        reservations:
+          cpus: '2'
+          memory: '6G'
+      restart_policy:
+        condition: always
+
+  client1:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    hostname: client1
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - edge1
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 0 -o True -sb True -m alexnet -s no_splitting -en True -e True -iid True & wait -n"
+
+
+  client2:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    hostname: client2
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - edge1
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 1 -o True -sb True -m alexnet -s no_splitting -en True -e True -iid True & wait -n"
+
+  client3:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    hostname: client3
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - edge1
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 2 -o True -sb True -m alexnet -s no_splitting -en True -e True -iid True & wait -n"
+
+  client4:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    hostname: client4
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - edge1
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 3 -o True -sb True -m alexnet -s no_splitting -en True -e True -iid True & wait -n"
+
+  client5:
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./econfig1.py:/fed-flow/energy/config.py
+    image: autlpdslab/fedflow:rabbitmq
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    hostname: client5
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+      restart_policy:
+        condition: on-failure
+    working_dir: /fed-flow/app/fl_training/runner
+    depends_on:
+      - server
+      - edge1
+      - broker1
+    entrypoint: bash -c "python3 /fed-flow/energy/service.py & python3 /fed-flow/app/fl_training/runner/fed_client_run.py -i 4 -o True -sb True -m alexnet -s no_splitting -en True -e True -iid True & wait -n"
