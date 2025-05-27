@@ -123,7 +123,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     flops_of_each_layer = list(flops_of_each_layer.values())
 
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
-
+    test_load_on_edges_and_server.append([[0, 1], [0, 2], [0, 3], [0, 4], [0, 5]])
+    test_load_on_edges_and_server.append([[0, 6], [0, 7], [1, 3], [2, 4], [3, 5]])
     for layer in range(config.model_len - 1):
         test_load_on_edges_and_server.append([[layer, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 

@@ -49,6 +49,7 @@ def edge_based_heuristic_splitting(state: dict, label):
         min_energy_trainingTime_splitting_for_each_client[client] = []
         comp_time_of_each_layer_on_clients[client] = []
 
+
     MODEL_PATH = '/fed-flow/app/model'
     edge_linear_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_linear_model.pkl")
     edge_poly_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_poly_model.pkl")
@@ -63,6 +64,9 @@ def edge_based_heuristic_splitting(state: dict, label):
     previous_server_nice_value = state['prev_server_nice_value']
 
     total_model_size = state['total_model_size']
+    total_model_size_per_op1 = {0: 1151104, 1: 20871112, 2: 49262208, 3: 91809536, 4: 120180488, 5: 1328276632,
+                                6: 1865284136, 7: 1866600320}
+
     activation_size = state['activation_size']
     activation_size[config.model_len - 1] = 0
     gradient_size = state['gradient_size']
@@ -353,6 +357,8 @@ def edge_based_heuristic_splitting(state: dict, label):
     for client in clients_score:
         if (client in high_prio_bad_energy_consuming_client) and (client not in bad_tt_device_and_bad_energy):
             bad_tt_device_and_bad_energy.append(client)
+
+    fed_logger.info(Fore.GREEN + f"Bad clients in energy efficiency: {high_prio_bad_energy_consuming_client}")
 
     while len(bad_tt_device_and_bad_energy) != 0:
         badClient = bad_tt_device_and_bad_energy[0]
