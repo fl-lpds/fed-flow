@@ -51,6 +51,7 @@ class FedServerInterface(ABC, Communicator):
         self.start_time_of_computation_each_client = {}
         self.computation_time_of_each_client = {}
         self.process_wall_time = {}
+        self.model_gather_transmission_time = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
 
         self.computation_time_of_each_client_on_edges = {}
         self.total_computation_time_of_each_edge = {}

@@ -71,6 +71,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     clientCommTime = {}
     clientUtilization = {}
     clientTT = {}
+    model_gather_transmission_time = {client: [] for client in config.CLIENTS_CONFIG.keys()}
     comp_time_of_each_layer_on_client = {client: [] for client in config.CLIENTS_LIST}
 
     edge_server_comm_time_list = {}
@@ -123,8 +124,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     flops_of_each_layer = list(flops_of_each_layer.values())
 
     test_load_on_edges_and_server = [[[config.model_len - 1, config.model_len - 1] for _ in range(config.K)]]
-    test_load_on_edges_and_server.append([[0, 1], [0, 2], [0, 3], [0, 4], [0, 5]])
-    test_load_on_edges_and_server.append([[0, 6], [0, 7], [1, 3], [2, 4], [3, 5]])
     for layer in range(config.model_len - 1):
         test_load_on_edges_and_server.append([[layer, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
 
@@ -240,6 +239,8 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             fed_logger.info("receiving local weights")
             local_weights = server.e_local_weights(config.CLIENTS_LIST)
+            for client in config.CLIENTS_LIST:
+                model_gather_transmission_time[client].append(server.model_gather_transmission_time[client])
 
             aggregation_start_time = time.time()
             fed_logger.info("aggregating weights")
@@ -340,7 +341,7 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                        server.approximated_tt_of_actions, comp_time_of_each_client_on_edge,
                        comp_time_of_each_client_on_server, flop_of_each_client_on_edge_list,
                        flop_of_each_client_on_server_list, edge_server_comm_time_list, splitting=splitting_list,
-                       splitting_method=options.get('splitting'))
+                       splitting_method=options.get('splitting'), model_gather_transmission_time=model_gather_transmission_time)
         else:
             break
 
@@ -558,7 +559,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
                clientCommTime=None, approximated_energy=None, approximated_tt=None,
                computation_time_of_each_client_on_edge=None, computation_time_of_each_client_on_server=None,
                flop_of_each_client_on_edge=None, flop_of_each_client_on_server=None, edge_server_comm_time=None,
-               splitting=None, splitting_method=None):
+               splitting=None, splitting_method=None, model_gather_transmission_time=None):
     base_dir = "/fed-flow/Graphs/results_npy"
     MEMORY_FILE = "/fed-flow/app/model/memory.json"
 
@@ -578,6 +579,7 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
     np.savez(f"{base_dir}/clientCommEnergy_{splitting_method}.npz", **clientCommEnergy)
     np.savez(f"{base_dir}/remainingEnergy_{splitting_method}.npz", **remainingEnergy)
     np.savez(f"{base_dir}/clientUtilization_{splitting_method}.npz", **clientUtilization)
+    np.savez(f"{base_dir}/model_gather_transmission_time{splitting_method}.npz", **model_gather_transmission_time)
 
     np.savez(f"{base_dir}/clientCompTime_{splitting_method}.npz", **clientCompTime)
     np.savez(f"{base_dir}/clientCommTime_{splitting_method}.npz", **clientCommTime)
@@ -741,6 +743,19 @@ def plot_graph(tt=None, simnet_tt=None, avgEnergy=None, clientConsumedEnergy=Non
         plt.legend()
         plt.grid()
         plt.savefig(os.path.join("/fed-flow/Graphs", f"total time on each client"))
+        plt.close()
+
+    if model_gather_transmission_time:
+        plt.figure(figsize=(int(25), int(5)))
+        for k in model_gather_transmission_time.keys():
+            iotDevice_K = model_gather_transmission_time[k]
+            plt.title(f"Local model transmission between edge and server for each iot devices")
+            plt.xlabel("FL Round")
+            plt.ylabel("Transmission time")
+            plt.plot(iotDevice_K, color=device_colormap(config.CLIENTS_CONFIG[k]), linewidth='3', label=f"Device {k}")
+        plt.legend()
+        plt.grid()
+        plt.savefig(os.path.join("/fed-flow/Graphs", f"localModelGatherTransmissionTime"))
         plt.close()
 
     if remainingEnergy:

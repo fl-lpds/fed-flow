@@ -432,6 +432,7 @@ class FedServer(FedServerInterface):
                                 message_utils.local_weights_edge_to_server() + "_" + client_ips[i], True,
                                 config.CLIENT_MAP[client_ips[i]])
             self.tt_end[client_ips[i]] = time.time()
+            self.model_gather_transmission_time[client_ips[i]] = data_utils.sizeofmessage(msg) / self.edge_bandwidth[config.CLIENT_MAP[client_ips[i]]]
             end_transmission(data_utils.sizeofmessage(msg))
             eweights[client_ips[i]] = msg[1]
         return eweights
@@ -537,11 +538,11 @@ class FedServer(FedServerInterface):
         send global weights to edges
         """
         msg = [message_utils.initial_global_weights_server_to_edge(), self.uninet.state_dict()]
-        if self.simnet:
-            for edgeIP in config.EDGE_SERVER_LIST:
-                start_transmission()
-                set_simnet(self.edge_bandwidth[edgeIP])
-                end_transmission(data_utils.sizeofmessage(msg))
+        # if self.simnet:
+        #     for edgeIP in config.EDGE_SERVER_LIST:
+        #         start_transmission()
+        #         set_simnet(self.edge_bandwidth[edgeIP])
+        #         end_transmission(data_utils.sizeofmessage(msg))
         self.scatter(msg, True)
 
     def no_offloading_global_weights(self):
@@ -952,7 +953,9 @@ class FedServer(FedServerInterface):
                         energy_tt_list[clientip][2] + \
                         self.client_training_transmissionTime[clientip]
 
-                trainingTime_simnetBW = max(total_time_for_each_client.values())
+                trainingTime_simnetBW = (max(total_time_for_each_client.values()) +
+                                         aggregation_time +
+                                         server_sequential_transmission_time)
                 fed_logger.info(f"Training time of each client : {total_time_for_each_client}")
                 fed_logger.info(f"Training time using Simnet bw : {trainingTime_simnetBW}")
                 return trainingTime_simnetBW, total_time_for_each_client
