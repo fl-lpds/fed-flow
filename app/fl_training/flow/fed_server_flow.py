@@ -136,6 +136,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     if server.simnet:
         simulated_edge_server_bw = np.load(f"/fed-flow/app/config/edge_server_bw.npz")
 
+    MEMORY_FILE = "/fed-flow/app/model/memory.json"
+    fed_logger.info(Fore.YELLOW + f'Removing MEMORY!')
+    with open(MEMORY_FILE, "w") as f:
+        memory = {'history': []}  # Create new memory if file doesn't exist
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(memory, f, indent=4)
+
     fed_logger.info(Fore.LIGHTGREEN_EX + f"TOTAL ROUND: {config.R}")
     for r in range(config.R):
         fed_logger.debug(Fore.LIGHTBLUE_EX + f"number of final K: {config.K}")
