@@ -99,6 +99,7 @@ services:
         limits:
           cpus: "1"
           memory: 1G
+
   
   server1:
     <<: *node_base
