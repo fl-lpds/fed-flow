@@ -1,6 +1,5 @@
 import sys
 
-CLIENTS_BANDWIDTH = []
 index = 0
 simnet = False
 # Dataset configration
@@ -27,18 +26,18 @@ mq_pass = "password"
 mq_vh = "/"
 cluster = "fed-flow"
 current_round = 0
-model_name = ''
+model_name = 'alexnet'
 model_size = 1.28
 model_flops = 32.902
 total_flops = 8488192
-split_layer = [[6, 6], [6, 6], [6, 6], [6, 6], [6, 6]]  # Initial split layers
-model_len = 7
+split_layer = [[7, 7], [7, 7], [7, 7], [7, 7], [7, 7]]  # Initial split layers
+model_len = 8
 
 # FL training configration
 
-R = 10  # FL rounds
+R = 100  # FL rounds
 LR = 0.01  # Learning rate
-B = 100  # Batch size
+B = 10  # Batch size
 
 # RL training configration
 max_episodes = 2000  # max training episodes
@@ -64,8 +63,10 @@ SERVER_PORT = 5002
 EDGESERVER_PORT = {'edge1': 5001}
 
 K = 5  # Number of devices
-G = 1  # Number of groups
+G = 3  # Number of groups
 S = 1  # Number of server connecting devices
+
+CLIENTS_BANDWIDTH = [40_000_000, 2_000_000, 10_000_000, 1_000_000, 5_000_000]
 
 # Unique clients order
 HOST2IP = {}

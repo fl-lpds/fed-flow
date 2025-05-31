@@ -1,0 +1,13 @@
+__pycache__
+test_app/integration/docker_compose
+app/model/memory.json
+Graphs
+app/dataset
+app/agent
+**/*broker*/
+**/test_script.log
+app/model/memory.json
+app/model/edge_flops_prediction_linear_model.pkl
+app/model/edge_flops_prediction_poly_model.pkl
+app/model/server_flops_prediction_linear_model.pkl
+app/model/server_flops_prediction_poly_model.pkl

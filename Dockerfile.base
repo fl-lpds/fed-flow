@@ -1,5 +1,4 @@
-FROM docker.arvancloud.ir/python:3.10
+FROM autlpdslab/fedflow:base
 USER root
 WORKDIR /fedflow
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install scikit-learn

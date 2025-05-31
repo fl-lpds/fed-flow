@@ -7,34 +7,34 @@ logging.basicConfig(filename='test_script.log', level=logging.INFO, format='%(as
 logger = logging.getLogger(__name__)
 
 docker_compose_configs = [
-    {
-        "compose_file": "test_classicFL_simnet_1_5.yaml",
-        "compose_name": "ClassicFL",
-    },
-    {
-        "compose_file": "test_only_edge_simnet_1_1_5.yaml",
-        "compose_name": "OnlyEdge",
-    },
-    {
-        "compose_file": "test_only_server_simnet_1_5.yaml",
-        "compose_name": "OnlyServer",
-    },
-    {
-        "compose_file": "test_random_splitting_simnet_1_1_5.yaml",
-        "compose_name": "Random",
-    },
-    {
-        "compose_file": "test_fedmec_offloading_simnet_1_1_5.yaml",
-        "compose_name": "FedMec",
-    },
+#    {
+#        "compose_file": "test_classicFL_simnet_1_5.yaml",
+#        "compose_name": "ClassicFL",
+#    },
+#    {
+#        "compose_file": "test_only_edge_simnet_1_1_5.yaml",
+#        "compose_name": "OnlyEdge",
+#    },
+#    {
+#        "compose_file": "test_only_server_simnet_1_5.yaml",
+#        "compose_name": "OnlyServer",
+#    },
+#    {
+#        "compose_file": "test_random_splitting_simnet_1_1_5.yaml",
+#        "compose_name": "Random",
+#    },
+#    {
+#        "compose_file": "test_fedmec_offloading_simnet_1_1_5.yaml",
+#        "compose_name": "FedMec",
+#    },
     {
         "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
         "compose_name": "OurMethod",
-    },
-    {
-        "compose_file": "test_fedadapt_offloading_simnet_1_5.yaml",
-        "compose_name": "FedAdapt",
     }
+#    {
+#        "compose_file": "test_fedadapt_offloading_simnet_1_5.yaml",
+#        "compose_name": "FedAdapt",
+#    }
 ]
 
 SRC_CONFIG_FILE = 'config.py'

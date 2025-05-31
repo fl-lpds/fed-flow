@@ -41,7 +41,7 @@ SRC_CONFIG_FILE = 'config.py'
 DST_CONFIG_FILE = './../../../../../app/config/config.py'
 
 # Folder to archive images
-ARCHIVE_BASE_FOLDER = './../../../../../../results/1_1_5/alexnet/'
+ARCHIVE_BASE_FOLDER = './../../../../../../results/1_1_5/alexnet_v2/'
 
 
 def get_running_containers_with_name(substring):
