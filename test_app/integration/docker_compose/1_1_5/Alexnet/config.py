@@ -17,7 +17,7 @@ model_cfg = {
              ('D', 128, 10, 1, 10, 128 * 10)]
 }
 
-N = 500  # data length
+N = 5000  # data length
 mq_port = 5672
 mq_url = "amqp://user:password@broker:5672/%2F"
 mq_host = "broker"
@@ -37,7 +37,7 @@ model_len = 8
 
 R = 100  # FL rounds
 LR = 0.01  # Learning rate
-B = 10  # Batch size
+B = 100  # Batch size
 
 # RL training configration
 max_episodes = 2000  # max training episodes
