@@ -3,7 +3,6 @@ import json
 import random
 from collections import Counter
 
-import joblib
 import numpy as np
 import torch
 from colorama import Fore
@@ -14,29 +13,9 @@ from app.model.entity.rl_model import PPO
 from app.util import model_utils
 
 
-# def edge_based_rl_splitting(state, labels):
-#     env = rl_utils.CustomEnv()
-#     agent = DDPG.load('/fed-flow/app/agent/160.zip', env=env,
-#                       custom_objects={'observation_space': env.observation_space, 'action_space': env.action_space})
-#     floatAction, _ = agent.predict(observation=state, deterministic=True)
-#     actions = []
-#     for i in range(0, len(floatAction), 2):
-#         actions.append([rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[0],
-#                         rl_utils.actionToLayerEdgeBase([floatAction[i], floatAction[i + 1]])[1]])
-#
-#     return actions
-
-
 def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.MAGENTA + f"Heuristic Splitting algorithm =======================")
-    approximated_tt = 0
-    approximated_energy = 0
 
-    # ALPHA == 1 try minimum energy and ALPHA == 0 is vice versa
-    ALPHA = 1
-    score_threshold = 0.5
-
-    candidate_splitting = []
     min_energy_splitting_for_each_client = {}
     min_time_splitting_for_each_client = {}
     filtered_min_time_splitting_for_each_client = {}
@@ -49,27 +28,24 @@ def edge_based_heuristic_splitting(state: dict, label):
         min_energy_trainingTime_splitting_for_each_client[client] = []
         comp_time_of_each_layer_on_clients[client] = []
 
-
-    MODEL_PATH = '/fed-flow/app/model'
-    edge_linear_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_linear_model.pkl")
-    edge_poly_model = joblib.load(f"{MODEL_PATH}/edge_flops_prediction_poly_model.pkl")
-
-    server_linear_model = joblib.load(f"{MODEL_PATH}/server_flops_prediction_linear_model.pkl")
-    server_poly_model = joblib.load(f"{MODEL_PATH}/server_flops_prediction_linear_model.pkl")
-    fed_logger.info(Fore.MAGENTA + f"Edge and server flops prediction model loaded =======================")
-
     client_remaining_runtime = {}
     previous_action = state['prev_action']
     previous_edge_nice_value = state['prev_edge_nice_value']
     previous_server_nice_value = state['prev_server_nice_value']
 
     total_model_size = state['total_model_size']
-    total_model_size_per_op1 = {0: 1151104, 1: 20871112, 2: 49262208, 3: 91809536, 4: 120180488, 5: 1328276632,
-                                6: 1865284136, 7: 1866600320}
+    if config.model_len == 8:
+        # Alexnet
+        total_model_size_per_op = {0: 1151104, 1: 20871112, 2: 49262208, 3: 91809536, 4: 120180488, 5: 1328276632, 6: 1865284136, 7: 1866600320}
+
+    else:
+        # VGG5
+        total_model_size_per_op = {0: 53248, 1: 53408, 2: 671568, 3: 671728, 4: 1879720, 5: 18666200, 6: 18712544}
 
     activation_size = state['activation_size']
     activation_size[config.model_len - 1] = 0
     gradient_size = state['gradient_size']
+
     flops_of_each_layer = state['flops_of_each_layer']
     flops_of_each_layer = {key: flops_of_each_layer[key] for key in sorted(flops_of_each_layer)}
     flops_of_each_layer = list(flops_of_each_layer.values())
@@ -96,16 +72,12 @@ def edge_based_heuristic_splitting(state: dict, label):
         for op1 in range(1, config.model_len - 1):
             comp_time_of_each_layer_on_clients[client].append(client_comp_time[client][op1 + 1] - client_comp_time[client][op1])
 
-    client_comm_time = {client: comm_energy / client_power_usage[client][1] for client, comm_energy in
-                        client_comm_energy.items()}
+    client_comm_time = {client: comm_energy / client_power_usage[client][1] for client, comm_energy in client_comm_energy.items()}
     edge_server_comm_time = state['edge_server_comm_time']
     comp_time_of_each_client_on_edges = state['comp_time_of_each_client_on_edge']
     comp_time_of_each_client_on_server = state['comp_time_of_each_client_on_server']
-    total_time_on_each_edge = {edgeIP: 0 for edgeIP in config.EDGE_SERVER_LIST}
-    total_time_on_server = sum(comp_time_of_each_client_on_server.values())
-    action = previous_action
 
-    best_tt_splitting_found = state['best_tt_splitting_found']
+    action = previous_action
 
     fed_logger.info(Fore.GREEN + f"STATE:")
     fed_logger.info(Fore.GREEN + f"=============================================================================")
@@ -127,7 +99,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     each_splitting_share = {op1: {op2: {} for op2 in range(op1, config.model_len)} for op1 in range(config.model_len)}
     max_computation_on_client = sum(flops_of_each_layer)
     max_computation_on_edge_and_server = sum(flops_of_each_layer[1:])
-    max_comm = (2 * batchNumber * max(activation_size.values())) + (2 * total_model_size)
+    max_comm = (2 * batchNumber * max(activation_size.values())) + (2 * total_model_size_per_op[config.model_len - 1])
 
     for op1 in range(config.model_len):
         for op2 in range(op1, config.model_len):
@@ -135,17 +107,13 @@ def edge_based_heuristic_splitting(state: dict, label):
                 'client_comp': sum(flops_of_each_layer[:op1 + 1]) / max_computation_on_client,
                 'edge_comp': sum(flops_of_each_layer[op1 + 1:op2 + 1]) / max_computation_on_edge_and_server,
                 'server_comp': sum(flops_of_each_layer[op2 + 1:]) / max_computation_on_edge_and_server,
-                'client_comm': (2 * batchNumber * activation_size[op1]) + (2 * total_model_size) / max_comm if (op1 != config.model_len - 1)
-                else (2 * total_model_size) / max_comm,
-                'edge_server_comm': (2 * batchNumber * activation_size[op2]) + (2 * total_model_size) / max_comm if op2 != config.model_len - 1
-                else (2 * total_model_size) / max_comm,
+                'edge_server_comm_during_round': 2 * batchNumber * activation_size[op2] / max_comm,
+                'edge_server_comm_gather': total_model_size_per_op[op2] / max_comm
             }
 
-    clients_computation_e, clients_communication_e, clients_totals_e = energyEstimator(previous_action,
-                                                                                       client_bw, activation_size,
-                                                                                       batchNumber, total_model_size,
-                                                                                       client_comp_energy,
-                                                                                       client_power_usage)
+    clients_computation_e, clients_communication_e, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size,
+                                                                                       batchNumber, total_model_size_per_op,
+                                                                                       client_comp_energy, client_power_usage)
     for client in client_remaining_energy.keys():
         client_remaining_runtime[client] = client_remaining_energy[client] / (clients_totals_e[client])
 
@@ -155,14 +123,12 @@ def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_comp_score.items()}")
 
     classicFL_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
-    classicFL_tt, _, _, _, _, _, _, _ = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw,
-                                                              edge_server_bw, flops_of_each_layer, activation_size,
-                                                              total_model_size, batchNumber, edge_poly_model, server_poly_model,
-                                                              None,
-                                                              None)
+    classicFL_tt, _, _, _, = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw, activation_size, batchNumber,
+                                                   None, None,
+                                                   total_model_size_per_op=total_model_size_per_op)
 
     clients_classicFL_comp_energy, clients_classicFL_comm_energy, clients_classicFL_total_energy = energyEstimator(
-        classicFL_action, client_bw, activation_size, batchNumber, total_model_size, client_comp_energy,
+        classicFL_action, client_bw, activation_size, batchNumber, total_model_size_per_op, client_comp_energy,
         client_power_usage)
 
     if config.K != 0:
@@ -181,7 +147,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     fed_logger.info(Fore.GREEN + f"===============================================================================")
 
     clients_time_for_each_op1 = {client: {} for client in runningClients}
-
+    temp_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
     for client, score in client_score.items():
         fed_logger.info(Fore.GREEN + f"Client: {client}")
         fed_logger.info(Fore.GREEN + f"Running Clients: {runningClients}")
@@ -191,18 +157,25 @@ def edge_based_heuristic_splitting(state: dict, label):
         client_op1_time = []
         for layer in range(config.model_len):
             op1 = layer
-            if layer != config.model_len - 1:
-                size = activation_size[layer]
-                tt_trans = ((2 * size * batchNumber) + (2 * total_model_size)) / client_bw[client]
-            else:
-                tt_trans = (2 * total_model_size) / client_bw[client]
+            size = activation_size[layer]
+            tt_trans = ((2 * size * batchNumber) + (total_model_size_per_op[op1] + total_model_size_per_op[config.model_len - 1])) / client_bw[client]
+            temp_action[config.CLIENTS_CONFIG[client]][0] = op1
+            _, _, time_of_each_client, _ = trainingTimeEstimator(temp_action, client_comp_time, client_bw, edge_server_bw, activation_size,
+                                                                 batchNumber, None, None,
+                                                                 total_model_size_per_op)
             comm_energy = tt_trans * client_power_usage[client][1]
             comp_energy = client_comp_energy[client][op1]
             total_energy = comp_energy + comm_energy
-            total_time = client_comp_time[client][op1] + tt_trans
+            total_time = (client_comp_time[client][op1] +
+                          time_of_each_client[client]['client_edge_comm_during_round'] +
+                          time_of_each_client[client]['server_edge_comm_scatter'] +
+                          time_of_each_client[client]['edge_client_comm_scatter'] +
+                          time_of_each_client[client]['client_edge_comm_gather'])
+
             client_op1_energy.append((op1, total_energy))
             client_op1_time.append((op1, total_time))
             clients_time_for_each_op1[client][op1] = total_time
+
         min_energy_splitting_for_each_client[client] = sorted(client_op1_energy, key=lambda x: x[1])
         min_time_splitting_for_each_client[client] = sorted(client_op1_time, key=lambda x: x[1])
         filtered_min_time_splitting_for_each_client[client] = [item for item in
@@ -235,32 +208,28 @@ def edge_based_heuristic_splitting(state: dict, label):
     if config.current_round == config.model_len:
         action = [[op1s[0][0], config.model_len - 1] for client, op1s in
                   min_energy_trainingTime_splitting_for_each_client.items()]
+        temp_action = copy.deepcopy(action)
         for client in runningClients:
             clientOP1 = action[config.CLIENTS_CONFIG[client]][0]
-            edgeIP = config.CLIENT_MAP[client]
-
             op2_bigger_than_op1 = {layer: size for layer, size in activation_size.items() if layer >= clientOP1}
             layer_with_min_size = min(op2_bigger_than_op1, key=op2_bigger_than_op1.get)
+            temp_action[config.CLIENTS_CONFIG[client]][1] = layer_with_min_size
 
-            if layer_with_min_size != config.model_len - 1:
-                edge_server_comm_time_temp = (
-                        ((2 * (activation_size[layer_with_min_size]) * batchNumber) + (2 * total_model_size)) /
-                        edge_server_bw[edgeIP])
-            else:
-                edge_server_comm_time_temp = (2 * total_model_size) / edge_server_bw[edgeIP]
+        total_time, _, _, _ = trainingTimeEstimator(temp_action, client_comp_time, client_bw, edge_server_bw, activation_size, batchNumber,
+                                                    None, None, total_model_size_per_op)
 
-            if (min_energy_trainingTime_splitting_for_each_client[client][0][2] + edge_server_comm_time_temp) < classicFL_tt:
-                action[config.CLIENTS_CONFIG[client]][1] = layer_with_min_size
+        if total_time < classicFL_tt:
+            action = temp_action
         edge_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
         server_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
         return action, 0, 0, edge_nice_value, server_nice_value
 
     new_edge_nice_value = copy.deepcopy(previous_edge_nice_value)
     new_server_nice_value = copy.deepcopy(previous_server_nice_value)
-    prev_action_tt, prev_action_each_client_total_tt, prev_action_each_client_tt, _, _, _, _, _ = (
-        trainingTimeEstimator(previous_action, client_comp_time, client_bw, edge_server_bw, flops_of_each_layer,
-                              activation_size, total_model_size, batchNumber, edge_poly_model, server_poly_model,
-                              comp_time_of_each_client_on_edges, comp_time_of_each_client_on_server))
+    prev_action_tt, prev_action_each_client_total_tt, prev_action_each_client_tt, _ = (
+        trainingTimeEstimator(previous_action, client_comp_time, client_bw, edge_server_bw, activation_size, batchNumber,
+                              comp_time_of_each_client_on_edges, comp_time_of_each_client_on_server,
+                              total_model_size_per_op=total_model_size_per_op))
 
     fed_logger.info(Fore.MAGENTA + f"Prev Action tt: {prev_action_tt}, Baseline tt: {baseline_tt}")
     fed_logger.info(Fore.MAGENTA + f"Action's training time: {prev_action_tt}")
@@ -274,13 +243,13 @@ def edge_based_heuristic_splitting(state: dict, label):
     # Phase 1: Finding bottleneck devices
     bad_clients = {client: time for client, time in prev_action_each_client_total_tt.items() if time > baseline_tt}
     bad_clients_cluster = {
-        edge: {'edge_comp': [], 'client_comp': [], 'server_comp': [], 'client_comm': [], 'edge_server_comm': []} for
+        edge: {'edge_comp': [], 'client_comp': [], 'server_comp': [], 'edge_server_comm_during_round': [], 'edge_server_comm_gather': []} for
         edge in config.EDGE_SERVER_LIST}
 
     good_clients = {client: time for client, time in prev_action_each_client_total_tt.items() if
                     time <= baseline_tt}
     good_clients_cluster = {
-        edge: {'edge_comp': [], 'client_comp': [], 'server_comp': [], 'client_comm': [], 'edge_server_comm': []} for
+        edge: {'edge_comp': [], 'client_comp': [], 'server_comp': [], 'edge_server_comm_during_round': [], 'edge_server_comm_gather': []} for
         edge in config.EDGE_SERVER_LIST}
 
     fed_logger.info(Fore.MAGENTA + f"Bad Clients: {bad_clients}")
@@ -303,21 +272,20 @@ def edge_based_heuristic_splitting(state: dict, label):
 
         clientOP1 = previous_action[config.CLIENTS_CONFIG[client]][0]
         clientOP2 = previous_action[config.CLIENTS_CONFIG[client]][1]
+        edgeIP = config.CLIENT_MAP[client]
 
-        client_comp_share = prev_action_each_client_tt[client]['client_comp'] / total_client_time
         edge_comp_share = prev_action_each_client_tt[client]['edge_comp'] / total_client_time
         server_comp_share = prev_action_each_client_tt[client]['server_comp'] / total_client_time
-        client_comm_share = prev_action_each_client_tt[client]['client_comm'] / total_client_time
-        edge_server_comm_share = prev_action_each_client_tt[client]['edge_server_comm'] / total_client_time
+        edge_server_comm_during_round_share = prev_action_each_client_tt[client]['edge_server_comm_during_round'] / total_client_time
+        edge_server_comm_gather_share = (total_model_size_per_op[clientOP2] / edge_server_bw[edgeIP]) / total_client_time
 
         op2_bigger_than_op1 = {layer: size for layer, size in activation_size.items() if layer >= clientOP1}
         layer_with_min_size = min(op2_bigger_than_op1, key=op2_bigger_than_op1.get)
 
-        shares[client] = {'client_comp': 0,
-                          'edge_comp': edge_comp_share,
+        shares[client] = {'edge_comp': edge_comp_share,
                           'server_comp': server_comp_share,
-                          'client_comm': 0,
-                          'edge_server_comm': edge_server_comm_share}
+                          'edge_server_comm_during_round': edge_server_comm_during_round_share,
+                          'edge_server_comm_gather': edge_server_comm_gather_share}
         if clientOP2 == layer_with_min_size:
             shares[client]['edge_server_comm'] = 0
 
@@ -327,9 +295,9 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.MAGENTA + f"Client comp time: {prev_action_each_client_tt[client]['client_comp']}")
         fed_logger.info(Fore.MAGENTA + f"Edges comp time: {prev_action_each_client_tt[client]['edge_comp']}")
         fed_logger.info(Fore.MAGENTA + f"Server comp time: {prev_action_each_client_tt[client]['server_comp']}")
-        fed_logger.info(Fore.MAGENTA + f"Client comm time: {prev_action_each_client_tt[client]['client_comm']}")
-        fed_logger.info(
-            Fore.MAGENTA + f"Edge-Server comm time: {prev_action_each_client_tt[client]['edge_server_comm']}")
+        fed_logger.info(Fore.MAGENTA + f"edge_server_comm_during_round: {prev_action_each_client_tt[client]['edge_server_comm_during_round']}")
+        fed_logger.info(Fore.MAGENTA + f"edge_server_comm_gather: {prev_action_each_client_tt[client]['edge_server_comm_gather']}")
+
         fed_logger.info(Fore.MAGENTA + f"Client Bottleneck: {bottlenecks[client]}")
 
         if isBadClient:
@@ -374,89 +342,61 @@ def edge_based_heuristic_splitting(state: dict, label):
         fed_logger.info(Fore.GREEN + f"IsEnergy Efficient: {isEnergyEfficient}")
 
         if (badClient in high_prio_bad_energy_consuming_client) and (badClient not in current_bad_device):
-            best_time_section = sorted(((k, v) for k, v in time_for_each_client[badClient].items() if k != 'client_comp' or k != 'client_comm'),
-                                       key=lambda item: item[1])
-
             for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
                 temp = copy.deepcopy(new_action)
                 temp[config.CLIENTS_CONFIG[badClient]][0] = op1
-                sorted_op2 = sorted(each_splitting_share[op1].items(), key=lambda item: item[1][best_time_section[0][0]])
-                for op2, share in sorted_op2:
-                    if share[best_time_section[0][0]] > currentOffloadingShares[best_time_section[0][0]]:
-                        if op2 != config.model_len - 1:
-                            edge_server_comm_time_temp = (
-                                    ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) / edge_server_bw[edgeIP])
-                        else:
-                            edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
+                for op2 in range(op1, config.model_len):
+                    temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp, client_comp_time, client_bw, edge_server_bw, activation_size,
+                                                                            batchNumber, None,
+                                                                            None, total_model_size_per_op)
 
-                        if (clients_time_for_each_op1[badClient][op1] + edge_server_comm_time_temp) < baseline_tt:
-                            temp[config.CLIENTS_CONFIG[badClient]][1] = op2
-                            isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
-                                                                                                       runningClients,
-                                                                                                       current_bad_device,
-                                                                                                       time_for_each_client,
-                                                                                                       baseline_tt,
-                                                                                                       client_comp_time,
-                                                                                                       client_bw,
-                                                                                                       edge_server_bw,
-                                                                                                       activation_size,
-                                                                                                       total_model_size,
-                                                                                                       batchNumber)
-                            if not isViolated:
-                                if memoryAvailability == 'BOTH':
-                                    if ((clients_time_for_each_op1[badClient][op1] +
-                                         newTimes[badClient]['edge_comp'] +
-                                         newTimes[badClient]['server_comp'] +
-                                         edge_server_comm_time_temp) < baseline_tt):
-                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                        time_for_each_client = newTimes
-                                        total_time_for_each_client = newTotalTimes
-                                        deviceChanged = True
-                                        break
-                                elif memoryAvailability == 'EDGE':
-                                    if ((clients_time_for_each_op1[badClient][op1] +
-                                         newTimes[badClient]['edge_comp'] +
-                                         edge_server_comm_time_temp) < baseline_tt):
-                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                        deviceChanged = True
-                                        break
-                                elif memoryAvailability == 'SERVER':
-                                    if ((newTimes[badClient]['server_comp'] +
-                                         edge_server_comm_time_temp +
-                                         clients_time_for_each_op1[badClient][op1]) < baseline_tt):
-                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                        deviceChanged = True
-                                        break
-                                elif memoryAvailability == 'NONE':
-                                    if (clients_time_for_each_op1[badClient][op1] + edge_server_comm_time_temp) < baseline_tt:
-                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                        deviceChanged = True
-                                        break
-                                else:
-                                    raise Exception('Invalid memory availability in check violation function')
+                    if (total_time_each_c_temp[badClient]) < baseline_tt:
+                        isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
+                                                                                                   runningClients,
+                                                                                                   current_bad_device,
+                                                                                                   time_for_each_client,
+                                                                                                   baseline_tt,
+                                                                                                   client_comp_time,
+                                                                                                   client_bw,
+                                                                                                   edge_server_bw,
+                                                                                                   activation_size,
+                                                                                                   total_model_size_per_op,
+                                                                                                   batchNumber)
+                        if not isViolated:
+                            if memoryAvailability == 'BOTH':
+                                if newTotalTimes[badClient] < baseline_tt:
+                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    time_for_each_client = newTimes
+                                    total_time_for_each_client = newTotalTimes
+                                    deviceChanged = True
+                                    break
+                            else:
+                                new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                deviceChanged = True
+                                break
                 if deviceChanged:
                     break
         else:
             if bottleneck == 'edge_comp':
                 if badClient in high_prio_bad_energy_consuming_client:
+                    temp_energy_action = copy.deepcopy(new_action)
                     for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
-                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size,
+                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size_per_op,
                                                                  client_comp_energy, client_power_usage)
                         if energy < clients_totals_e[badClient]:
                             sorted_op2_by_edge_comp = sorted(each_splitting_share[op1].items(), key=lambda item: item[1]['edge_comp'],
                                                              reverse=True)
                             for op2, share in sorted_op2_by_edge_comp:
                                 if share['edge_comp'] < currentOffloadingShares['edge_comp']:
-                                    if op2 != config.model_len - 1:
-                                        edge_server_comm_time_temp = (
-                                                ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) /
-                                                edge_server_bw[edgeIP])
-                                    else:
-                                        edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
+                                    temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp_energy_action, client_comp_time, client_bw,
+                                                                                            edge_server_bw, activation_size, batchNumber,
+                                                                                            None,
+                                                                                            None,
+                                                                                            total_model_size_per_op)
 
-                                    if (clients_time_for_each_op1[badClient][op1] + edge_server_comm_time_temp) < baseline_tt:
-                                        temp_energy_action = copy.deepcopy(new_action)
-                                        temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    if total_time_each_c_temp[badClient] < baseline_tt:
                                         isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp_energy_action,
                                                                                                                    badClient,
                                                                                                                    runningClients,
@@ -467,7 +407,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                    client_bw,
                                                                                                                    edge_server_bw,
                                                                                                                    activation_size,
-                                                                                                                   total_model_size,
+                                                                                                                   total_model_size_per_op,
                                                                                                                    batchNumber)
                                         if not isViolated:
                                             if memoryAvailability == 'BOTH':
@@ -502,21 +442,19 @@ def edge_based_heuristic_splitting(state: dict, label):
                         time_diff = total_time_for_each_client[badClient] - baseline_tt
                         op2_selected = False
                         if time_for_each_client[badClient]['edge_comp'] - time_for_each_client[badClient]['server_comp'] > time_diff:
+                            temp = copy.deepcopy(new_action)
                             sorted_op2_by_edge_comp = sorted(each_splitting_share[currentOffloading[0]].items(),
                                                              key=lambda item: item[1]['edge_comp'],
                                                              reverse=True)
                             for op2, share in sorted_op2_by_edge_comp:
                                 if share['edge_comp'] < currentOffloadingShares['edge_comp']:
+                                    temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp, client_comp_time, client_bw,
+                                                                                            edge_server_bw, activation_size, batchNumber,
+                                                                                            None,
+                                                                                            None, total_model_size_per_op)
 
-                                    if op2 != config.model_len - 1:
-                                        edge_server_comm_time_temp = (
-                                                ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) / edge_server_bw[edgeIP])
-                                    else:
-                                        edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
-
-                                    if (clients_time_for_each_op1[badClient][currentOffloading[0]] + edge_server_comm_time_temp) < baseline_tt:
-                                        temp = copy.deepcopy(new_action)
-                                        temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if total_time_each_c_temp[badClient] < baseline_tt:
                                         isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
                                                                                                                    runningClients,
                                                                                                                    current_bad_device,
@@ -526,89 +464,31 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                    client_bw,
                                                                                                                    edge_server_bw,
                                                                                                                    activation_size,
-                                                                                                                   total_model_size,
+                                                                                                                   total_model_size_per_op,
                                                                                                                    batchNumber)
                                         if not isViolated:
                                             if memoryAvailability == 'BOTH':
-                                                if ((clients_time_for_each_op1[badClient][currentOffloading[0]] +
-                                                     newTimes[badClient]['edge_comp'] + newTimes[badClient]['server_comp'] +
-                                                     newTimes[badClient]['edge_server_comm']) < baseline_tt):
+                                                if newTotalTimes[badClient] < baseline_tt:
                                                     new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
                                                     time_for_each_client = newTimes
                                                     total_time_for_each_client = newTotalTimes
                                                     op2_selected = True
                                                     break
-                                            elif memoryAvailability == 'EDGE':
-                                                if ((newTimes[badClient]['edge_comp'] + edge_server_comm_time_temp) <
-                                                        time_for_each_client[badClient]['edge_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'SERVER':
-                                                if ((newTimes[badClient]['server_comp'] + edge_server_comm_time_temp) <
-                                                        time_for_each_client[badClient]['server_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'NONE':
-                                                fed_logger.info(Fore.GREEN + f"Bad Client time: {time_for_each_client}")
-                                                if edge_server_comm_time_temp < time_for_each_client[badClient]['edge_comp']:
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    op2_selected = True
-                                                    break
                                             else:
-                                                raise Exception('Invalid memory availability in check violation function')
+                                                new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                                op2_selected = True
+                                                break
                         if not op2_selected:
                             temp = copy.deepcopy(new_action)
                             # we must increase energy consumption, because of edge-server bw
                             for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
                                 if op1 > currentOffloading[0]:
                                     temp[config.CLIENTS_CONFIG[badClient]][0] = op1
-                                    if op1 <= currentOffloading[1]:
-                                        isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
-                                                                                                                   runningClients,
-                                                                                                                   current_bad_device,
-                                                                                                                   time_for_each_client,
-                                                                                                                   baseline_tt,
-                                                                                                                   client_comp_time,
-                                                                                                                   client_bw,
-                                                                                                                   edge_server_bw,
-                                                                                                                   activation_size,
-                                                                                                                   total_model_size,
-                                                                                                                   batchNumber)
-                                        if not isViolated:
-                                            if memoryAvailability == 'BOTH':
-                                                new_action[config.CLIENTS_CONFIG[badClient]][0] = op1
-                                                time_for_each_client = newTimes
-                                                total_time_for_each_client = newTotalTimes
-                                                break
-                                            elif memoryAvailability == 'EDGE':
-                                                if ((newTimes[badClient]['edge_comp'] +
-                                                     newTimes[badClient]['client_comm'] +
-                                                     newTimes[badClient]['client_comp']) <
-                                                        time_for_each_client[badClient]['edge_comp'] +
-                                                        time_for_each_client[badClient]['client_comm'] +
-                                                        time_for_each_client[badClient]['client_comp']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][0] = op1
-                                                    break
-                                            elif memoryAvailability == 'SERVER':
-                                                if ((newTimes[badClient]['server_comp'] +
-                                                     newTimes[badClient]['client_comm'] +
-                                                     newTimes[badClient]['client_comp'] +
-                                                     newTimes[badClient]['edge_server_comm']) <
-                                                        time_for_each_client[badClient]['edge_comp'] +
-                                                        time_for_each_client[badClient]['client_comm'] +
-                                                        time_for_each_client[badClient]['client_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][0] = op1
-                                                    break
-                                            elif memoryAvailability == 'NONE':
-                                                new_action[config.CLIENTS_CONFIG[badClient]][0] = op1
-                                                break
-                                    else:
-                                        for op2 in range(op1, config.model_len):
+                                    sorted_op2_by_edge_comp = sorted(each_splitting_share[op1].items(),
+                                                                     key=lambda item: item[1]['edge_comp'],
+                                                                     reverse=True)
+                                    for op2, share in sorted_op2_by_edge_comp:
+                                        if share['edge_comp'] < currentOffloadingShares['edge_comp']:
                                             temp[config.CLIENTS_CONFIG[badClient]][1] = op2
                                             isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
                                                                                                                        runningClients,
@@ -619,9 +499,8 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                        client_bw,
                                                                                                                        edge_server_bw,
                                                                                                                        activation_size,
-                                                                                                                       total_model_size,
+                                                                                                                       total_model_size_per_op,
                                                                                                                        batchNumber)
-
                                             if not isViolated:
                                                 if memoryAvailability == 'BOTH':
                                                     new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
@@ -629,35 +508,13 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                     total_time_for_each_client = newTotalTimes
                                                     op2_selected = True
                                                     break
-                                                elif memoryAvailability == 'EDGE':
-                                                    if ((newTimes[badClient]['edge_comp'] +
-                                                         newTimes[badClient]['client_comm'] +
-                                                         newTimes[badClient]['client_comp'] +
-                                                         newTimes[badClient]['edge_server_comm']) <
-                                                            time_for_each_client[badClient]['edge_comp'] +
-                                                            time_for_each_client[badClient]['client_comm'] +
-                                                            time_for_each_client[badClient]['client_comp'] +
-                                                            time_for_each_client[badClient]['edge_server_comm']):
-                                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                        op2_selected = True
-                                                        break
-                                                elif memoryAvailability == 'SERVER':
-                                                    if ((newTimes[badClient]['server_comp'] +
-                                                         newTimes[badClient]['client_comm'] +
-                                                         newTimes[badClient]['client_comp'] +
-                                                         newTimes[badClient]['edge_server_comm']) <
-                                                            time_for_each_client[badClient]['server_comp'] +
-                                                            time_for_each_client[badClient]['client_comm'] +
-                                                            time_for_each_client[badClient]['client_comp'] +
-                                                            time_for_each_client[badClient]['edge_server_comm']):
-                                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                        op2_selected = True
-                                                        break
-                                                elif memoryAvailability == 'NONE':
+                                                else:
                                                     new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                                    op2_selected = True
                                                     break
-                                        if op2_selected:
-                                            break
+
+                                    if op2_selected:
+                                        break
                     else:
                         # Give bad device a high priority and vice versa
                         high_outlier, low_outlier = detect_outliers_using_iqr(edges_client_comp_time)
@@ -669,23 +526,23 @@ def edge_based_heuristic_splitting(state: dict, label):
                                 new_edge_nice_value[lowOutlierClient] = 10
             elif bottleneck == 'server_comp':
                 if badClient in high_prio_bad_energy_consuming_client:
+                    temp_energy_action = copy.deepcopy(new_action)
                     for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
-                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size,
+                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size_per_op,
                                                                  client_comp_energy, client_power_usage)
                         if energy < clients_totals_e[badClient]:
                             sorted_op2_by_server_comp = sorted(each_splitting_share[op1].items(), key=lambda item: item[1]['server_comp'],
                                                                reverse=True)
                             for op2, share in sorted_op2_by_server_comp:
                                 if share['server_comp'] < currentOffloadingShares['server_comp']:
-                                    if op2 != config.model_len - 1:
-                                        edge_server_comm_time_temp = (
-                                                ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) / edge_server_bw[edgeIP])
-                                    else:
-                                        edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
+                                    temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp_energy_action, client_comp_time, client_bw,
+                                                                                            edge_server_bw, activation_size, batchNumber,
+                                                                                            None,
+                                                                                            None,
+                                                                                            total_model_size_per_op)
 
-                                    if (clients_time_for_each_op1[badClient][op1] + edge_server_comm_time_temp) < baseline_tt:
-                                        temp_energy_action = copy.deepcopy(new_action)
-                                        temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    if total_time_each_c_temp[badClient] < baseline_tt:
                                         isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp_energy_action,
                                                                                                                    badClient,
                                                                                                                    runningClients,
@@ -696,7 +553,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                    client_bw,
                                                                                                                    edge_server_bw,
                                                                                                                    activation_size,
-                                                                                                                   total_model_size,
+                                                                                                                   total_model_size_per_op,
                                                                                                                    batchNumber)
                                         if not isViolated:
                                             if memoryAvailability == 'BOTH':
@@ -727,20 +584,18 @@ def edge_based_heuristic_splitting(state: dict, label):
                         time_diff = total_time_for_each_client[badClient] - baseline_tt
                         op2_selected = False
                         if time_for_each_client[badClient]['server_comp'] - time_for_each_client[badClient]['edge_comp'] > time_diff:
+                            temp = copy.deepcopy(new_action)
                             sorted_op2_by_server_comp = sorted(each_splitting_share[currentOffloading[0]].items(),
                                                                key=lambda item: item[1]['server_comp'], reverse=True)
                             for op2, share in sorted_op2_by_server_comp:
                                 if share['server_comp'] < currentOffloadingShares['server_comp']:
+                                    temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp, client_comp_time, client_bw,
+                                                                                            edge_server_bw, activation_size, batchNumber,
+                                                                                            None,
+                                                                                            None, total_model_size_per_op)
 
-                                    if op2 != config.model_len - 1:
-                                        edge_server_comm_time_temp = (
-                                                ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) / edge_server_bw[edgeIP])
-                                    else:
-                                        edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
-
-                                    if (clients_time_for_each_op1[badClient][currentOffloading[0]] + edge_server_comm_time_temp) < baseline_tt:
-                                        temp = copy.deepcopy(new_action)
-                                        temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if total_time_each_c_temp[badClient] < baseline_tt:
                                         isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
                                                                                                                    runningClients,
                                                                                                                    current_bad_device,
@@ -750,46 +605,25 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                    client_bw,
                                                                                                                    edge_server_bw,
                                                                                                                    activation_size,
-                                                                                                                   total_model_size,
+                                                                                                                   total_model_size_per_op,
                                                                                                                    batchNumber)
                                         if not isViolated:
+                                            new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
                                             if memoryAvailability == 'BOTH':
-                                                if ((clients_time_for_each_op1[badClient][currentOffloading[0]] +
-                                                     newTimes[badClient]['edge_comp'] + newTimes[badClient]['server_comp'] +
-                                                     newTimes[badClient]['edge_server_comm']) < baseline_tt):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    time_for_each_client = newTimes
-                                                    total_time_for_each_client = newTotalTimes
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'EDGE':
-                                                if ((newTimes[badClient]['edge_comp'] + edge_server_comm_time_temp) <
-                                                        time_for_each_client[badClient]['edge_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'SERVER':
-                                                if ((newTimes[badClient]['server_comp'] + edge_server_comm_time_temp) <
-                                                        time_for_each_client[badClient]['server_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'NONE':
-                                                if edge_server_comm_time_temp < time_for_each_client[badClient]['edge_comp']:
-                                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                    op2_selected = True
-                                                    break
-                                            else:
-                                                raise Exception('Invalid memory availability in check violation function')
+                                                time_for_each_client = newTimes
+                                                total_time_for_each_client = newTotalTimes
+                                            op2_selected = True
+                                            break
                         if not op2_selected:
                             temp = copy.deepcopy(new_action)
                             for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
                                 if op1 > currentOffloading[0]:
                                     temp[config.CLIENTS_CONFIG[badClient]][0] = op1
-                                    if op1 < currentOffloading[1]:
-                                        for op2 in range(currentOffloading[1], config.model_len):
+                                    sorted_op2_by_server_comp = sorted(each_splitting_share[op1].items(),
+                                                                       key=lambda item: item[1]['server_comp'],
+                                                                       reverse=True)
+                                    for op2, share in sorted_op2_by_server_comp:
+                                        if share['server_comp'] < currentOffloadingShares['server_comp']:
                                             temp[config.CLIENTS_CONFIG[badClient]][1] = op2
                                             isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
                                                                                                                        runningClients,
@@ -800,96 +634,17 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                        client_bw,
                                                                                                                        edge_server_bw,
                                                                                                                        activation_size,
-                                                                                                                       total_model_size,
+                                                                                                                       total_model_size_per_op,
                                                                                                                        batchNumber)
-
                                             if not isViolated:
+                                                new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                                 if memoryAvailability == 'BOTH':
-                                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                                     time_for_each_client = newTimes
                                                     total_time_for_each_client = newTotalTimes
-                                                    op2_selected = True
-                                                    break
-                                                elif memoryAvailability == 'EDGE':
-                                                    if ((newTimes[badClient]['edge_comp'] +
-                                                         newTimes[badClient]['client_comm'] +
-                                                         newTimes[badClient]['client_comp'] +
-                                                         newTimes[badClient]['edge_server_comm']) <
-                                                            time_for_each_client[badClient]['edge_comp'] +
-                                                            time_for_each_client[badClient]['client_comm'] +
-                                                            time_for_each_client[badClient]['client_comp'] +
-                                                            time_for_each_client[badClient]['edge_server_comm']):
-                                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                        op2_selected = True
-                                                        break
-                                                elif memoryAvailability == 'SERVER':
-                                                    if ((newTimes[badClient]['server_comp'] +
-                                                         newTimes[badClient]['client_comm'] +
-                                                         newTimes[badClient]['client_comp'] +
-                                                         newTimes[badClient]['edge_server_comm']) <
-                                                            time_for_each_client[badClient]['server_comp'] +
-                                                            time_for_each_client[badClient]['client_comm'] +
-                                                            time_for_each_client[badClient]['client_comp'] +
-                                                            time_for_each_client[badClient]['edge_server_comm']):
-                                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                        op2_selected = True
-                                                        break
-                                                elif memoryAvailability == 'NONE':
-                                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                    break
-                                        if op2_selected:
-                                            break
-                                    else:
-                                        for op2 in range(op1, config.model_len):
-                                            temp[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                            isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
-                                                                                                                       runningClients,
-                                                                                                                       current_bad_device,
-                                                                                                                       time_for_each_client,
-                                                                                                                       baseline_tt,
-                                                                                                                       client_comp_time,
-                                                                                                                       client_bw,
-                                                                                                                       edge_server_bw,
-                                                                                                                       activation_size,
-                                                                                                                       total_model_size,
-                                                                                                                       batchNumber)
-
-                                            if not isViolated:
-                                                if memoryAvailability == 'BOTH':
-                                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                    time_for_each_client = newTimes
-                                                    total_time_for_each_client = newTotalTimes
-                                                    op2_selected = True
-                                                    break
-                                                elif memoryAvailability == 'EDGE':
-                                                    if ((newTimes[badClient]['edge_comp'] +
-                                                         newTimes[badClient]['client_comm'] +
-                                                         newTimes[badClient]['client_comp'] +
-                                                         newTimes[badClient]['edge_server_comm']) <
-                                                            time_for_each_client[badClient]['edge_comp'] +
-                                                            time_for_each_client[badClient]['client_comm'] +
-                                                            time_for_each_client[badClient]['client_comp'] +
-                                                            time_for_each_client[badClient]['edge_server_comm']):
-                                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                        op2_selected = True
-                                                        break
-                                                elif memoryAvailability == 'SERVER':
-                                                    if ((newTimes[badClient]['server_comp'] +
-                                                         newTimes[badClient]['client_comm'] +
-                                                         newTimes[badClient]['client_comp'] +
-                                                         newTimes[badClient]['edge_server_comm']) <
-                                                            time_for_each_client[badClient]['server_comp'] +
-                                                            time_for_each_client[badClient]['client_comm'] +
-                                                            time_for_each_client[badClient]['client_comp'] +
-                                                            time_for_each_client[badClient]['edge_server_comm']):
-                                                        new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                        op2_selected = True
-                                                        break
-                                                elif memoryAvailability == 'NONE':
-                                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                    break
-                                        if op2_selected:
-                                            break
+                                                op2_selected = True
+                                                break
+                                    if op2_selected:
+                                        break
                     else:
                         # Give bad device a high priority and vic versa
                         high_outlier, low_outlier = detect_outliers_using_iqr(servers_client_comp_time)
@@ -899,136 +654,99 @@ def edge_based_heuristic_splitting(state: dict, label):
                         for lowOutlierClient in low_outlier:
                             if previous_server_nice_value[lowOutlierClient] != 10:
                                 new_server_nice_value[lowOutlierClient] = 10
-            else:
-                fed_logger.info(Fore.YELLOW + f"Edge-Server comm")
 
+            elif bottleneck == 'edge_server_comm_during_round':
+                fed_logger.info(Fore.YELLOW + f"EDGE - SERVER comm_during_round")
                 currentOffloading = new_action[config.CLIENTS_CONFIG[badClient]]
                 currentOffloadingShares = each_splitting_share[currentOffloading[0]][currentOffloading[1]]
 
                 if badClient in high_prio_bad_energy_consuming_client:
                     fed_logger.info(Fore.YELLOW + f"Edge-Server comm => improving energy")
-
+                    temp_energy_action = copy.deepcopy(new_action)
                     for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
                         fed_logger.info(Fore.YELLOW + f"Edge-Server comm => improving energy [{op1}, ]")
-
-                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size,
+                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size_per_op,
                                                                  client_comp_energy, client_power_usage)
                         sorted_op2_by_edge_server_comm = sorted(each_splitting_share[op1].items(),
-                                                                key=lambda item: item[1]['edge_server_comm'], reverse=True)
+                                                                key=lambda item: item[1]['edge_server_comm_during_round'], reverse=True)
                         fed_logger.info(Fore.YELLOW + f"Edge-Server comm => improving energy [{op1}, ] => op2 by edge-server comm: "
                                                       f"{sorted_op2_by_edge_server_comm}")
 
                         if energy < clients_totals_e[badClient]:
                             for op2, share in sorted_op2_by_edge_server_comm:
                                 fed_logger.info(Fore.YELLOW + f"Edge-Server comm => improving energy [{op1}, {op2}]")
-
-                                if share['edge_server_comm'] < currentOffloadingShares['edge_server_comm']:
-                                    if op2 != config.model_len - 1:
-                                        edge_server_comm_time_temp = (
-                                                ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) / edge_server_bw[edgeIP])
-                                    else:
-                                        edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
-
-                                        if (clients_time_for_each_op1[badClient][op1] + edge_server_comm_time_temp) < baseline_tt:
-                                            temp_energy_action = copy.deepcopy(new_action)
-                                            temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                            isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp_energy_action,
-                                                                                                                       badClient,
-                                                                                                                       runningClients,
-                                                                                                                       current_bad_device,
-                                                                                                                       time_for_each_client,
-                                                                                                                       baseline_tt,
-                                                                                                                       client_comp_time,
-                                                                                                                       client_bw,
-                                                                                                                       edge_server_bw,
-                                                                                                                       activation_size,
-                                                                                                                       total_model_size,
-                                                                                                                       batchNumber)
-                                            if not isViolated:
-                                                if memoryAvailability == 'BOTH':
-                                                    time_for_each_client = newTimes
-                                                    total_time_for_each_client = newTotalTimes
-                                                new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                deviceChanged = True
-                                                break
+                                if share['edge_server_comm_during_round'] < currentOffloadingShares['edge_server_comm_during_round']:
+                                    temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp_energy_action, client_comp_time, client_bw,
+                                                                                            edge_server_bw, activation_size, batchNumber,
+                                                                                            None,
+                                                                                            None,
+                                                                                            total_model_size_per_op)
+                                    if total_time_each_c_temp[badClient] < baseline_tt:
+                                        isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp_energy_action,
+                                                                                                                   badClient,
+                                                                                                                   runningClients,
+                                                                                                                   current_bad_device,
+                                                                                                                   time_for_each_client,
+                                                                                                                   baseline_tt,
+                                                                                                                   client_comp_time,
+                                                                                                                   client_bw,
+                                                                                                                   edge_server_bw,
+                                                                                                                   activation_size,
+                                                                                                                   total_model_size_per_op,
+                                                                                                                   batchNumber)
+                                        if not isViolated:
+                                            if memoryAvailability == 'BOTH':
+                                                time_for_each_client = newTimes
+                                                total_time_for_each_client = newTotalTimes
+                                            new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                            deviceChanged = True
+                                            break
                             if deviceChanged:
                                 break
                 if not deviceChanged:
                     fed_logger.info(Fore.YELLOW + f"Edge-Server comm => device not changed")
-
                     sorted_op2_by_edge_server_comm = sorted(each_splitting_share[currentOffloading[0]].items(),
-                                                            key=lambda item: item[1]['edge_server_comm'], reverse=True)
+                                                            key=lambda item: item[1]['edge_server_comm_during_round'], reverse=True)
                     time_diff = total_time_for_each_client[badClient] - baseline_tt
                     op2_selected = False
                     if abs(time_for_each_client[badClient]['server_comp'] - time_for_each_client[badClient]['edge_comp']) > time_diff:
                         for op2, share in sorted_op2_by_edge_server_comm:
                             fed_logger.info(Fore.YELLOW + f"Edge-Server comm => deviceNotChanged => op2: {op2}")
 
-                            if share['edge_server_comm'] < currentOffloadingShares['edge_server_comm']:
-
-                                if op2 != config.model_len - 1:
-                                    edge_server_comm_time_temp = (
-                                            ((2 * (activation_size[op2]) * batchNumber) + (2 * total_model_size)) / edge_server_bw[edgeIP])
-                                else:
-                                    edge_server_comm_time_temp = (2 * total_model_size / edge_server_bw[edgeIP])
-
-                                if (clients_time_for_each_op1[badClient][currentOffloading[0]] + edge_server_comm_time_temp) < baseline_tt:
-                                    temp = copy.deepcopy(new_action)
-                                    temp[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                    isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
-                                                                                                               runningClients,
-                                                                                                               current_bad_device,
-                                                                                                               time_for_each_client,
-                                                                                                               baseline_tt,
-                                                                                                               client_comp_time,
-                                                                                                               client_bw,
-                                                                                                               edge_server_bw,
-                                                                                                               activation_size,
-                                                                                                               total_model_size,
-                                                                                                               batchNumber)
-                                    if not isViolated:
-                                        if memoryAvailability == 'BOTH':
-                                            if ((clients_time_for_each_op1[badClient][currentOffloading[0]] +
-                                                 newTimes[badClient]['edge_comp'] + newTimes[badClient]['server_comp'] +
-                                                 newTimes[badClient]['edge_server_comm']) < baseline_tt):
-                                                new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                time_for_each_client = newTimes
-                                                total_time_for_each_client = newTotalTimes
-                                                op2_selected = True
-                                                break
-                                        elif memoryAvailability == 'EDGE':
-                                            if ((newTimes[badClient]['edge_comp'] + edge_server_comm_time_temp) <
-                                                    time_for_each_client[badClient]['edge_comp'] +
-                                                    time_for_each_client[badClient]['edge_server_comm']):
-                                                new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                op2_selected = True
-                                                break
-                                        elif memoryAvailability == 'SERVER':
-                                            if ((newTimes[badClient]['server_comp'] + edge_server_comm_time_temp) <
-                                                    time_for_each_client[badClient]['server_comp'] +
-                                                    time_for_each_client[badClient]['edge_server_comm']):
-                                                new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                op2_selected = True
-                                                break
-                                        elif memoryAvailability == 'NONE':
-                                            if edge_server_comm_time_temp < time_for_each_client[badClient]['edge_comp']:
-                                                new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
-                                                op2_selected = True
-                                                break
-                                        else:
-                                            raise Exception('Invalid memory availability in check violation function')
+                            if share['edge_server_comm_during_round'] < currentOffloadingShares['edge_server_comm_during_round']:
+                                temp = copy.deepcopy(new_action)
+                                temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
+                                                                                                           runningClients,
+                                                                                                           current_bad_device,
+                                                                                                           time_for_each_client,
+                                                                                                           baseline_tt,
+                                                                                                           client_comp_time,
+                                                                                                           client_bw,
+                                                                                                           edge_server_bw,
+                                                                                                           activation_size,
+                                                                                                           total_model_size_per_op,
+                                                                                                           batchNumber)
+                                if not isViolated:
+                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if memoryAvailability == 'BOTH':
+                                        time_for_each_client = newTimes
+                                        total_time_for_each_client = newTotalTimes
+                                    op2_selected = True
+                                    break
 
                     if not op2_selected:
                         temp = copy.deepcopy(new_action)
                         for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
-                            _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size,
+                            _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber,
+                                                                     total_model_size_per_op,
                                                                      client_comp_energy, client_power_usage)
-
                             if energy > clients_totals_e[badClient]:
                                 sorted_op2_by_edge_server_comm = sorted(each_splitting_share[op1].items(),
-                                                                        key=lambda item: item[1]['edge_server_comm'], reverse=True)
+                                                                        key=lambda item: item[1]['edge_server_comm_during_round'], reverse=True)
                                 for op2, share in sorted_op2_by_edge_server_comm:
-                                    if share['edge_server_comm'] < currentOffloadingShares['edge_server_comm']:
+                                    if share['edge_server_comm_during_round'] < currentOffloadingShares['edge_server_comm_during_round']:
                                         temp[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                         isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
                                                                                                                    runningClients,
@@ -1039,55 +757,132 @@ def edge_based_heuristic_splitting(state: dict, label):
                                                                                                                    client_bw,
                                                                                                                    edge_server_bw,
                                                                                                                    activation_size,
-                                                                                                                   total_model_size,
+                                                                                                                   total_model_size_per_op,
                                                                                                                    batchNumber)
 
                                         if not isViolated:
+                                            new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                             if memoryAvailability == 'BOTH':
-                                                new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
                                                 time_for_each_client = newTimes
                                                 total_time_for_each_client = newTotalTimes
-                                                op2_selected = True
-                                                break
-                                            elif memoryAvailability == 'EDGE':
-                                                if ((newTimes[badClient]['edge_comp'] +
-                                                     newTimes[badClient]['client_comm'] +
-                                                     newTimes[badClient]['client_comp'] +
-                                                     newTimes[badClient]['edge_server_comm']) <
-                                                        time_for_each_client[badClient]['edge_comp'] +
-                                                        time_for_each_client[badClient]['client_comm'] +
-                                                        time_for_each_client[badClient]['client_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'SERVER':
-                                                if ((newTimes[badClient]['server_comp'] +
-                                                     newTimes[badClient]['client_comm'] +
-                                                     newTimes[badClient]['client_comp'] +
-                                                     newTimes[badClient]['edge_server_comm']) <
-                                                        time_for_each_client[badClient]['server_comp'] +
-                                                        time_for_each_client[badClient]['client_comm'] +
-                                                        time_for_each_client[badClient]['client_comp'] +
-                                                        time_for_each_client[badClient]['edge_server_comm']):
-                                                    new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                    op2_selected = True
-                                                    break
-                                            elif memoryAvailability == 'NONE':
-                                                new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
-                                                break
+                                            op2_selected = True
+                                            break
                                 if op2_selected:
                                     break
+            else:
+                fed_logger.info(Fore.YELLOW + f"EDGE - SERVER gather time")
+                currentOffloading = new_action[config.CLIENTS_CONFIG[badClient]]
+                currentOffloadingShares = each_splitting_share[currentOffloading[0]][currentOffloading[1]]
 
-        # _, _, clients_totals_e = energyEstimator(new_action, client_bw, activation_size, batchNumber, total_model_size, client_comp_energy,
-        #                                          client_power_usage)
-        #
-        # for client in client_remaining_energy.keys():
-        #     client_remaining_runtime[client] = client_remaining_energy[client] / (clients_totals_e[client])
-        #
-        # client_remaining_runtime_comp_score = normalizer(client_remaining_runtime)
-        # client_score = client_remaining_runtime_comp_score
-        # clients_score = sorted(client_score.items(), key=lambda item: item[1], reverse=True)
+                if badClient in high_prio_bad_energy_consuming_client:
+                    fed_logger.info(Fore.YELLOW + f"Edge-Server gather => improving energy")
+                    temp_energy_action = copy.deepcopy(new_action)
+                    for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
+                        fed_logger.info(Fore.YELLOW + f"Edge-Server gather => improving energy [{op1}, ]")
+                        _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size_per_op,
+                                                                 client_comp_energy, client_power_usage)
+                        sorted_op2_by_edge_server_gather = sorted(each_splitting_share[op1].items(),
+                                                                key=lambda item: item[1]['edge_server_comm_gather'], reverse=True)
+                        fed_logger.info(Fore.YELLOW + f"Edge-Server gather => improving energy [{op1}, ] => op2 by edge-server gather: "
+                                                      f"{sorted_op2_by_edge_server_gather}")
+
+                        if energy < clients_totals_e[badClient]:
+                            for op2, share in sorted_op2_by_edge_server_gather:
+                                fed_logger.info(Fore.YELLOW + f"Edge-Server comm => improving energy [{op1}, {op2}]")
+                                if share['edge_server_comm_gather'] < currentOffloadingShares['edge_server_comm_gather']:
+                                    temp_energy_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                    _, total_time_each_c_temp, _, _ = trainingTimeEstimator(temp_energy_action, client_comp_time, client_bw,
+                                                                                            edge_server_bw, activation_size, batchNumber,
+                                                                                            None,
+                                                                                            None,
+                                                                                            total_model_size_per_op)
+                                    if total_time_each_c_temp[badClient] < baseline_tt:
+                                        isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp_energy_action,
+                                                                                                                   badClient,
+                                                                                                                   runningClients,
+                                                                                                                   current_bad_device,
+                                                                                                                   time_for_each_client,
+                                                                                                                   baseline_tt,
+                                                                                                                   client_comp_time,
+                                                                                                                   client_bw,
+                                                                                                                   edge_server_bw,
+                                                                                                                   activation_size,
+                                                                                                                   total_model_size_per_op,
+                                                                                                                   batchNumber)
+                                        if not isViolated:
+                                            if memoryAvailability == 'BOTH':
+                                                time_for_each_client = newTimes
+                                                total_time_for_each_client = newTotalTimes
+                                            new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                            deviceChanged = True
+                                            break
+                            if deviceChanged:
+                                break
+                if not deviceChanged:
+                    fed_logger.info(Fore.YELLOW + f"Edge-Server gather => device not changed")
+                    sorted_op2_by_edge_server_comm = sorted(each_splitting_share[currentOffloading[0]].items(),
+                                                            key=lambda item: item[1]['edge_server_comm_gather'], reverse=True)
+                    time_diff = total_time_for_each_client[badClient] - baseline_tt
+                    op2_selected = False
+                    if abs(time_for_each_client[badClient]['server_comp'] - time_for_each_client[badClient]['edge_comp']) > time_diff:
+                        for op2, share in sorted_op2_by_edge_server_comm:
+                            fed_logger.info(Fore.YELLOW + f"edge_server_comm_gather => deviceNotChanged => op2: {op2}")
+
+                            if share['edge_server_comm_gather'] < currentOffloadingShares['edge_server_comm_gather']:
+                                temp = copy.deepcopy(new_action)
+                                temp[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
+                                                                                                           runningClients,
+                                                                                                           current_bad_device,
+                                                                                                           time_for_each_client,
+                                                                                                           baseline_tt,
+                                                                                                           client_comp_time,
+                                                                                                           client_bw,
+                                                                                                           edge_server_bw,
+                                                                                                           activation_size,
+                                                                                                           total_model_size_per_op,
+                                                                                                           batchNumber)
+                                if not isViolated:
+                                    new_action[config.CLIENTS_CONFIG[badClient]][1] = op2
+                                    if memoryAvailability == 'BOTH':
+                                        time_for_each_client = newTimes
+                                        total_time_for_each_client = newTotalTimes
+                                    op2_selected = True
+                                    break
+
+                    if not op2_selected:
+                        temp = copy.deepcopy(new_action)
+                        for op1, energy, tt in min_energy_trainingTime_splitting_for_each_client[badClient]:
+                            _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber,
+                                                                     total_model_size_per_op,
+                                                                     client_comp_energy, client_power_usage)
+                            if energy > clients_totals_e[badClient]:
+                                sorted_op2_by_edge_server_comm = sorted(each_splitting_share[op1].items(),
+                                                                        key=lambda item: item[1]['edge_server_comm_gather'], reverse=True)
+                                for op2, share in sorted_op2_by_edge_server_comm:
+                                    if share['edge_server_comm_gather'] < currentOffloadingShares['edge_server_comm_gather']:
+                                        temp[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                        isViolated, memoryAvailability, newTimes, newTotalTimes = checkTTViolation(temp, badClient,
+                                                                                                                   runningClients,
+                                                                                                                   current_bad_device,
+                                                                                                                   time_for_each_client,
+                                                                                                                   baseline_tt,
+                                                                                                                   client_comp_time,
+                                                                                                                   client_bw,
+                                                                                                                   edge_server_bw,
+                                                                                                                   activation_size,
+                                                                                                                   total_model_size_per_op,
+                                                                                                                   batchNumber)
+
+                                        if not isViolated:
+                                            new_action[config.CLIENTS_CONFIG[badClient]] = [op1, op2]
+                                            if memoryAvailability == 'BOTH':
+                                                time_for_each_client = newTimes
+                                                total_time_for_each_client = newTotalTimes
+                                            op2_selected = True
+                                            break
+                                if op2_selected:
+                                    break
 
         changed_device.append(badClient)
         current_bad_device.remove(badClient)
@@ -1101,11 +896,10 @@ def edge_based_heuristic_splitting(state: dict, label):
             clientOP2 = new_action[config.CLIENTS_CONFIG[client]][1]
             edgeIP = config.CLIENT_MAP[client]
 
-            client_comp_share = time_for_each_client[client]['client_comp'] / total_client_time
             edge_comp_share = time_for_each_client[client]['edge_comp'] / total_client_time
             server_comp_share = time_for_each_client[client]['server_comp'] / total_client_time
-            client_comm_share = time_for_each_client[client]['client_comm'] / total_client_time
-            edge_server_comm_share = time_for_each_client[client]['edge_server_comm'] / total_client_time
+            edge_server_comm_during_round_share = time_for_each_client[client]['edge_server_comm_during_round'] / total_client_time
+            edge_server_comm_gather_share = (total_model_size_per_op[clientOP2] / edge_server_bw[edgeIP]) / total_client_time
 
             op2_bigger_than_op1 = {layer: size for layer, size in activation_size.items() if layer >= clientOP1}
             fed_logger.info(Fore.GREEN + f"op2_bigger_than_op1: {op2_bigger_than_op1}")
@@ -1114,11 +908,10 @@ def edge_based_heuristic_splitting(state: dict, label):
 
             layer_with_min_size = min(op2_bigger_than_op1, key=op2_bigger_than_op1.get)
 
-            shares[client] = {'client_comp': 0,
-                              'edge_comp': edge_comp_share,
+            shares[client] = {'edge_comp': edge_comp_share,
                               'server_comp': server_comp_share,
-                              'client_comm': 0,
-                              'edge_server_comm': edge_server_comm_share}
+                              'edge_server_comm_during_round': edge_server_comm_during_round_share,
+                              'edge_server_comm_gather': edge_server_comm_gather_share}
             if clientOP2 == layer_with_min_size:
                 shares[client]['edge_server_comm'] = 0
 
@@ -1295,27 +1088,31 @@ def actionToLayerEdgeBase(splitDecision: list[float]) -> tuple[int, int]:
     return op1, op2
 
 
-def energyEstimator(action, client_bw, activation_size, batchNumber, total_model_size, client_comp_energy,
-                    client_power_usage):
+def energyEstimator(action, client_bw, activation_size, batchNumber, total_model_size_per_op, client_comp_energy, client_power_usage):
     client_computation_energy = {client: 0 for client, _ in client_bw.items()}
     client_communication_energy = {client: 0 for client, _ in client_bw.items()}
     client_total_energy = {client: 0 for client, _ in client_bw.items()}
 
+    edge_client_scatter, client_edge_during_round, client_edge_gather = (
+        transmissionTimeForEachClient(action, activation_size, batchNumber, total_model_size_per_op, client_bw, edge_server_bw=None))
+
     for client in config.CLIENTS_CONFIG.keys():
         client_op1 = action[config.CLIENTS_CONFIG[client]][0]
-        if client_op1 != config.model_len - 1:
-            tt_trans = ((2 * activation_size[client_op1] * batchNumber) + (2 * total_model_size)) / client_bw[client]
-        else:
-            tt_trans = (2 * total_model_size) / client_bw[client]
+
+        # Communication energy
+        client_transmission_time = edge_client_scatter[client] + client_edge_during_round[client] + client_edge_gather[client]
+        client_communication_energy[client] = client_transmission_time * client_power_usage[client][1]
+
+        # Computation energy
         client_computation_energy[client] = client_comp_energy[client][client_op1]
-        client_communication_energy[client] = tt_trans * client_power_usage[client][1]
+
         client_total_energy[client] = client_communication_energy[client] + client_computation_energy[client]
 
     return client_computation_energy, client_communication_energy, client_total_energy
 
 
 def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, time_for_each_client, baseline_tt, comp_time_on_each_client,
-                     clients_bw, edge_server_bw, activation_size, total_model_size, batchNumber):
+                     clients_bw, edge_server_bw, activation_size, total_model_size_per_op, batchNumber):
     fed_logger.info(Fore.GREEN + f"Check Violation")
     fed_logger.info(Fore.GREEN + f"=======================================")
     fed_logger.info(Fore.GREEN + f"CURRENT SPLITTING: {currentAction}")
@@ -1324,36 +1121,34 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
 
     temp_time_for_each_client = copy.deepcopy(time_for_each_client)
 
-    for client in active_clients:
-        edgeIP = config.CLIENT_MAP[client]
-        ClientOP1 = currentAction[config.CLIENTS_CONFIG[client]][0]
-        ClientOP2 = currentAction[config.CLIENTS_CONFIG[client]][1]
+    _, _, time_each_c, _ = trainingTimeEstimator(currentAction, comp_time_on_each_client, clients_bw, edge_server_bw, activation_size,
+                                                 batchNumber, None, None,
+                                                 total_model_size_per_op)
 
-        if ClientOP1 != config.model_len - 1:
-            transmission_time_on_each_client = (((2 * activation_size[ClientOP1] * batchNumber) + (2 * total_model_size)) /
-                                                clients_bw[client])
-        else:
-            transmission_time_on_each_client = (2 * total_model_size) / clients_bw[client]
+    ClientOP1 = currentAction[config.CLIENTS_CONFIG[changedClient]][0]
+    ClientOP2 = currentAction[config.CLIENTS_CONFIG[changedClient]][1]
 
-        if ClientOP2 != config.model_len - 1:
-            edge_server_transmission_time_for_each_client = (((2 * activation_size[ClientOP2] * batchNumber) + (2 * total_model_size)) /
-                                                             edge_server_bw[edgeIP])
-        else:
-            edge_server_transmission_time_for_each_client = (2 * total_model_size) / edge_server_bw[edgeIP]
-
-        temp_time_for_each_client[client] = {'client_comp': comp_time_on_each_client[client][ClientOP1],
-                                             'client_comm': transmission_time_on_each_client,
-                                             'edge_server_comm': edge_server_transmission_time_for_each_client}
-        if ClientOP1 == ClientOP2:
-            temp_time_for_each_client[client]['edge_comp'] = 0
-        if ClientOP2 == config.model_len - 1:
-            temp_time_for_each_client[client]['server_comp'] = 0
+    temp_time_for_each_client[changedClient] = {'client_comp': comp_time_on_each_client[changedClient][ClientOP1],
+                                                'client_edge_comm_during_round': time_each_c[changedClient]['client_edge_comm_during_round'],
+                                                'edge_server_comm_during_round': time_each_c[changedClient]['edge_server_comm_during_round'],
+                                                'server_edge_comm_scatter': time_each_c[changedClient]['server_edge_comm_scatter'],
+                                                'edge_client_comm_scatter': time_each_c[changedClient]['edge_client_comm_scatter'],
+                                                'client_edge_comm_gather': time_each_c[changedClient]['client_edge_comm_gather'],
+                                                'edge_server_comm_gather': time_each_c[changedClient]['edge_server_comm_gather']}
+    if ClientOP1 == ClientOP2:
+        temp_time_for_each_client[changedClient]['edge_comp'] = 0
+    if ClientOP2 == config.model_len - 1:
+        temp_time_for_each_client[changedClient]['server_comp'] = 0
 
     if (edge_memory is None) and (server_memory is None):
         if ((temp_time_for_each_client[changedClient]['client_comp'] +
-             temp_time_for_each_client[changedClient]['client_comm'] +
-             temp_time_for_each_client[changedClient]['edge_server_comm']) < baseline_tt):
-            return False, 'NONE', None, None
+             temp_time_for_each_client[changedClient]['client_edge_comm_during_round'] +
+             temp_time_for_each_client[changedClient]['edge_server_comm_during_round'] +
+             temp_time_for_each_client[changedClient]['server_edge_comm_scatter'] +
+             temp_time_for_each_client[changedClient]['edge_client_comm_scatter'] +
+             temp_time_for_each_client[changedClient]['client_edge_comm_gather'] +
+             temp_time_for_each_client[changedClient]['edge_server_comm_gather']) < baseline_tt):
+            return False, 'NONE', temp_time_for_each_client, None
         else:
             return True, 'NONE', None, None
     else:
@@ -1373,8 +1168,12 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
 
                     total_time_for_each_client[neighbour_client] = (temp_time_for_each_client[neighbour_client]['edge_comp'] +
                                                                     temp_time_for_each_client[neighbour_client]['client_comp'] +
-                                                                    temp_time_for_each_client[neighbour_client]['client_comm'] +
-                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm'])
+                                                                    temp_time_for_each_client[neighbour_client]['client_edge_comm_during_round'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm_during_round'] +
+                                                                    temp_time_for_each_client[neighbour_client]['server_edge_comm_scatter'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_client_comm_scatter'] +
+                                                                    temp_time_for_each_client[neighbour_client]['client_edge_comm_gather'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm_gather'])
                     if total_time_for_each_client[neighbour_client] > baseline_tt:
                         return True, 'EDGE', None, None
             return False, 'EDGE', temp_time_for_each_client, None
@@ -1392,8 +1191,12 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
 
                     total_time_for_each_client[neighbour_client] = (temp_time_for_each_client[neighbour_client]['server_comp'] +
                                                                     temp_time_for_each_client[neighbour_client]['client_comp'] +
-                                                                    temp_time_for_each_client[neighbour_client]['client_comm'] +
-                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm'])
+                                                                    temp_time_for_each_client[neighbour_client]['client_edge_comm_during_round'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm_during_round'] +
+                                                                    temp_time_for_each_client[neighbour_client]['server_edge_comm_scatter'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_client_comm_scatter'] +
+                                                                    temp_time_for_each_client[neighbour_client]['client_edge_comm_gather'] +
+                                                                    temp_time_for_each_client[neighbour_client]['edge_server_comm_gather'])
                     if total_time_for_each_client[neighbour_client] > baseline_tt:
                         return True, 'SERVER', None, None
             return False, 'SERVER', temp_time_for_each_client, None
@@ -1419,7 +1222,7 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
                 temp_time_for_each_client[neighbour_client]['server_comp'] = client_server_comp
 
             for modified_client in active_clients:
-                total_time_for_each_client[modified_client] = sum(time_for_each_client[modified_client].values())
+                total_time_for_each_client[modified_client] = sum(temp_time_for_each_client[modified_client].values())
 
             for client in active_clients:
                 if (client not in bad_clients) or (client == changedClient):
@@ -1430,14 +1233,8 @@ def checkTTViolation(currentAction, changedClient, active_clients, bad_clients, 
             raise Exception("Exception in checking TT violation")
 
 
-def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_server_bw, flops_of_each_layer,
-                          activation_size, total_model_size, batchNumber, edge_flops_model, server_flops_model,
-                          comp_time_on_edge_for_each_client=None, comp_time_on_server_for_each_client=None):
-    edge_flops = {edgeIP: 0.0 for edgeIP in config.EDGE_SERVER_LIST}
-    flop_of_each_edge_on_server = {edgeIP: 0.0 for edgeIP in config.EDGE_SERVER_LIST}
-    server_flops = 0
-    transmission_time_on_each_client = {}
-    edge_server_transmission_time_for_each_client = {}
+def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_server_bw, activation_size, batchNumber,
+                          comp_time_on_edge_for_each_client=None, comp_time_on_server_for_each_client=None, total_model_size_per_op=None):
     total_time_for_each_client = {}
     time_for_each_client = {}
     for client in config.CLIENTS_LIST:
@@ -1448,56 +1245,27 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
     if comp_time_on_server_for_each_client is None:
         comp_time_on_server_for_each_client = {client: 0 for client, _ in clients_bw.items()}
 
-    for i in range(len(action)):
-        clientAction = action[i]
-        clientIP = config.CLIENTS_INDEX[i]
-        edgeIP = config.CLIENT_MAP[clientIP]
-        op1 = clientAction[0]
-        op2 = clientAction[1]
-
-        if op1 != config.model_len - 1:
-            transmission_time_on_each_client[clientIP] = ((2 * activation_size[op1] * batchNumber) + (
-                    2 * total_model_size)) / clients_bw[clientIP]
-
-        else:
-            transmission_time_on_each_client[clientIP] = (2 * total_model_size) / clients_bw[clientIP]
-
-        if op2 != config.model_len - 1:
-            edge_server_transmission_time_for_each_client[clientIP] = ((2 * activation_size[op2] * batchNumber) + (
-                    2 * total_model_size)) / edge_server_bw[edgeIP]
-        else:
-            edge_server_transmission_time_for_each_client[clientIP] = (2 * total_model_size) / edge_server_bw[edgeIP]
-
-        # offloading on client, edge and server
-        if op1 < op2 < config.model_len - 1:
-            edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-            flop_of_each_edge_on_server[edgeIP] += sum(flops_of_each_layer[op2 + 1:])
-            server_flops += sum(flops_of_each_layer[op2 + 1:])
-        # offloading on client and edge
-        elif (op1 < op2) and op2 == config.model_len - 1:
-            edge_flops[edgeIP] += sum(flops_of_each_layer[op1 + 1:op2 + 1])
-        # offloading on client and server
-        elif (op1 == op2) and op1 < config.model_len - 1:
-            server_flops += sum(flops_of_each_layer[op2 + 1:])
-            flop_of_each_edge_on_server[edgeIP] += sum(flops_of_each_layer[op2 + 1:])
-
-    EDGE_INDEX: list = [(edge, config.EDGE_SERVER_LIST.index(edge)) for edge in config.EDGE_SERVER_LIST]
-    comp_time_on_each_edge = {edge: edge_flops_model.predict([[index, edge_flops[edge]]])[0] for edge, index in
-                              EDGE_INDEX}
-    comp_time_on_server = server_flops_model.predict([[server_flops]])
-    # fed_logger.info(Fore.GREEN + f"Comp time on edges prediction: {comp_time_on_each_edge}")
+    (server_edge_scatter_transmission_time, edge_client_scatter_transmission_time, client_edge_during_round,
+     edge_server_during_round, client_edge_gather, edge_server_gather_for_each_client, total_gather_time,
+     total_transmission_time_for_each_client) = transmissionTimeForEachClient(action, activation_size, batchNumber, total_model_size_per_op,
+                                                                              clients_bw, edge_server_bw)
 
     fed_logger.info(Fore.GREEN + f"Client's TT Approximation:")
+    fed_logger.info(Fore.GREEN + f"SERVER ==> EDGE SCATTER: {server_edge_scatter_transmission_time}")
     fed_logger.info(Fore.GREEN + f"Action: {action}")
     fed_logger.info(Fore.GREEN + f"===============================================================================")
     for clientIP in config.CLIENTS_LIST:
         op1 = action[config.CLIENTS_CONFIG[clientIP]][0]
+        edgeIP = config.CLIENT_MAP[clientIP]
         time_for_each_client[clientIP] = {'client_comp': comp_time_on_each_client[clientIP][op1],
-                                          'client_comm': transmission_time_on_each_client[clientIP],
-                                          'edge_server_comm': edge_server_transmission_time_for_each_client[
-                                              clientIP],
                                           'edge_comp': comp_time_on_edge_for_each_client[clientIP],
-                                          'server_comp': comp_time_on_server_for_each_client[clientIP]
+                                          'server_comp': comp_time_on_server_for_each_client[clientIP],
+                                          'server_edge_comm_scatter': server_edge_scatter_transmission_time[edgeIP],
+                                          'edge_client_comm_scatter': edge_client_scatter_transmission_time[clientIP],
+                                          'client_edge_comm_during_round': client_edge_during_round[clientIP],
+                                          'edge_server_comm_during_round': edge_server_during_round[clientIP],
+                                          'client_edge_comm_gather': client_edge_gather[clientIP],
+                                          'edge_server_comm_gather': edge_server_gather_for_each_client[clientIP],
                                           }
         total_time_for_each_client[clientIP] = sum(time_for_each_client[clientIP].values())
 
@@ -1505,8 +1273,12 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
         fed_logger.info(Fore.GREEN + f"     Client Comp: {time_for_each_client[clientIP]['client_comp']}")
         fed_logger.info(Fore.GREEN + f"     Edge Comp: {time_for_each_client[clientIP]['edge_comp']}")
         fed_logger.info(Fore.GREEN + f"     Server Comp: {time_for_each_client[clientIP]['server_comp']}")
-        fed_logger.info(Fore.GREEN + f"     Client Comm: {time_for_each_client[clientIP]['client_comm']}")
-        fed_logger.info(Fore.GREEN + f"     Edge-Server Comm: {time_for_each_client[clientIP]['edge_server_comm']}")
+        fed_logger.info(Fore.GREEN + f"     SERVER ==> EDGE Comm Scatter: {time_for_each_client[clientIP]['server_edge_comm_scatter']}")
+        fed_logger.info(Fore.GREEN + f"     EDGE ==> CLIENT Comm Scatter: {time_for_each_client[clientIP]['edge_client_comm_scatter']}")
+        fed_logger.info(Fore.GREEN + f"     CLIENT ==> EDGE Comm during round: {time_for_each_client[clientIP]['client_edge_comm_during_round']}")
+        fed_logger.info(Fore.GREEN + f"     Edge ==> SERVER Comm during round: {time_for_each_client[clientIP]['edge_server_comm_during_round']}")
+        fed_logger.info(Fore.GREEN + f"     CLIENT ==> EDGE Comm gathering: {time_for_each_client[clientIP]['client_edge_comm_gather']}")
+        fed_logger.info(Fore.GREEN + f"     EDGE ==> SERVER Comm gathering: {time_for_each_client[clientIP]['edge_server_comm_gather']}")
         fed_logger.info(Fore.GREEN + f"     SUM: {total_time_for_each_client[clientIP]}")
         fed_logger.info(Fore.GREEN + f"---------------------------------------------------------------------------")
 
@@ -1526,8 +1298,100 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
     total_trainingTime = max(total_time_for_each_client.values())
     fed_logger.info(Fore.GREEN + f"Action's Training Time: {total_trainingTime}")
 
-    return (total_trainingTime, total_time_for_each_client, time_for_each_client, nice_values, comp_time_on_server,
-            comp_time_on_each_edge, transmission_time_on_each_client, edge_server_transmission_time_for_each_client)
+    return total_trainingTime, total_time_for_each_client, time_for_each_client, nice_values
+
+
+def transmissionTimeForEachClient(action, activation_size, batchNumber, total_model_size_per_op, clients_bw, edge_server_bw):
+    """
+    Args:
+    Returns:
+        server_edge_scatter_transmission_time, edge_client_scatter_transmission_time, client_edge_during_round, edge_server_during_round,
+        client_edge_gather, edge_server_gather_for_each_client, total_gather_time, total_transmission_time_for_each_client
+
+    Example:
+    """
+    total_transmission_time_for_each_client = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+
+    # During round transmission times
+    client_edge_transmission_time_during_round = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+    edge_server_transmission_time_during_round = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+
+    # Scattering transmission time
+    server_edge_scatter_transmission_time = {edge: 0 for edge in config.EDGE_SERVER_LIST}
+    edge_client_scatter_transmission_time = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+
+    # Gathering transmission tine
+    client_edge_gather_transmission_time = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+    edge_server_gather_transmission_time = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+
+    if edge_server_bw is not None:
+
+        # Scattering transmission time SERVER ==> EDGE
+        cumulative_server_edge_scatter_time = 0
+        for edge, bandwidth in edge_server_bw.items():
+            cumulative_server_edge_scatter_time += total_model_size_per_op[config.model_len - 1] / bandwidth
+            server_edge_scatter_transmission_time[edge] = cumulative_server_edge_scatter_time
+
+        fed_logger.info(Fore.GREEN + f"TransmissionEstimator[Total model size] = {total_model_size_per_op[config.model_len - 1]}")
+        fed_logger.info(Fore.GREEN + f"TransmissionEstimator[SERVER EDGE SCATTER] = {server_edge_scatter_transmission_time}")
+        # Gathering transmission time EDGE ==> SERVER
+        cumulative_edge_server_gather_time = 0
+        runningClient = [client for client in config.CLIENTS_CONFIG.keys() if
+                         action[config.CLIENTS_CONFIG[client]] != [config.model_len, config.model_len]]
+        for client in runningClient:
+            op2 = action[config.CLIENTS_CONFIG[client]][1]
+            edgeIP = config.CLIENT_MAP[client]
+            cumulative_edge_server_gather_time += total_model_size_per_op[op2] / edge_server_bw[edgeIP]
+            edge_server_gather_transmission_time[client] = cumulative_edge_server_gather_time
+
+        for i in range(len(action)):
+            clientAction = action[i]
+            clientIP = config.CLIENTS_INDEX[i]
+            edgeIP = config.CLIENT_MAP[clientIP]
+
+            op1 = clientAction[0]
+            op2 = clientAction[1]
+
+            # Scattering transmission time  EDGE ===> CLIENT
+            edge_client_scatter_transmission_time[clientIP] = total_model_size_per_op[config.model_len - 1] / clients_bw[clientIP]
+
+            # During round transmission times
+            client_edge_transmission_time_during_round[clientIP] = (2 * activation_size[op1] * batchNumber) / clients_bw[clientIP]
+            edge_server_transmission_time_during_round[clientIP] = (2 * activation_size[op2] * batchNumber) / edge_server_bw[edgeIP]
+
+            # Gathering transmission time CLIENT ===> EDGE
+            client_edge_gather_transmission_time[clientIP] = total_model_size_per_op[op1] / clients_bw[clientIP]
+
+            total_transmission_time_for_each_client[clientIP] = (server_edge_scatter_transmission_time[edgeIP] +
+                                                                 edge_client_scatter_transmission_time[clientIP] +
+                                                                 client_edge_transmission_time_during_round[clientIP] +
+                                                                 edge_server_transmission_time_during_round[clientIP] +
+                                                                 client_edge_gather_transmission_time[clientIP] +
+                                                                 edge_server_gather_transmission_time[clientIP])
+
+        total_gather_time = sum(edge_server_gather_transmission_time.values())
+        edge_server_gather_for_each_client = edge_server_gather_transmission_time
+
+        client_edge_during_round = client_edge_transmission_time_during_round
+        edge_server_during_round = edge_server_transmission_time_during_round
+        client_edge_gather = client_edge_gather_transmission_time
+
+        return (server_edge_scatter_transmission_time, edge_client_scatter_transmission_time, client_edge_during_round, edge_server_during_round,
+                client_edge_gather, edge_server_gather_for_each_client, total_gather_time, total_transmission_time_for_each_client)
+    else:
+        edge_client_scatter_transmission_time = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
+        for i in range(len(action)):
+            clientAction = action[i]
+            clientIP = config.CLIENTS_INDEX[i]
+            op1 = clientAction[0]
+            if op1 != config.model_len - 1:
+                client_edge_transmission_time_during_round[clientIP] = (2 * activation_size[op1] * batchNumber) / clients_bw[clientIP]
+            else:
+                client_edge_transmission_time_during_round[clientIP] = 0
+
+            edge_client_scatter_transmission_time[clientIP] = total_model_size_per_op[config.model_len - 1] / clients_bw[clientIP]
+            client_edge_gather_transmission_time[clientIP] = total_model_size_per_op[op1] / clients_bw[clientIP]
+        return edge_client_scatter_transmission_time, client_edge_transmission_time_during_round, client_edge_gather_transmission_time
 
 
 def triedBefore(current_splitting, edgeName=None):
