@@ -142,6 +142,13 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
         memory = {'history': []}  # Create new memory if file doesn't exist
         with open(MEMORY_FILE, "w") as f:
             json.dump(memory, f, indent=4)
+    fed_logger.info(Fore.YELLOW + f'Removing Graphs and npys!')
+    GRAPHS_Path = "/fed-flow/Graphs/"
+    for root, dirs, files in os.walk(GRAPHS_Path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            os.remove(file_path)
+            print(f"Deleted: {file_path}")
 
     fed_logger.info(Fore.LIGHTGREEN_EX + f"TOTAL ROUND: {config.R}")
     for r in range(config.R):
