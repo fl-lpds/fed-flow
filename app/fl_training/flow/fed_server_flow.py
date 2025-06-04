@@ -191,21 +191,19 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
 
             elif options.get('splitting') == 'edge_rl_splitting' and r == 0:
                 server.split_layers = config.split_layer
-            elif options.get('splitting') == 'edge_rl_splitting':
 
+            elif options.get('splitting') == 'edge_rl_splitting':
                 fed_logger.info(Fore.YELLOW + f"Clustering based on BW")
                 server.cluster(options)
-
                 fed_logger.info("Creating state")
                 server.offloading = server.get_offloading(server.split_layers)
                 ttpi_of_each_client = {client: clientTT[client][-1] for client in config.CLIENTS_LIST}
                 ttpi = server.ttpi(config.CLIENTS_LIST, ttpi_of_each_client)
                 state = server.concat_norm(ttpi, server.offloading)
-
                 fed_logger.info("splitting")
                 server.split(state, options)
-            else:
 
+            else:
                 state = server.edge_based_state()
                 fed_logger.info("splitting")
                 splitTime_start = time.time()
