@@ -254,6 +254,8 @@ class FedServer(FedServerInterface):
 
                 if self.simnet:
                     communication_time += (data_utils.sizeofmessage(msg) / self.edge_bandwidth[edge_of_client])
+                    fed_logger.info(Fore.LIGHTGREEN_EX + f'{client_ip}=> activation size received from edge: {data_utils.sizeofmessage(msg)}')
+                    fed_logger.info(Fore.LIGHTGREEN_EX + f'{client_ip}=> comm time: {communication_time}')
 
                 smashed_layers = msg[1]
                 labels = msg[2]
@@ -280,6 +282,8 @@ class FedServer(FedServerInterface):
                 self.send_msg(config.CLIENT_MAP[client_ip], msg, True, url=config.CLIENT_MAP[client_ip])
                 if self.simnet:
                     communication_time += (data_utils.sizeofmessage(msg) / self.edge_bandwidth[edge_of_client])
+                    fed_logger.info(Fore.LIGHTGREEN_EX + f'{client_ip}=> gradient size send to edge: {data_utils.sizeofmessage(msg)}')
+                    fed_logger.info(Fore.LIGHTGREEN_EX + f'{client_ip}=> comm time: {communication_time}')
 
             i += 1
 
