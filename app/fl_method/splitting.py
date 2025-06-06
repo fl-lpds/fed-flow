@@ -33,11 +33,14 @@ def edge_based_heuristic_splitting(state: dict, label):
     previous_edge_nice_value = state['prev_edge_nice_value']
     previous_server_nice_value = state['prev_server_nice_value']
 
+    BASELINE = 'only_server'
+
     total_model_size = state['total_model_size']
     if config.model_len == 8:
         # Alexnet
         total_model_size_per_op = {0: 1151104, 1: 20871112, 2: 49262208, 3: 91809536, 4: 120180488, 5: 1328276632, 6: 1865284136, 7: 1866600320}
-
+        # Each layer activation (bit): {0: 223,948,800, 1: 138444800, 2: 207667200, 3: 207667200, 4: 29491200, 5: 13107200, 6: 13107200, 7: 32000}
+        # Each layer gradient (bit): {0: 223948800, 1: 138444800, 2: 207667200, 3: 207667200, 4: 29491200, 5: 13107200, 6: 13107200, 7: 32000}
     else:
         # VGG5
         total_model_size_per_op = {0: 53248, 1: 53408, 2: 671568, 3: 671728, 4: 1879720, 5: 18666200, 6: 18712544}
@@ -122,24 +125,30 @@ def edge_based_heuristic_splitting(state: dict, label):
 
     fed_logger.info(f"RUN TIME SCORE: {client_remaining_runtime_comp_score.items()}")
 
-    classicFL_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
-    classicFL_tt, _, _, _, = trainingTimeEstimator(classicFL_action, client_comp_time, client_bw, edge_server_bw, activation_size, batchNumber,
-                                                   None, None,
-                                                   total_model_size_per_op=total_model_size_per_op)
+    if BASELINE == 'classic':
+        baseline_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
+    elif BASELINE == 'only_server':
+        baseline_action = [[0, 0] for _ in range(len(config.CLIENTS_CONFIG))]
+    else:
+        raise "Invalid baseline"
 
-    clients_classicFL_comp_energy, clients_classicFL_comm_energy, clients_classicFL_total_energy = energyEstimator(
-        classicFL_action, client_bw, activation_size, batchNumber, total_model_size_per_op, client_comp_energy,
+    baseline_tt, _, _, _, = trainingTimeEstimator(baseline_action, client_comp_time, client_bw, edge_server_bw, activation_size, batchNumber,
+                                                  None, None,
+                                                  total_model_size_per_op=total_model_size_per_op)
+
+    clients_baseline_comp_energy, clients_baseline_comm_energy, clients_baseline_total_energy = energyEstimator(
+        baseline_action, client_bw, activation_size, batchNumber, total_model_size_per_op, client_comp_energy,
         client_power_usage)
 
     if config.K != 0:
-        classicFL_avg_energy = sum(clients_classicFL_total_energy.values()) / config.K
+        baseline_avg_energy = sum(clients_baseline_total_energy.values()) / config.K
     else:
-        classicFL_avg_energy = 0
+        baseline_avg_energy = 0
 
-    fed_logger.info(Fore.MAGENTA + f"Classic FL training time approximation: {classicFL_tt}")
-    fed_logger.info(Fore.MAGENTA + f"Classic FL average energy approximation: {classicFL_avg_energy}")
-    fed_logger.info(Fore.MAGENTA + f"Classic FL communication energy approximation: {clients_classicFL_comm_energy}")
-    fed_logger.info(Fore.MAGENTA + f"Classic FL computation energy approximation: {clients_classicFL_comp_energy}")
+    fed_logger.info(Fore.MAGENTA + f"Baseline training time approximation: {baseline_tt}")
+    fed_logger.info(Fore.MAGENTA + f"Baseline average energy approximation: {baseline_avg_energy}")
+    fed_logger.info(Fore.MAGENTA + f"Baseline communication energy approximation: {clients_baseline_comm_energy}")
+    fed_logger.info(Fore.MAGENTA + f"Baseline computation energy approximation: {clients_baseline_comp_energy}")
 
     currentAction = previous_action
 
@@ -180,9 +189,9 @@ def edge_based_heuristic_splitting(state: dict, label):
         min_time_splitting_for_each_client[client] = sorted(client_op1_time, key=lambda x: x[1])
         filtered_min_time_splitting_for_each_client[client] = [item for item in
                                                                min_time_splitting_for_each_client[client] if
-                                                               item[1] <= classicFL_tt]
+                                                               item[1] <= baseline_tt]
         for op1, energy in min_energy_splitting_for_each_client[client]:
-            if clients_time_for_each_op1[client][op1] < classicFL_tt:
+            if clients_time_for_each_op1[client][op1] < baseline_tt:
                 min_energy_trainingTime_splitting_for_each_client[client].append((op1, energy, clients_time_for_each_op1[client][op1]))
 
         # fed_logger.info(Fore.GREEN + f"   Energy[Ascending]: {min_energy_splitting_for_each_client[client]}")
@@ -200,8 +209,6 @@ def edge_based_heuristic_splitting(state: dict, label):
         else:
             isEnergyEfficient[client] = (False, optimalEnergyOP1)
 
-    baseline_tt = classicFL_tt
-
     clients_score = sorted(client_score.items(), key=lambda item: item[1])
     fed_logger.info(Fore.MAGENTA + f"Current Round: {config.current_round}, model_len: {config.model_len}")
 
@@ -214,8 +221,8 @@ def edge_based_heuristic_splitting(state: dict, label):
             for op2 in range(clientOP1, config.model_len):
                 temp_action[config.CLIENTS_CONFIG[client]][1] = op2
                 total_time, _, _, _ = trainingTimeEstimator(temp_action, client_comp_time, client_bw, edge_server_bw, activation_size, batchNumber,
-                                                    None, None, total_model_size_per_op)
-                if total_time < classicFL_tt:
+                                                            None, None, total_model_size_per_op)
+                if total_time < baseline_tt:
                     action[config.CLIENTS_CONFIG[client]] = [clientOP1, op2]
                     break
         edge_nice_value = {client: 0 for client in config.CLIENTS_CONFIG.keys()}
@@ -772,7 +779,7 @@ def edge_based_heuristic_splitting(state: dict, label):
                         _, _, clients_totals_e = energyEstimator(previous_action, client_bw, activation_size, batchNumber, total_model_size_per_op,
                                                                  client_comp_energy, client_power_usage)
                         sorted_op2_by_edge_server_gather = sorted(each_splitting_share[op1].items(),
-                                                                key=lambda item: item[1]['edge_server_comm_gather'], reverse=True)
+                                                                  key=lambda item: item[1]['edge_server_comm_gather'], reverse=True)
                         fed_logger.info(Fore.YELLOW + f"Edge-Server gather => improving energy [{op1}, ] => op2 by edge-server gather: "
                                                       f"{sorted_op2_by_edge_server_gather}")
 
