@@ -39,8 +39,8 @@ services:
       --port $$PORT
       --rabbitmq-url $$RABBITMQ_URL
       --neighbors $$NEIGHBORS
-      --node-type $$NODE_TYPE"
-      --coordinates $$COORDINATES
+      --node-type $$NODE_TYPE
+      --coordinates $$COORDINATES"
     volumes:
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
