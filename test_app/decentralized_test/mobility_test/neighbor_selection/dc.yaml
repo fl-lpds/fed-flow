@@ -20,7 +20,7 @@ services:
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/"
       NEIGHBORS: ""
       NODE_TYPE: ""
-      ROUND_COUNT: "2"
+      ROUND_COUNT: ""
       DEVICE_COUNT: ""
       COORDINATES: ""
     entrypoint: >
