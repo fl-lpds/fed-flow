@@ -1329,8 +1329,6 @@ def transmissionTimeForEachClient(action, activation_size, batchNumber, total_mo
             cumulative_server_edge_scatter_time += total_model_size_per_op[config.model_len - 1] / bandwidth
             server_edge_scatter_transmission_time[edge] = cumulative_server_edge_scatter_time
 
-        fed_logger.info(Fore.GREEN + f"TransmissionEstimator[Total model size] = {total_model_size_per_op[config.model_len - 1]}")
-        fed_logger.info(Fore.GREEN + f"TransmissionEstimator[SERVER EDGE SCATTER] = {server_edge_scatter_transmission_time}")
         # Gathering transmission time EDGE ==> SERVER
         cumulative_edge_server_gather_time = 0
         runningClient = [client for client in config.CLIENTS_CONFIG.keys() if
@@ -1345,7 +1343,7 @@ def transmissionTimeForEachClient(action, activation_size, batchNumber, total_mo
             clientAction = action[i]
             clientIP = config.CLIENTS_INDEX[i]
             edgeIP = config.CLIENT_MAP[clientIP]
-
+            edge_server_bw_during_round = edge_server_bw[edgeIP] / len(config.EDGE_MAP[edgeIP])
             op1 = clientAction[0]
             op2 = clientAction[1]
 
@@ -1354,7 +1352,7 @@ def transmissionTimeForEachClient(action, activation_size, batchNumber, total_mo
 
             # During round transmission times
             client_edge_transmission_time_during_round[clientIP] = (2 * activation_size[op1] * batchNumber) / clients_bw[clientIP]
-            edge_server_transmission_time_during_round[clientIP] = (2 * activation_size[op2] * batchNumber) / edge_server_bw[edgeIP]
+            edge_server_transmission_time_during_round[clientIP] = (2 * activation_size[op2] * batchNumber) / edge_server_bw_during_round
 
             # Gathering transmission time CLIENT ===> EDGE
             client_edge_gather_transmission_time[clientIP] = total_model_size_per_op[op1] / clients_bw[clientIP]
