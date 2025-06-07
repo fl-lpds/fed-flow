@@ -14,7 +14,8 @@ def bandwidth(edge_server_BW):
     client_edge_BW = config.CLIENTS_BANDWIDTH
 
     for i in range(len(config.CLIENTS_LIST)):
-        edge_server_bw_list.append(edge_server_BW[config.CLIENT_MAP[config.CLIENTS_INDEX[i]]])
+        edgeOfClient = config.CLIENT_MAP[config.CLIENTS_INDEX[i]]
+        edge_server_bw_list.append(edge_server_BW[edgeOfClient] / len(config.EDGE_MAP[edgeOfClient]))
 
         # bw between client -> server ===> B1B2 / B1 + B2
         client_server_bw.append((client_edge_BW[i] * edge_server_bw_list[i]) / (client_edge_BW[i] + edge_server_bw_list[i]))
