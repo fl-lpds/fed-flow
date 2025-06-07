@@ -283,7 +283,6 @@ class FedEdgeServer(FedEdgeServerInterface):
             w_local = cweights
             # print("------------------------"+str(eweights[i]))
         msg = [message_utils.local_weights_edge_to_server() + "_" + client_ip, w_local]
-        fed_logger.info(Fore.LIGHTGREEN_EX + f"CLIENT => {client_ip}, combined model size: {data_utils.sizeofmessage(msg)}")
         self.send_msg(config.EDGE_SERVER_CONFIG[config.index], msg, True,
                       url=config.EDGE_SERVER_CONFIG[config.index])
 

@@ -33,7 +33,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     previous_edge_nice_value = state['prev_edge_nice_value']
     previous_server_nice_value = state['prev_server_nice_value']
 
-    BASELINE = 'only_server'
+    BASELINE = 'only_server'  # classic, only_server, only_edge
 
     total_model_size = state['total_model_size']
     if config.model_len == 8:
@@ -129,6 +129,8 @@ def edge_based_heuristic_splitting(state: dict, label):
         baseline_action = [[config.model_len - 1, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
     elif BASELINE == 'only_server':
         baseline_action = [[0, 0] for _ in range(len(config.CLIENTS_CONFIG))]
+    elif BASELINE == 'only_edge':
+        baseline_action = [[0, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG))]
     else:
         raise "Invalid baseline"
 
