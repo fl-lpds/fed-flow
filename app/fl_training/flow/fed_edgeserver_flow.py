@@ -153,7 +153,7 @@ def run(options_ins):
     simnet = options_ins.get("simulatebandwidth") == "True"
     estimate_energy = options_ins.get("energy") == "True"
 
-    config.R = 10
+    config.R = 5
     if (options_ins.get('splitting') == 'edge_based_heuristic' or
             options_ins.get('splitting') == 'edge_rl_splitting' or
             options_ins.get('splitting') == 'random_splitting'):
