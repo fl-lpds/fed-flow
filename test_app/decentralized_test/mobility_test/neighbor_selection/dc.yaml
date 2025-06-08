@@ -72,6 +72,7 @@ services:
         limits:
           cpus: "20"
           memory: 5G
+
   
   edge1:
     <<: *node_base
