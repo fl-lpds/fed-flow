@@ -8,6 +8,7 @@ services:
     environment:
       AGGREGATION: "fedavg"
       DECENTRALIZED: "False"
+      D2D: "False"
       MOBILITY: "True"
       CLUSTERING: "none_clustering"
       OFFLOADING: "False"
