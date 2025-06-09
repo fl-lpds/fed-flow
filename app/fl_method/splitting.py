@@ -214,7 +214,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     clients_score = sorted(client_score.items(), key=lambda item: item[1])
     fed_logger.info(Fore.MAGENTA + f"Current Round: {config.current_round}, model_len: {config.model_len}")
 
-    if config.current_round == config.model_len:
+    if config.current_round == config.model_len + 1:
         action = [[op1s[0][0], config.model_len - 1] for client, op1s in
                   min_energy_trainingTime_splitting_for_each_client.items()]
         temp_action = copy.deepcopy(action)

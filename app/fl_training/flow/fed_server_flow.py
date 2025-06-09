@@ -124,10 +124,9 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
     flops_of_each_layer = list(flops_of_each_layer.values())
 
     test_load_on_edges_and_server = []
-    for layer in range(config.model_len - 1):
+    for layer in range(config.model_len):
         test_load_on_edges_and_server.append([[layer, layer] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
     test_load_on_edges_and_server.append([[0, config.model_len - 1] for _ in range(len(config.CLIENTS_CONFIG.keys()))])
-    test_load_on_edges_and_server.append([[config.model_len - 1, config.model_len - 1] for _ in range(config.K)])
 
     fed_logger.info(Fore.YELLOW + f"Energy Testing: {test_load_on_edges_and_server}")
 
