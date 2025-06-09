@@ -33,7 +33,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     previous_edge_nice_value = state['prev_edge_nice_value']
     previous_server_nice_value = state['prev_server_nice_value']
 
-    BASELINE = 'only_edge'  # classic, only_server, only_edge
+    BASELINE = 'classic'  # classic, only_server, only_edge
 
     total_model_size = state['total_model_size']
     if config.model_len == 8:
@@ -1244,6 +1244,15 @@ def trainingTimeEstimator(action, comp_time_on_each_client, clients_bw, edge_ser
     if comp_time_on_server_for_each_client is None:
         comp_time_on_server_for_each_client = {client: 0 for client, _ in clients_bw.items()}
 
+    memory = load_memory('/fed-flow/app/model/memory.json')['history']
+    for item in memory:
+        if item['splitting'] == action:
+            client_info = item['clientInfo']
+            for clientIndex in range(config.K):
+                comp_time_on_server_for_each_client[config.CLIENTS_INDEX[clientIndex]] = (
+                    client_info[config.CLIENTS_INDEX[clientIndex]]['serverCompTime'])
+                comp_time_on_edge_for_each_client[config.CLIENTS_INDEX[clientIndex]] = client_info[config.CLIENTS_INDEX[clientIndex]]['edgeCompTime']
+
     (server_edge_scatter_transmission_time, edge_client_scatter_transmission_time, client_edge_during_round,
      edge_server_during_round, client_edge_gather, edge_server_gather_for_each_client, total_gather_time,
      total_transmission_time_for_each_client) = transmissionTimeForEachClient(action, activation_size, batchNumber, total_model_size_per_op,
@@ -1492,40 +1501,6 @@ def load_memory(memory_path):
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {"history": []}  # Return empty memory if file doesn't exist
-
-
-#
-#
-# def compareCurrentSplittingWithMemory(current_splitting: list, client_remaining_energy, flop_of_each_layer,
-#                                       compare_aspect: str, edge_name: str = None):
-#     memory = load_memory(memory_path='/fed-flow/app/model/memory.json')['history']
-#
-#     current_load_of_each_client_on_edge = {}
-#     current_total_load_on_edge = 0
-#     if compare_aspect == 'edge' and edge_name is None:
-#         for clientIP in config.EDGE_MAP[edge_name]:
-#             if client_remaining_energy[clientIP] > 1:
-#                 op1 = current_splitting[config.CLIENTS_CONFIG[clientIP]][0]
-#                 op2 = current_splitting[config.CLIENTS_CONFIG[clientIP]][1]
-#                 current_load_of_each_client_on_edge[clientIP] = sum(flop_of_each_layer[op1 + 1: op2 + 1])
-#         current_total_load_on_edge = sum(current_load_of_each_client_on_edge.values())
-#
-#     similar_splitting_in_memory = []
-#     memory_load_of_each_client_on_edge = {}
-#     for item in memory:
-#         memory_splitting = item['splitting']
-#         client_info = item['client_info']
-#         edges_info = item['edge_info']
-#         server_info = item['server_info']
-#
-#         if compare_aspect == 'edge':
-#             if edge_name is None:
-#                 raise Exception('Edge name cannot be None')
-#             memory_edge_load = edges_info[edge_name]['flopOnEdge']
-#             for clientIP in config.EDGE_MAP[edge_name]:
-#                 op1 = memory_splitting[config.CLIENTS_CONFIG[clientIP]][0]
-#                 op2 = memory_splitting[config.CLIENTS_CONFIG[clientIP]][1]
-#                 memory_load_of_each_client_on_edge[clientIP] = sum(flop_of_each_layer[op1 + 1: op2 + 1])
 
 
 def are_times_close_enough(times, similarity_threshold=0.2):

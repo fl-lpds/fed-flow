@@ -204,7 +204,6 @@ def run_edge_based_offload(server: FedServerInterface, LR, options):
                 state = server.concat_norm(ttpi, server.offloading)
                 fed_logger.info("splitting")
                 server.split(state, options)
-
             else:
                 state = server.edge_based_state()
                 fed_logger.info("splitting")
