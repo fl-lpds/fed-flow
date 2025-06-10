@@ -330,8 +330,8 @@ def edge_based_heuristic_splitting(state: dict, label):
 
     bad_tt_device_and_bad_energy = copy.deepcopy(current_bad_device)
     for client in clients_score:
-        if (client in high_prio_bad_energy_consuming_client) and (client not in bad_tt_device_and_bad_energy):
-            bad_tt_device_and_bad_energy.append(client)
+        if (client[0] in high_prio_bad_energy_consuming_client) and (client[0] not in bad_tt_device_and_bad_energy):
+            bad_tt_device_and_bad_energy.append(client[0])
 
     fed_logger.info(Fore.GREEN + f"Bad clients in energy or time: {bad_tt_device_and_bad_energy}")
     fed_logger.info(Fore.GREEN + f"Bad clients in energy efficiency: {high_prio_bad_energy_consuming_client}")
@@ -884,9 +884,9 @@ def edge_based_heuristic_splitting(state: dict, label):
                                     break
 
         changed_device.append(badClient)
-        current_bad_device.remove(badClient)
+        if badClient in current_bad_device:
+            current_bad_device.remove(badClient)
         bad_tt_device_and_bad_energy.remove(badClient)
-        fed_logger.info(Fore.GREEN + f"NEW ACTION2: {new_action}")
 
         for client in runningClients:
             total_client_time = total_time_for_each_client[client]
@@ -901,9 +901,6 @@ def edge_based_heuristic_splitting(state: dict, label):
             edge_server_comm_gather_share = (total_model_size_per_op[clientOP2] / edge_server_bw[edgeIP]) / total_client_time
 
             op2_bigger_than_op1 = {layer: size for layer, size in activation_size.items() if layer >= clientOP1}
-            fed_logger.info(Fore.GREEN + f"op2_bigger_than_op1: {op2_bigger_than_op1}")
-            fed_logger.info(Fore.GREEN + f"NEW ACTION: {new_action}")
-            fed_logger.info(Fore.GREEN + f"clientOP1, OP2: {clientOP1} , {clientOP2}")
 
             layer_with_min_size = min(op2_bigger_than_op1, key=op2_bigger_than_op1.get)
 
