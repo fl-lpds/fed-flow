@@ -24,31 +24,31 @@ for r in range(100):
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 15 <= r < 20:
         for edgeIndex in range(edge_number):
-            bw = random.randint(200_000_000, 300_000_000)
+            bw = random.randint(10_000, 200_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 20 <= r < 25:
         for edgeIndex in range(edge_number):
-            bw = random.randint(100_000_000, 150_000_000)
+            bw = random.randint(200_000, 1_000_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 25 <= r < 30:
         for edgeIndex in range(edge_number):
-            bw = random.randint(50_000_000, 100_000_000)
+            bw = random.randint(10_000_000, 15_000_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 30 <= r < 40:
         for edgeIndex in range(edge_number):
-            bw = random.randint(10_000_000, 50_000_000)
+            bw = random.randint(15_000_000, 30_000_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 40 <= r < 50:
         for edgeIndex in range(edge_number):
-            bw = random.randint(1_000_000, 10_000_000)
+            bw = random.randint(500_000, 1_000_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 50 <= r < 55:
         for edgeIndex in range(edge_number):
-            bw = random.randint(50_000, 5_000_000)
+            bw = random.randint(1_000_000, 5_000_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 55 <= r < 60:
         for edgeIndex in range(edge_number):
-            bw = random.randint(10_000, 1_000_000)
+            bw = random.randint(5_000_000, 10_000_000)
             edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
     elif 60 <= r < 70:
         for edgeIndex in range(edge_number):
