@@ -33,7 +33,7 @@ def edge_based_heuristic_splitting(state: dict, label):
     previous_edge_nice_value = state['prev_edge_nice_value']
     previous_server_nice_value = state['prev_server_nice_value']
 
-    BASELINE = 'classic'  # classic, only_server, only_edge
+    BASELINE = 'only_edge'  # classic, only_server, only_edge
 
     total_model_size = state['total_model_size']
     if config.model_len == 8:
