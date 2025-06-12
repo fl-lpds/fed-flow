@@ -559,7 +559,7 @@ class FedServer(FedServerInterface):
         self.scatter(msg, True)
 
     def cluster(self, options: dict):
-        self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))(self.edge_bandwidth)
+        self.group_labels = fl_method_parser.fl_methods.get(options.get('clustering'))(self.edge_bandwidth, self.client_bandwidth)
 
     def split(self, state, options: dict):
         if options.get('splitting') == 'edge_based_heuristic':

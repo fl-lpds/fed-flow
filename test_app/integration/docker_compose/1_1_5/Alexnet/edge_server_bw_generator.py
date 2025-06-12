@@ -13,71 +13,19 @@ base_dir = "."
 if not os.path.exists(base_dir):
     os.makedirs(base_dir)
 
-for r in range(100):
-    if r < 10:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(450_000_000, 500_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 10 <= r < 15:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(300_000_000, 350_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 15 <= r < 20:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(10_000, 200_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 20 <= r < 25:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(200_000, 1_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 25 <= r < 30:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(10_000_000, 15_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 30 <= r < 40:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(15_000_000, 30_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 40 <= r < 50:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(500_000, 1_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 50 <= r < 55:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(1_000_000, 5_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 55 <= r < 60:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(5_000_000, 10_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 60 <= r < 70:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(10_050_000, 15_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 70 <= r < 75:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(20_000_000, 30_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 75 <= r < 80:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(30_000_000, 50_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 80 <= r < 85:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(50_000_000, 100_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 85 <= r < 90:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(100_000_000, 150_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 90 <= r < 95:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(150_000_000, 200_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
-    elif 95 <= r < 100:
-        for edgeIndex in range(edge_number):
-            bw = random.randint(250_000_000, 300_000_000)
-            edge_server_bw[config.EDGE_SERVER_CONFIG[edgeIndex]].append(bw)
+# Edge ↔ Server: 50–100 Mbps (80%), 100–150 Mbps (20%)
+for edge in edge_server_bw:
+    for _ in range(100):
+        chance = random.random()
+        if chance < 0.2:
+          bw = round(random.uniform(75_000_000, 100_000_000), 2)
+        elif 0.2 <= chance < 0.4:
+            bw = round(random.uniform(100_000_000, 150_000_000), 2)
+        elif chance > 0.90:
+            bw = round(random.uniform(3_000_000, 5_000_000), 2)
+        else:
+            bw = round(random.uniform(50_000_000, 100_000_000), 2)
+        edge_server_bw[edge].append(bw)
 
 np.savez(f"{base_dir}/edge_server_bw.npz", **edge_server_bw)
 data = np.load(f"{base_dir}/edge_server_bw.npz")

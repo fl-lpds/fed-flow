@@ -4,6 +4,8 @@ import os
 import sys
 import time
 import warnings
+import numpy as np
+
 
 sys.path.append('../../../')
 from app.entity.client import Client
@@ -29,9 +31,13 @@ def run_edge_based(client: FedClientInterface, LR):
     client.send_power_to_edge()
     fed_logger.info(Fore.LIGHTGREEN_EX + f"TOTAL ROUND: {config.R}")
 
+    simulated_client_edge_bw = {}
+    if client.simnet:
+        simulated_client_edge_bw = np.load(f"/fed-flow/app/config/client_edge_bw.npz")
+
     for r in range(config.R):
 
-        simnet_BW = config.CLIENTS_BANDWIDTH[config.index]
+        simnet_BW = simulated_client_edge_bw[config.CLIENTS_INDEX[config.index]][r]
         energy_estimation.set_simnet(simnet_BW)
 
         config.current_round = r

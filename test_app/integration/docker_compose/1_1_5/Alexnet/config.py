@@ -66,7 +66,7 @@ K = 5  # Number of devices
 G = 3  # Number of groups
 S = 1  # Number of server connecting devices
 
-CLIENTS_BANDWIDTH = [1_000_000, 30_000_000, 500_000, 25_000_000, 2_000_000]
+CLIENTS_BANDWIDTH = []
 
 # Unique clients order
 HOST2IP = {}

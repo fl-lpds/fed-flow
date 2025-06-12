@@ -87,6 +87,7 @@ services:
   client1:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     shm_size: '4g'
     logging:
@@ -112,6 +113,7 @@ services:
   client2:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     shm_size: '4g'
     logging:
@@ -137,6 +139,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     shm_size: '4g'
     logging:
@@ -162,6 +165,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     shm_size: '4g'
     logging:
@@ -187,6 +191,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     shm_size: '4g'
     logging:
