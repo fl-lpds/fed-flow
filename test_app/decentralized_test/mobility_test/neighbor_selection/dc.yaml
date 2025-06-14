@@ -19,11 +19,11 @@ services:
       IP: "0.0.0.0"
       PORT: "8080"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/"
-      NEIGHBORS: ""
-      NODE_TYPE: ""
-      ROUND_COUNT: ""
-      DEVICE_COUNT: ""
-      COORDINATES: ""
+      NEIGHBORS: "none,0"
+      NODE_TYPE: "base"
+      ROUND_COUNT: "2"
+      DEVICE_COUNT: "1"
+      COORDINATES: "0,0,0"
     entrypoint: >
       bash -c "python3 /fed-flow/main.py
       --aggregation $$AGGREGATION
