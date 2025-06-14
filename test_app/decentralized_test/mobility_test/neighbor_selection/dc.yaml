@@ -46,6 +46,7 @@ services:
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./processed_data/012/012_data.csv:/fed-flow/app/dataset/mobility_data/data.csv
+
   client1:
     <<: *node_base
     environment:
