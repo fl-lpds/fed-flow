@@ -23,7 +23,7 @@ services:
       NODE_TYPE: "base"
       ROUND_COUNT: "2"
       DEVICE_COUNT: "1"
-      COORDINATES: "0,0,0"
+      COORDINATES: "0.0,0.0,0.0"
     entrypoint: >
       bash -c "python3 /fed-flow/main.py
       --aggregation $$AGGREGATION
@@ -67,6 +67,7 @@ services:
       NODE_TYPE: "client"
       ROUND_COUNT: "2"
       DEVICE_COUNT: "1"
+      COORDINATES: "20.0,20.0,5.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
@@ -95,7 +96,7 @@ services:
       NODE_TYPE: "edge"
       ROUND_COUNT: "2"
       DEVICE_COUNT: "1"
-      COORDINATES: "10.10.10"
+      COORDINATES: "10.0,10.0,10.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
