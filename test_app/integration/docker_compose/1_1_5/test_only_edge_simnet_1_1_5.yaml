@@ -3,8 +3,8 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./../../../../Graphs:/fed-flow/Graphs
-      - ./../../../../app/model:/fed-flow/app/model
-      - ./../../../../app/logs:/fed-flow/app/logs
+      #- ./../../../../app/model:/fed-flow/app/model
+      #- ./../../../../app/logs:/fed-flow/app/logs
       - ./edge_server_bw.npz:/fed-flow/app/config/edge_server_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
@@ -20,7 +20,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '32'
+          cpus: '8'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
@@ -85,6 +85,7 @@ services:
   client1:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -109,6 +110,7 @@ services:
   client2:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -133,6 +135,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -157,6 +160,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"
@@ -181,6 +185,7 @@ services:
     volumes:
       - ./config.py:/fed-flow/app/config/config.py
       - ./econfig1.py:/fed-flow/energy/config.py
+      - ./client_edge_bw.npz:/fed-flow/app/config/client_edge_bw.npz
     image: autlpdslab/fedflow:rabbitmq
     logging:
       driver: "json-file"

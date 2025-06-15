@@ -20,7 +20,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '10'
+          cpus: '12'
       restart_policy:
         condition: on-failure
     working_dir: /fed-flow/app/fl_training/runner
