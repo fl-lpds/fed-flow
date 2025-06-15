@@ -27,10 +27,10 @@ docker_compose_configs = [
         "compose_file": "test_fedmec_offloading_simnet_1_1_5.yaml",
         "compose_name": "FedMec",
     },
-    {
-        "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
-        "compose_name": "OurMethod",
-    },
+    # {
+    #     "compose_file": "test_heuristic_offloading_simnet_1_1_5.yaml",
+    #     "compose_name": "OurMethod",
+    # },
     {
         "compose_file": "test_fedadapt_offloading_simnet_1_5.yaml",
         "compose_name": "FedAdapt",
@@ -41,7 +41,7 @@ SRC_CONFIG_FILE = 'config.py'
 DST_CONFIG_FILE = './../../../../app/config/config.py'
 
 # Folder to archive images
-ARCHIVE_BASE_FOLDER = './../../../../../results/1_1_5/vgg5/'
+ARCHIVE_BASE_FOLDER = './../../../../../results/1_1_5/vgg_total_dynamic/'
 
 
 def get_running_containers_with_name(substring):
