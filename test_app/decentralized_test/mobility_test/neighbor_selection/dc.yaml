@@ -124,6 +124,7 @@ services:
       NODE_TYPE: "server"
       ROUND_COUNT: "2"
       DEVICE_COUNT: "1"
+      COORDINATES: "30.0,30.0,3.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
