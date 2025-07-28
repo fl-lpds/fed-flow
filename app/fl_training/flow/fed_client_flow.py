@@ -56,12 +56,15 @@ def run(options_ins):
 
     fed_logger.info('Preparing Client')
     fed_logger.info('Preparing Data.')
+
+    mobility = options_ins.get('mobility')  # define mobility first
+    fed_logger.info(f"[Debug] Mobility flag received: {mobility}")  # log after definition
+
     indices = list(range(N))
     part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
     train_loader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, 0)
 
     estimate_energy = options_ins.get("energy") == "True"
-    mobility = options_ins.get('mobility')
     d2d = options_ins.get('d2d')
 
     if estimate_energy:
@@ -76,14 +79,15 @@ def run(options_ins):
     client = FedClient(ip=ip, port=port, model_name=options_ins.get('model'),
                        dataset=options_ins.get('dataset'), train_loader=train_loader, LR=learning_rate,
                        cluster=cluster, aggregator=aggregator, neighbors=config.CURRENT_NODE_NEIGHBORS)
+
     if mobility:
+        fed_logger.info("[Debug] Starting mobility simulation thread")
         start_mobility_simulation_thread(client)
-        # client.mobility_manager.discover_edges()
-        # client.mobility_manager.monitor_and_migrate()
+
     if d2d:
         run_d2d(client)
-
     else:
         run_client(client, learning_rate)
+
     time.sleep(10)
     client.stop_server()

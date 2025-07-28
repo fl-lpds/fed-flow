@@ -33,7 +33,7 @@ def simulate_real_time_update(node: Node, user_data):
         logger.info(f"[Mobility] Time={current_second}s | Lat={current_data['Latitude']} Lon={current_data['Longitude']}")
 
         # Optional: Use print instead if logger not visible
-        # print(f"[Mobility] Time={current_second}s | Lat={current_data['Latitude']} Lon={current_data['Longitude']}")
+        print(f"[Mobility] Time={current_second}s | Lat={current_data['Latitude']} Lon={current_data['Longitude']}")
 
         time.sleep(1)
 

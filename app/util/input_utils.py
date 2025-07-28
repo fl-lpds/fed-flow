@@ -71,6 +71,8 @@ def parse_argument(parser: argparse.ArgumentParser):
                         help='Optional coordinates in the format "latitude,longitude,altitude"', default=None)
     parser.add_argument('--node-type', type=parse_node_type, help='Type of the node', default=NodeType.CLIENT)
 
+    parser.add_argument('--mobility', action='store_true')
+
     args = parser.parse_args()
     option = vars(args)
     option["offload"] = option.get("offload", "False") == "True"
