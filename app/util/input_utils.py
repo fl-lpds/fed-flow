@@ -71,14 +71,14 @@ def parse_argument(parser: argparse.ArgumentParser):
                         help='Optional coordinates in the format "latitude,longitude,altitude"', default=None)
     parser.add_argument('--node-type', type=parse_node_type, help='Type of the node', default=NodeType.CLIENT)
 
-    parser.add_argument('--mobility', action='store_true')
+    parser.add_argument('--mobility', action='store_true', help='Enable mobility simulation')
 
     args = parser.parse_args()
     option = vars(args)
     option["offload"] = option.get("offload", "False") == "True"
     option["edgebased"] = option.get("edgebased", "False") == "True"
     option["decentralized"] = option.get("decentralized", "False") == 'True'
-    option["mobility"] = option.get("mobility", "False") == 'True'
+    option["mobility"] = bool(option.get("mobility", "False"))
     option["d2d"] = option.get("d2d", "False") == 'True'
     option["cluster"] = option.get("cluster", "default_cluster")
     if option["decentralized"] and option["edgebased"]:

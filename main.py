@@ -15,7 +15,8 @@ parser = argparse.ArgumentParser()
 options = input_utils.parse_argument(parser)
 
 # Log mobility status
-logger.info(f"Mobility enabled: {options.get('mobility')}")
+mobility_enabled = options.get("mobility", False)
+logger.info(f"Mobility enabled: {mobility_enabled}")
 
 # Log IP address
 ip_address = socket.gethostbyname(socket.gethostname())
