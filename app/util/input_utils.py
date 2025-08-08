@@ -78,7 +78,7 @@ def parse_argument(parser: argparse.ArgumentParser):
     option["offload"] = option.get("offload", "False") == "True"
     option["edgebased"] = option.get("edgebased", "False") == "True"
     option["decentralized"] = option.get("decentralized", "False") == 'True'
-    option["mobility"] = option.get("mobility", "False")
+    option["mobility"] = option.get("mobility", "False") == 'True'
     option["d2d"] = option.get("d2d", "False") == 'True'
     option["cluster"] = option.get("cluster", "default_cluster")
     if option["decentralized"] and option["edgebased"]:
