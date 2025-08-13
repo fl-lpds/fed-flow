@@ -39,5 +39,5 @@ def simulate_real_time_update(node: Node, user_data):
 
 def start_mobility_simulation_thread(node: Node):
     user_data = load_user_data()
-    simulation_thread = threading.Thread(target=simulate_real_time_update, args=(node, user_data))
+    simulation_thread = threading.Thread(target=simulate_real_time_update, args=(node, user_data), daemon=True)
     simulation_thread.start()
