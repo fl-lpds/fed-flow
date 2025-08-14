@@ -83,6 +83,8 @@ def run(options_ins):
     if mobility:
         fed_logger.info("[Debug] Starting mobility simulation thread")
         start_mobility_simulation_thread(client)
+        client.mobility_manager.discover_edges()
+        client.mobility_manager.monitor_and_migrate()
 
     if d2d:
         run_d2d(client)
