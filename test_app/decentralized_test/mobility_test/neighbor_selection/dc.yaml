@@ -9,7 +9,7 @@ services:
       AGGREGATION: "fedavg"
       DECENTRALIZED: "True"
       D2D: "False"
-      MOBILITY: "True"
+      MOBILITY: "False"
       CLUSTERING: "none_clustering"
       OFFLOADING: "False"
       SPLITTING_METHOD: "none_spliting"
@@ -53,7 +53,7 @@ services:
       AGGREGATION: "fedavg"
       DECENTRALIZED: "True"
       D2D: "False"
-      MOBILITY: "True"
+      MOBILITY: "False"
       CLUSTERING: "none_clustering"
       OFFLOADING: "True"
       SPLITTING_METHOD: "fake_decentralized_splitting"
@@ -72,8 +72,35 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "20"
-          memory: 5G
+          cpus: "2"
+
+ client2:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "False"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client2"
+      PORT: "8082"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client1"
+      NEIGHBORS: "edge2,8083"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "2"
+      DEVICE_COUNT: "1"
+      COORDINATES: "20.0,20.0,5.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+
 
   
   edge1:
@@ -82,7 +109,7 @@ services:
       AGGREGATION: "fedavg"
       DECENTRALIZED: "True"
       D2D: "False"
-      MOBILITY: "True"
+      MOBILITY: "False"
       CLUSTERING: "none_clustering"
       OFFLOADING: "True"
       SPLITTING_METHOD: "fake_decentralized_splitting"
@@ -92,7 +119,7 @@ services:
       IP: "edge1"
       PORT: "8081"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge1"
-      NEIGHBORS: "server1,8082 client1,8080"
+      NEIGHBORS: "client1,8080"
       NODE_TYPE: "edge"
       ROUND_COUNT: "2"
       DEVICE_COUNT: "1"
@@ -102,35 +129,36 @@ services:
       resources:
         limits:
           cpus: "1"
-          memory: 1G
 
-  server1:
+ edge2:
     <<: *node_base
     environment:
       AGGREGATION: "fedavg"
       DECENTRALIZED: "True"
       D2D: "False"
-      MOBILITY: "True"
+      MOBILITY: "False"
       CLUSTERING: "none_clustering"
       OFFLOADING: "True"
       SPLITTING_METHOD: "fake_decentralized_splitting"
       MODEL: "VGG"
       DATASET: "cifar10"
       NODE_INDEX: "0"
-      IP: "server1"
-      PORT: "8082"
-      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/server1"
-      NEIGHBORS: "edge1,8081"
-      NODE_TYPE: "server"
+      IP: "edge2"
+      PORT: "8083"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge1"
+      NEIGHBORS: "client2,8082"
+      NODE_TYPE: "edge"
       ROUND_COUNT: "2"
       DEVICE_COUNT: "1"
-      COORDINATES: "30.0,30.0,3.0"
+      COORDINATES: "10.0,10.0,10.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "2"
-          memory: 2G
+          cpus: "1"
+
+
+
   
   broker:
     image: rabbitmq:3-management
