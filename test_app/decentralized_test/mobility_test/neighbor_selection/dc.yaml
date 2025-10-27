@@ -7,7 +7,7 @@ services:
         condition: service_healthy
     environment:
       AGGREGATION: "fedavg"
-      DECENTRALIZED: "False"
+      DECENTRALIZED: "True"
       D2D: "False"
       MOBILITY: "True"
       CLUSTERING: "none_clustering"
@@ -51,7 +51,7 @@ services:
     <<: *node_base
     environment:
       AGGREGATION: "fedavg"
-      DECENTRALIZED: "False"
+      DECENTRALIZED: "True"
       D2D: "False"
       MOBILITY: "True"
       CLUSTERING: "none_clustering"
@@ -80,7 +80,7 @@ services:
     <<: *node_base
     environment:
       AGGREGATION: "fedavg"
-      DECENTRALIZED: "False"
+      DECENTRALIZED: "True"
       D2D: "False"
       MOBILITY: "True"
       CLUSTERING: "none_clustering"
@@ -108,7 +108,7 @@ services:
     <<: *node_base
     environment:
       AGGREGATION: "fedavg"
-      DECENTRALIZED: "False"
+      DECENTRALIZED: "True"
       D2D: "False"
       MOBILITY: "True"
       CLUSTERING: "none_clustering"
