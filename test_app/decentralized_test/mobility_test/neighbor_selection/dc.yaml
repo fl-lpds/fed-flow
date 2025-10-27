@@ -46,6 +46,7 @@ services:
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./processed_data/012/012_data.csv:/fed-flow/app/dataset/mobility_data/data.csv
+      - ./config.py:/fed-flow/app/config/config.py
 
   client1:
     <<: *node_base
@@ -66,7 +67,7 @@ services:
       NEIGHBORS: "edge1,8081"
       NODE_TYPE: "client"
       ROUND_COUNT: "2"
-      DEVICE_COUNT: "1"
+      DEVICE_COUNT: "2"
       COORDINATES: "20.0,20.0,5.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
@@ -90,11 +91,11 @@ services:
       NODE_INDEX: "0"
       IP: "client2"
       PORT: "8082"
-      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client1"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client2"
       NEIGHBORS: "edge2,8083"
       NODE_TYPE: "client"
       ROUND_COUNT: "2"
-      DEVICE_COUNT: "1"
+      DEVICE_COUNT: "2"
       COORDINATES: "20.0,20.0,5.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
@@ -122,7 +123,7 @@ services:
       NEIGHBORS: "client1,8080"
       NODE_TYPE: "edge"
       ROUND_COUNT: "2"
-      DEVICE_COUNT: "1"
+      DEVICE_COUNT: "2"
       COORDINATES: "10.0,10.0,10.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
@@ -146,11 +147,11 @@ services:
       NODE_INDEX: "0"
       IP: "edge2"
       PORT: "8083"
-      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge1"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge2"
       NEIGHBORS: "client2,8082"
       NODE_TYPE: "edge"
       ROUND_COUNT: "2"
-      DEVICE_COUNT: "1"
+      DEVICE_COUNT: "2"
       COORDINATES: "10.0,10.0,10.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
