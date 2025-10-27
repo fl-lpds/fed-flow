@@ -73,6 +73,7 @@ services:
       resources:
         limits:
           cpus: "2"
+          memory: 1G
 
  client2:
     <<: *node_base
@@ -100,6 +101,7 @@ services:
       resources:
         limits:
           cpus: "2"
+          memory: 1G
 
 
   
@@ -129,6 +131,7 @@ services:
       resources:
         limits:
           cpus: "1"
+          memory: 1G
 
  edge2:
     <<: *node_base
@@ -156,6 +159,7 @@ services:
       resources:
         limits:
           cpus: "1"
+          memory: 1G
 
 
 
