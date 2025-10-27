@@ -75,7 +75,7 @@ services:
           cpus: "2"
           memory: 1G
 
- client2:
+  client2:
     <<: *node_base
     environment:
       AGGREGATION: "fedavg"
@@ -103,8 +103,6 @@ services:
           cpus: "2"
           memory: 1G
 
-
-  
   edge1:
     <<: *node_base
     environment:
@@ -133,7 +131,7 @@ services:
           cpus: "1"
           memory: 1G
 
- edge2:
+  edge2:
     <<: *node_base
     environment:
       AGGREGATION: "fedavg"
