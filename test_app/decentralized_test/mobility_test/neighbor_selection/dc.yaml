@@ -76,7 +76,7 @@ services:
           cpus: "8"
           memory: 1G
     volumes:
-       - ./test_app/decentralized_test/mobility_test/neighbor_selection/processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+       - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
        - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
        - ./data:/fed-flow/app/dataset/data
 
@@ -111,7 +111,7 @@ services:
           cpus: "8"
           memory: 1G
     volumes:
-      - ./test_app/decentralized_test/mobility_test/neighbor_selection/processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
       - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
       - ./data:/fed-flow/app/dataset/data
 
