@@ -73,7 +73,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2"
+          cpus: "8"
           memory: 1G
 
   client2:
@@ -101,7 +101,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2"
+          cpus: "8"
           memory: 1G
 
   edge1:
@@ -129,7 +129,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1"
+          cpus: "12"
           memory: 1G
 
   edge2:
@@ -157,7 +157,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1"
+          cpus: "12"
           memory: 1G
 
 
