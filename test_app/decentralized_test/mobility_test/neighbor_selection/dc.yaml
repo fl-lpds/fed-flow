@@ -45,7 +45,6 @@ services:
     volumes:
       - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
       - ./data:/fed-flow/app/dataset/data
-
       - ./config.py:/fed-flow/app/config/config.py
 
   client1:
