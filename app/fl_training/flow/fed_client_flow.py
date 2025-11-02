@@ -77,8 +77,11 @@ def run(options_ins):
                        dataset=options_ins.get('dataset'), train_loader=train_loader, LR=learning_rate,
                        cluster=cluster, aggregator=aggregator, neighbors=config.CURRENT_NODE_NEIGHBORS)
     if mobility:
+        fed_logger.info("[Mobility] Starting mobility simulation thread")
         start_mobility_simulation_thread(client)
+        fed_logger.info("[Mobility] Discover edges")
         client.mobility_manager.discover_edges()
+        fed_logger.info("[Mobility] Start monitor and migrate")
         client.mobility_manager.monitor_and_migrate()
     if d2d:
         run_d2d(client)

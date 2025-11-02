@@ -1,6 +1,8 @@
 import threading
 import time
 from geopy.distance import geodesic
+
+from app.config.logger import fed_logger
 from app.entity.node import NodeIdentifier
 from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_type import NodeType
@@ -13,9 +15,10 @@ class MobilityManager:
         self.client = client
 
     def discover_edges(self):
+        fed_logger.info("[Mobility] discover_edges: seed neighbors=%s", list(self.client.neighbors))
         queue = list(self.client.neighbors)
         visited = set(self.client.discovered_edges)
-
+        fed_logger.info("[Mobility] discover_edges: discovered_edges=%s", list(self.client.neighbors))
         while queue:
             current_neighbor = queue.pop(0)
             if current_neighbor in visited:
@@ -45,17 +48,19 @@ class MobilityManager:
             node_coords = (self.client.node_coordinate.latitude, self.client.node_coordinate.longitude)
 
             distance = geodesic(node_coords, edge_coords).meters
+            fed_logger.info("[Mobility] distance to %s = %.1f m", edge, distance)
 
             if distance < min_distance:
                 min_distance = distance
                 closest_edge = edge
-
+        fed_logger.info("[Mobility] closest_edge=%s (%.1f m)", closest_edge, min_distance if min_distance < float("inf") else -1)
         return closest_edge
 
     def initialize_neighbors(self):
         closest_edge = self.find_closest_edge()
 
         if closest_edge:
+            fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
             self.client.add_neighbor(closest_edge)
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
 
@@ -66,6 +71,7 @@ class MobilityManager:
         return None
 
     def migrate_to_edge(self, new_edge: NodeIdentifier):
+        fed_logger.info("[Mobility] migrating to %s …", new_edge)
         current_edge = self.get_current_edge()
         if current_edge:
             self.client.remove_neighbor(current_edge)
@@ -79,6 +85,7 @@ class MobilityManager:
 
     def monitor_and_migrate(self):
         def monitor():
+            fed_logger.info("[Mobility] monitor loop started (THRESHOLD=%sm)", self.THRESHOLD_DISTANCE)
             while True:
                 time.sleep(1)
 
