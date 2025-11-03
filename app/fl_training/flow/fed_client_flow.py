@@ -1,6 +1,7 @@
 import logging
 import time
 import warnings
+import os
 
 from app.config import config
 from app.config.config import *
@@ -81,6 +82,8 @@ def run(options_ins):
         start_mobility_simulation_thread(client)
         fed_logger.info("[Mobility] Discover edges")
         client.mobility_manager.discover_edges()
+        fed_logger.info("[Mobility] Initialize to closest edge")
+        client.mobility_manager.initialize_neighbors()
         fed_logger.info("[Mobility] Start monitor and migrate")
         client.mobility_manager.monitor_and_migrate()
     if d2d:

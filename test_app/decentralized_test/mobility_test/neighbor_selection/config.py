@@ -5,7 +5,7 @@ from os import environ
 from app.entity.node_coordinate import NodeCoordinate
 from app.entity.node_identifier import NodeIdentifier
 
-mobility = os.getenv('mobility', 'False').lower() == 'true'
+mobility = os.getenv('MOBILITY', 'False').lower() == 'True'
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 CLIENTS_BANDWIDTH = []
