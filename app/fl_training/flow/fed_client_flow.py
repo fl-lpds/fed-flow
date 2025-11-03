@@ -62,7 +62,7 @@ def run(options_ins):
     train_loader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, 0)
 
     estimate_energy = options_ins.get("energy") == "True"
-    mobility = str(options_ins.get('mobility', os.getenv('MOBILITY', 'False'))).lower() == 'True'
+    mobility = options_ins.get('mobility')
     fed_logger.info(f"[Mobility] flag = {mobility}")
     d2d = options_ins.get('d2d')
 
