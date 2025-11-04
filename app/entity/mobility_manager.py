@@ -3,7 +3,7 @@ import time
 from geopy.distance import geodesic
 
 from app.config.logger import fed_logger
-from app.entity.node import NodeIdentifier
+from app.entity.node_identifier import NodeIdentifier
 from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_type import NodeType
 
@@ -29,9 +29,14 @@ class MobilityManager:
             if HTTPCommunicator.get_node_type(current_neighbor) == NodeType.EDGE:
                 self.client.discovered_edges.add(current_neighbor)
 
-            neighbor_info = self.client.fetch_neighbors_from_neighbor(current_neighbor)
+            neighbor_info = self.client.fetch_neighbors_from_neighbor(current_neighbor) or []
             for info in neighbor_info:
-                new_edge = NodeIdentifier(ip=info['ip'], port=info['port'])
+                if isinstance(info, NodeIdentifier):
+                    new_edge = info
+                elif isinstance(info, dict):
+                    new_edge = NodeIdentifier(ip=info['ip'], port=info['port'])
+                else:
+                    continue
                 if new_edge not in self.client.discovered_edges and new_edge not in visited:
                     queue.append(new_edge)
 
