@@ -1,5 +1,6 @@
 import http
 import threading
+import os
 
 import uvicorn
 from fastapi import FastAPI, Request, HTTPException
@@ -41,6 +42,14 @@ class Node:
         self.is_leader = False
         self.node_coordinate = None
 
+        coord_str = os.getenv("EDGE_COORD", "")
+        if coord_str:
+            try:
+                self.node_coordinate = NodeCoordinate.parse(coord_str, 0.0)
+                fed_logger.info(f"[Node] Coordinate set from ENV: {self.node_coordinate}")
+            except Exception as e:
+                fed_logger.warning(f"[Node] Invalid EDGE_COORD='{coord_str}': {e}")
+
     def __str__(self):
         return f'{self.ip}:{self.port}'
 
@@ -54,6 +63,7 @@ class Node:
         self._app.add_route("/get-cluster", self.get_cluster, methods=["GET"])
         self._app.add_route("/set-leader", self.set_leader_api, methods=["POST"])
         self._app.add_route("/get-is-leader", self.get_is_leader_api, methods=["GET"])
+        self._app.add_route("/set-node-coordinate", self.set_node_coordinate_api, methods=["POST"])
 
     async def get_node_type(self, _: Request):
         return JSONResponse({'node_type': self._node_type.name}, http.HTTPStatus.OK)
@@ -159,3 +169,16 @@ class Node:
 
     async def get_is_leader_api(self, _: Request):
         return JSONResponse({'is_leader': self.is_leader}, http.HTTPStatus.OK)
+
+    async def set_node_coordinate_api(self, request: Request):
+        data = await request.json()
+        if "coord" in data:
+            self.node_coordinate = NodeCoordinate.parse(data["coord"], data.get("seconds_since_start", 0.0))
+        elif all(k in data for k in ("latitude", "longitude")):
+            lat = float(data["latitude"])
+            lon = float(data["longitude"])
+            alt = float(data.get("altitude", 0.0))
+            self.node_coordinate = NodeCoordinate(lat, lon, alt, data.get("seconds_since_start", 0.0))
+        else:
+            raise HTTPException(status_code=400, detail="Provide either 'coord' or lat/lon(/alt)")
+        return JSONResponse({"message": "Coordinate set"}, http.HTTPStatus.OK)
