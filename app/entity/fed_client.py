@@ -1,6 +1,7 @@
 import torch.nn as nn
 from torch import optim
 import tqdm
+from tqdm.auto import tqdm
 from app.config import config
 from app.config.logger import fed_logger
 from app.dto.message import GlobalWeightMessage, NetworkTestMessage, SplitLayerConfigMessage, IterationFlagMessage
