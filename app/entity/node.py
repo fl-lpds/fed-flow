@@ -39,13 +39,13 @@ class Node:
         self.node_coordinate = None
         if neighbors:
             self.add_neighbors(neighbors)
-        coord_str = os.getenv("EDGE_COORD", "")
+        coord_str = os.getenv("COORDINATES", "")
         if coord_str:
             try:
                 self.node_coordinate = NodeCoordinate.parse(coord_str, 0.0)
                 fed_logger.info(f"[Node] Coordinate set from ENV: {self.node_coordinate}")
             except Exception as e:
-                fed_logger.warning(f"[Node] Invalid EDGE_COORD='{coord_str}': {e}")
+                fed_logger.warning(f"[Node] Invalid COORDINATES='{coord_str}': {e}")
         self._setup_routes()
         self._start_server_in_thread(port)
 
