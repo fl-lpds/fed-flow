@@ -49,6 +49,9 @@ class HTTPCommunicator:
         response = requests.get(request_url)
         if response.status_code == 200:
             return response.json()
+        elif response.status_code == 404:
+            fed_logger.warning(f"Node {node_identifier} has no coordinate set (404)")
+            return None
         else:
             raise Exception(
                 f"Failed to get coordinates for node {node_identifier}, status code: {response.status_code}")
