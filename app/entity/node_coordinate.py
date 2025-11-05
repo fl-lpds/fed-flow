@@ -1,3 +1,4 @@
+import re
 class NodeCoordinate:
     latitude: float
     longitude: float
