@@ -138,7 +138,7 @@ services:
       NODE_TYPE: "edge"
       ROUND_COUNT: "3"
       DEVICE_COUNT: "2"
-      COORDINATES: "10.0,10.0,10.0"
+      COORDINATES: "39.9815,116.3309,45"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
@@ -171,7 +171,7 @@ services:
       NODE_TYPE: "edge"
       ROUND_COUNT: "3"
       DEVICE_COUNT: "2"
-      COORDINATES: "10.0,20.0,50.0"
+      COORDINATES: "39.9998,116.3267,30"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
