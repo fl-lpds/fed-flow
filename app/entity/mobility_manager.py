@@ -49,6 +49,9 @@ class MobilityManager:
 
         for edge in self.client.discovered_edges:
             edge_info = HTTPCommunicator.get_node_coordinate(edge)
+            if not edge_info:
+            # این edge هنوز مختصات نداده (404) یا خطای قابل‌هندل بوده؛ ردش کن
+                continue
             edge_coords = (edge_info['latitude'], edge_info['longitude'])
             node_coords = (self.client.node_coordinate.latitude, self.client.node_coordinate.longitude)
 
@@ -68,6 +71,8 @@ class MobilityManager:
             fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
             self.client.add_neighbor(closest_edge)
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
+        else:
+            fed_logger.warning("[Mobility] No edge has coordinates yet; skipping initial neighbor setup for now.")
 
     def get_current_edge(self) -> NodeIdentifier:
         for neighbor in self.client.neighbors:
@@ -99,12 +104,16 @@ class MobilityManager:
 
                 if current_edge:
                     current_edge_coords = HTTPCommunicator.get_node_coordinate(current_edge)
+                    if not current_edge_coords:
+                        continue
                     current_coords = (self.client.node_coordinate.latitude, self.client.node_coordinate.longitude)
                     edge_coords = (current_edge_coords['latitude'], current_edge_coords['longitude'])
 
                     distance_to_current_edge = geodesic(current_coords, edge_coords).meters
 
                     if distance_to_current_edge > self.THRESHOLD_DISTANCE and closest_edge != current_edge:
+                        if closest_edge is None:
+                            continue
                         self.migrate_to_edge(closest_edge)
 
         monitor_thread = threading.Thread(target=monitor, daemon=True)
