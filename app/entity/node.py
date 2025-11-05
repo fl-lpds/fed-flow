@@ -39,6 +39,7 @@ class Node:
         self._start_server_in_thread(port)
         self.cluster = cluster
         self.is_leader = False
+        self.node_coordinate = None
 
     def __str__(self):
         return f'{self.ip}:{self.port}'
