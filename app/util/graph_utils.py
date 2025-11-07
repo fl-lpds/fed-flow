@@ -56,7 +56,7 @@ def draw_graph(figSizeX, figSizeY, x, y, title, xlabel, ylabel, savePath, pictur
 
 
 def copy_compose_file_if_exists(dest):
-    src = 'neighbor_selection/dc.yml'
+    src = 'evaluation/docker-compose.yml'
     dest += '/docker-compose.yml'
     if os.path.isfile(src):
         try:
