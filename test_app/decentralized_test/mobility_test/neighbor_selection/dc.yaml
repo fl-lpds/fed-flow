@@ -43,7 +43,7 @@ services:
       --node-type $$NODE_TYPE
       --coordinates $$COORDINATES"
     volumes:
-      - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
+      - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./config.py:/fed-flow/app/config/config.py
 
@@ -76,7 +76,7 @@ services:
           memory: 1G
     volumes:
        - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
-       - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
+       - ./Results:/fed-flow/Results
        - ./data:/fed-flow/app/dataset/data
 
        - ./config.py:/fed-flow/app/config/config.py
@@ -111,7 +111,7 @@ services:
           memory: 1G
     volumes:
       - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
-      - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
+      - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
 
       - ./config.py:/fed-flow/app/config/config.py
@@ -146,7 +146,7 @@ services:
           cpus: "12"
           memory: 1G
     volumes:
-      - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
+      - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./config.py:/fed-flow/app/config/config.py
 
@@ -179,7 +179,7 @@ services:
           cpus: "12"
           memory: 1G
     volumes:
-      - ./Results:/fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results
+      - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./config.py:/fed-flow/app/config/config.py
 
