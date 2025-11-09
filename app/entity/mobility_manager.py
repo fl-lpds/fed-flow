@@ -7,6 +7,8 @@ from app.entity.node_identifier import NodeIdentifier
 from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_type import NodeType
 
+fed_logger.info("[BOOT] mobility_manager LOADED at %s", __file__)
+
 
 class MobilityManager:
     THRESHOLD_DISTANCE = 150
