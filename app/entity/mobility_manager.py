@@ -18,7 +18,7 @@ class MobilityManager:
         fed_logger.info("[Mobility] discover_edges: seed neighbors=%s", list(self.client.neighbors))
         queue = list(self.client.neighbors)
         visited = set(self.client.discovered_edges)
-        fed_logger.info("[Mobility] discover_edges: discovered_edges=%s", list(self.client.neighbors))
+        fed_logger.info("[Mobility] discover_edges: discovered_edges=%s", list(self.client.discovered_edges))
         while queue:
             current_neighbor = queue.pop(0)
             if current_neighbor in visited:
