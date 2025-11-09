@@ -9,7 +9,7 @@ from app.entity.node_type import NodeType
 
 
 class MobilityManager:
-    THRESHOLD_DISTANCE = 10
+    THRESHOLD_DISTANCE = 150
 
     def __init__(self, client):
         self.client = client
@@ -62,6 +62,8 @@ class MobilityManager:
                 min_distance = distance
                 closest_edge = edge
         fed_logger.info("[Mobility] closest_edge=%s (%.1f m)", closest_edge, min_distance if min_distance < float("inf") else -1)
+
+
         return closest_edge
 
     def initialize_neighbors(self):
@@ -94,6 +96,7 @@ class MobilityManager:
 
         if current_edge:
             HTTPCommunicator.remove_neighbor(current_edge, self.client.ip, self.client.port)
+        fed_logger.info("[Mobility] MIGRATED. Now connected edge = %s", self.get_current_edge())
 
     def monitor_and_migrate(self):
         def monitor():
