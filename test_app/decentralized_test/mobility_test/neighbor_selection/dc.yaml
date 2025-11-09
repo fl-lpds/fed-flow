@@ -200,14 +200,3 @@ services:
 volumes:
   rabbitmq_data:
 
-  results-web:
-    image: python:3.11-alpine
-    working_dir: /app
-    command: sh -c "python -m http.server 8974 -d /app/Results"
-    volumes:
-      # همان پوشه‌ی Results روی میزبان که بقیه سرویس‌ها هم به آن می‌نویسند
-      - ./Results:/app/Results:ro
-    ports:
-      - "8974:8974"
-    restart: unless-stopped
-
