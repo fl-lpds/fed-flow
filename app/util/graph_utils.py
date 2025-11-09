@@ -73,98 +73,108 @@ def copy_compose_file_if_exists(dest):
         print(f"File '{src}' does not exist.")
 
 def _scan_last_runs(results_root: str, limit: int = 5):
+    import os, glob
     runs = []
     if not os.path.isdir(results_root):
         return runs
-    for d in os.listdir(results_root):
-        path = os.path.join(results_root, d)
+    # اسکن فقط دایرکتوری‌ها
+    for name in os.listdir(results_root):
+        path = os.path.join(results_root, name)
         if not os.path.isdir(path):
             continue
-        # فقط پوشه‌هایی که داخلشان png یا yml دارند را به عنوان "run" می‌شناسیم
-        pngs = glob.glob(os.path.join(path, "*.png"))
-        order = ["accuracy-duration", "accuracy", "training-time", "bandwidth", "neighbor-bandwidths"]
-
-        def sort_key(p):
-            name = os.path.basename(p)
-            for i, k in enumerate(order):
-                if k in name: return (i, name)
-            return (len(order), name)
-
-        imgs = sorted(pngs, key=sort_key)
-
-        compose = glob.glob(os.path.join(path, "docker-compose.yml"))
-        if not imgs and not compose:
+        imgs = sorted(glob.glob(os.path.join(path, "*.png")))
+        compose = os.path.join(path, "docker-compose.yml")
+        if not imgs and not os.path.exists(compose):
             continue
         runs.append({
-            "name": d,
+            "name": name,
             "path": path,
             "mtime": os.path.getmtime(path),
-            "images": [os.path.relpath(p, results_root) for p in imgs]
+            "images": [os.path.relpath(p, results_root) for p in imgs],
+            "yml": (os.path.relpath(compose, results_root) if os.path.exists(compose) else None),
         })
+    # مرتب‌سازی نزولی بر اساس mtime
     runs.sort(key=lambda x: x["mtime"], reverse=True)
+    # 🔒 این خط تضمین می‌کند حداکثر فقط limit آیتم برگردد
     return runs[:limit]
 
+
 def _write_results_index(results_root: str = "Results", limit: int = 5):
+    import os, html, time
     os.makedirs(results_root, exist_ok=True)
-    last = _scan_last_runs(results_root, limit)
-    # HTML ساده و بدون وابستگی
+
+    # فقط همون تعداد limit تا
+    last = _scan_last_runs(results_root, limit=limit)
+    latest = html.escape(last[0]["name"]) if last else "#"
+
+    # کارت‌های HTML
     cards = []
     for r in last:
         title = html.escape(r["name"])
+        t = time.strftime("%Y-%m-%d %H:%M", time.localtime(r["mtime"]))
         imgs_html = "\n".join(
-            f'<a href="{html.escape(img)}" target="_blank"><img loading="lazy" src="{html.escape(img)}" style="max-width: 360px; height: auto; margin: 6px; border: 1px solid #ddd; border-radius: 8px;" /></a>'
+            f'<a href="{html.escape(img)}" target="_blank">'
+            f'<img loading="lazy" src="{html.escape(img)}" '
+            f'style="width:100%;height:auto;display:block;border:1px solid #e9e9ef;'
+            f'border-radius:12px;" /></a>'
             for img in r["images"]
         ) or "<em>No images found for this run.</em>"
+
+        yml_html = (
+            f'<a class="yml" href="{html.escape(r["yml"])}" target="_blank">docker-compose.yml</a>'
+            if r.get("yml") else ""
+        )
+
         cards.append(f"""
-        <section style="background:#fff; border:1px solid #eee; border-radius:16px; padding:16px; margin:16px 0; box-shadow:0 2px 6px rgba(0,0,0,0.06);">
-          <h2 style="margin:0 0 8px 0; font-size:18px;">{title}</h2>
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">{imgs_html}</div>
-          <div style="margin-top:8px;">
-            <a href="{html.escape(title)}/docker-compose.yml" target="_blank">docker-compose.yml</a>
+        <section class="card">
+          <div class="head">
+            <h2>{title}</h2>
+            <span class="mtime">{t}</span>
           </div>
+          <div class="grid">{imgs_html}</div>
+          <div class="links">{yml_html}</div>
         </section>
         """)
-    body = "\n".join(cards) or "<p>No runs found yet.</p>"
 
+    body = ("\n".join(cards) if cards
+            else '<div class="card empty">Runی پیدا نشد. یک ران بگیر و صفحه را رفرش کن.</div>')
 
-    latest = (last[0]["name"] if last else "#")
     html_doc = f"""<!doctype html>
-    <html lang="en">
-    <head>
-      <meta charset="utf-8" />
-      <meta content="width=device-width, initial-scale=1" name="viewport" />
-      <title>fed-flow – Last 5 runs</title>
-      <style>
-        :root {{ --fg:#111; --sub:#666; --bg:#f6f7fb; --card:#fff; --bd:#e9e9ef; }}
-        * {{ box-sizing:border-box; }}
-        body {{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; background:var(--bg); color:var(--fg); }}
-        header {{ position:sticky; top:0; background:#ffffffcc; backdrop-filter: blur(8px); border-bottom:1px solid var(--bd); padding:16px 20px; font-weight:800; font-size:22px; }}
-        main {{ max-width: 1200px; margin: 28px auto; padding: 0 16px; }}
-        a {{ color:#0b6bcb; text-decoration:none; }} a:hover {{ text-decoration:underline; }}
-        .card {{ background:var(--card); border:1px solid var(--bd); border-radius:18px; padding:16px; margin:16px 0; box-shadow:0 2px 10px rgba(0,0,0,.05); }}
-        .head {{ display:flex; gap:12px; align-items:baseline; justify-content:space-between; flex-wrap:wrap; }}
-        h2 {{ margin:0; font-size:22px; line-height:1.2; }}
-        .mtime {{ color:var(--sub); font-size:14px; }}
-        .grid {{ display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:12px; margin-top:12px; }}
-        .grid img {{ width:100%; height:auto; display:block; border:1px solid var(--bd); border-radius:12px; }}
-        .links {{ margin-top:10px; }}
-        .yml::before {{ content:"↗ "; }}
-        .empty {{ padding:32px; text-align:center; color:var(--sub); }}
-        .toolbar {{ display:flex; gap:10px; align-items:center; margin: 14px 0; }}
-        .btn {{ display:inline-block; padding:8px 12px; border-radius:10px; border:1px solid var(--bd); background:#fff; font-weight:600; }}
-        .btn:hover {{ background:#f0f3f8; }}
-      </style>
-    </head>
-    <body>
-      <header>fed-flow · آخرین ۵ ران</header>
-      <main>
-        <div class="toolbar">
-          <a class="btn" href="{html.escape(latest)}">Open latest run</a>
-        </div>
-        {body}
-      </main>
-    </body>
-    </html>"""
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <title>fed-flow – آخرین {limit} ران</title>
+  <style>
+    :root {{ --fg:#111; --sub:#666; --bg:#f6f7fb; --card:#fff; --bd:#e9e9ef; }}
+    * {{ box-sizing:border-box; }}
+    body {{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; background:var(--bg); color:var(--fg); }}
+    header {{ position:sticky; top:0; background:#ffffffcc; backdrop-filter: blur(8px); border-bottom:1px solid var(--bd); padding:16px 20px; font-weight:800; font-size:22px; }}
+    main {{ max-width: 1200px; margin: 28px auto; padding: 0 16px; }}
+    a {{ color:#0b6bcb; text-decoration:none; }} a:hover {{ text-decoration:underline; }}
+    .card {{ background:var(--card); border:1px solid var(--bd); border-radius:18px; padding:16px; margin:16px 0; box-shadow:0 2px 10px rgba(0,0,0,.05); }}
+    .head {{ display:flex; gap:12px; align-items:baseline; justify-content:space-between; flex-wrap:wrap; }}
+    h2 {{ margin:0; font-size:22px; line-height:1.2; }}
+    .mtime {{ color:var(--sub); font-size:14px; }}
+    .grid {{ display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:12px; margin-top:12px; }}
+    .links {{ margin-top:10px; }}
+    .yml::before {{ content:"↗ "; }}
+    .empty {{ padding:32px; text-align:center; color:var(--sub); }}
+    .toolbar {{ display:flex; gap:10px; align-items:center; margin: 14px 0; }}
+    .btn {{ display:inline-block; padding:8px 12px; border-radius:10px; border:1px solid var(--bd); background:#fff; font-weight:600; }}
+    .btn:hover {{ background:#f0f3f8; }}
+  </style>
+</head>
+<body>
+  <header>fed-flow · آخرین {limit} ران</header>
+  <main>
+    <div class="toolbar">
+      <a class="btn" href="{latest}">Open latest run</a>
+    </div>
+    {body}
+  </main>
+</body>
+</html>"""
 
     with open(os.path.join(results_root, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_doc)
