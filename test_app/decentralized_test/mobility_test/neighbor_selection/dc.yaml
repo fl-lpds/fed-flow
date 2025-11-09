@@ -1,14 +1,4 @@
 services:
-  results-web:
-    image: python:3.11-alpine
-    working_dir: /fed-flow
-    volumes:
-      - ./:/fed-flow:ro
-    command: sh -c "python -m http.server 8974 -d /fed-flow/Results"
-    ports:
-      - "8974:8974"
-    restart: unless-stopped
-
   node_base: &node_base
     image: autlpdslab/fedflow:latest
     working_dir: /fed-flow
