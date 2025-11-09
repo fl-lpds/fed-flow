@@ -1,10 +1,10 @@
 services:
   results-web:
     image: python:3.11-alpine
-    working_dir: /app
-    command: sh -c "python -m http.server 8974 -d /app/Results"
+    working_dir: /fed-flow
     volumes:
-      - ./Results:/app/Results:ro
+      - ./:/fed-flow:ro
+    command: sh -c "python -m http.server 8974 -d /fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results"
     ports:
       - "8974:8974"
     restart: unless-stopped
