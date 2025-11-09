@@ -176,5 +176,5 @@ def _write_results_index(results_root: str = "Results", limit: int = 5):
 </body>
 </html>"""
 
-    with open(os.path.join(results_root, "index.html"), "w", encoding="utf-8") as f:
+    with open(os.path.join(results_root, "dashboard.html"), "w", encoding="utf-8") as f:
         f.write(html_doc)
