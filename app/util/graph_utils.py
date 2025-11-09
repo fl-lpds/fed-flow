@@ -81,7 +81,17 @@ def _scan_last_runs(results_root: str, limit: int = 5):
         if not os.path.isdir(path):
             continue
         # فقط پوشه‌هایی که داخلشان png یا yml دارند را به عنوان "run" می‌شناسیم
-        imgs = sorted(glob.glob(os.path.join(path, "*.png")))
+        pngs = glob.glob(os.path.join(path, "*.png"))
+        order = ["accuracy-duration", "accuracy", "training-time", "bandwidth", "neighbor-bandwidths"]
+
+        def sort_key(p):
+            name = os.path.basename(p)
+            for i, k in enumerate(order):
+                if k in name: return (i, name)
+            return (len(order), name)
+
+        imgs = sorted(pngs, key=sort_key)
+
         compose = glob.glob(os.path.join(path, "docker-compose.yml"))
         if not imgs and not compose:
             continue
@@ -116,25 +126,45 @@ def _write_results_index(results_root: str = "Results", limit: int = 5):
         """)
     body = "\n".join(cards) or "<p>No runs found yet.</p>"
 
+
+    latest = (last[0]["name"] if last else "#")
     html_doc = f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta content="width=device-width, initial-scale=1" name="viewport" />
-  <title>fed-flow – Last 5 runs</title>
-  <style>
-    body {{ font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f7f7f9; color:#222; margin:0; }}
-    header {{ position:sticky; top:0; background:#ffffffcc; backdrop-filter: blur(8px); border-bottom:1px solid #eee; padding:12px 16px; }}
-    main {{ max-width: 1100px; margin: 24px auto; padding: 0 16px; }}
-    a {{ color:#0b6bcb; text-decoration:none; }} a:hover {{ text-decoration:underline; }}
-  </style>
-</head>
-<body>
-  <header><strong>fed-flow</strong> · Last 5 runs</header>
-  <main>
-    {body}
-  </main>
-</body>
-</html>"""
+    <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta content="width=device-width, initial-scale=1" name="viewport" />
+      <title>fed-flow – Last 5 runs</title>
+      <style>
+        :root {{ --fg:#111; --sub:#666; --bg:#f6f7fb; --card:#fff; --bd:#e9e9ef; }}
+        * {{ box-sizing:border-box; }}
+        body {{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial; background:var(--bg); color:var(--fg); }}
+        header {{ position:sticky; top:0; background:#ffffffcc; backdrop-filter: blur(8px); border-bottom:1px solid var(--bd); padding:16px 20px; font-weight:800; font-size:22px; }}
+        main {{ max-width: 1200px; margin: 28px auto; padding: 0 16px; }}
+        a {{ color:#0b6bcb; text-decoration:none; }} a:hover {{ text-decoration:underline; }}
+        .card {{ background:var(--card); border:1px solid var(--bd); border-radius:18px; padding:16px; margin:16px 0; box-shadow:0 2px 10px rgba(0,0,0,.05); }}
+        .head {{ display:flex; gap:12px; align-items:baseline; justify-content:space-between; flex-wrap:wrap; }}
+        h2 {{ margin:0; font-size:22px; line-height:1.2; }}
+        .mtime {{ color:var(--sub); font-size:14px; }}
+        .grid {{ display:grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap:12px; margin-top:12px; }}
+        .grid img {{ width:100%; height:auto; display:block; border:1px solid var(--bd); border-radius:12px; }}
+        .links {{ margin-top:10px; }}
+        .yml::before {{ content:"↗ "; }}
+        .empty {{ padding:32px; text-align:center; color:var(--sub); }}
+        .toolbar {{ display:flex; gap:10px; align-items:center; margin: 14px 0; }}
+        .btn {{ display:inline-block; padding:8px 12px; border-radius:10px; border:1px solid var(--bd); background:#fff; font-weight:600; }}
+        .btn:hover {{ background:#f0f3f8; }}
+      </style>
+    </head>
+    <body>
+      <header>fed-flow · آخرین ۵ ران</header>
+      <main>
+        <div class="toolbar">
+          <a class="btn" href="{html.escape(latest)}">Open latest run</a>
+        </div>
+        {body}
+      </main>
+    </body>
+    </html>"""
+
     with open(os.path.join(results_root, "index.html"), "w", encoding="utf-8") as f:
         f.write(html_doc)
