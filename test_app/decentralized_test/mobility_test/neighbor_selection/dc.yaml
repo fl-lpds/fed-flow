@@ -4,7 +4,7 @@ services:
     working_dir: /fed-flow
     volumes:
       - ./:/fed-flow:ro
-    command: sh -c "python -m http.server 8974 -d /fed-flow/test_app/decentralized_test/mobility_test/neighbor_selection/Results"
+    command: sh -c "python -m http.server 8974 -d /fed-flow/Results"
     ports:
       - "8974:8974"
     restart: unless-stopped
