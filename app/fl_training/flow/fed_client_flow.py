@@ -15,8 +15,6 @@ from app.util.mobility_data_utils import start_mobility_simulation_thread
 warnings.filterwarnings('ignore')
 logging.getLogger("requests").setLevel(logging.WARNING)
 
-fed_logger.info("[Mobility] Current edge before training = %s", client.mobility_manager.get_current_edge())
-assert client.mobility_manager.get_current_edge() is not None, "No EDGE neighbor set! Did initialize_neighbors() run?"
 
 def run_client(client: FedClient, learning_rate):
     for r in range(config.R):
