@@ -71,6 +71,8 @@ class MobilityManager:
             fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
             self.client.add_neighbor(closest_edge)
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
+            #add connecting log
+            fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s", self.client.ip, self.client.port, closest_edge)
         else:
             fed_logger.warning("[Mobility] No edge has coordinates yet; skipping initial neighbor setup for now.")
 
