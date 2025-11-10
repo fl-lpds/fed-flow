@@ -52,7 +52,6 @@ def run_d2d(client: FedClient):
 
 def run(options_ins):
     fed_logger.info("[BOOT] fed_client_flow.run() ENTER at %s", __file__)
-
     fed_logger.info("start mode: " + str(options_ins.values()))
     index = config.index
     learning_rate = config.learning_rate

@@ -64,8 +64,6 @@ class MobilityManager:
                 min_distance = distance
                 closest_edge = edge
         fed_logger.info("[Mobility] closest_edge=%s (%.1f m)", closest_edge, min_distance if min_distance < float("inf") else -1)
-
-
         return closest_edge
 
     def initialize_neighbors(self):
@@ -74,8 +72,12 @@ class MobilityManager:
         if closest_edge:
             fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
             self.client.add_neighbor(closest_edge)
+            # add connecting log
+            fed_logger.info("[Mobility] add_neighbor() done; calling HTTPCommunicator.add_neighbor ...")
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
-            #add connecting log
+            fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s", self.client.ip, self.client.port,
+                            closest_edge)
+            # add connecting log
             fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s", self.client.ip, self.client.port, closest_edge)
         else:
             fed_logger.warning("[Mobility] No edge has coordinates yet; skipping initial neighbor setup for now.")
