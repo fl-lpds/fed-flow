@@ -21,6 +21,10 @@ def run_client(client: FedClient, learning_rate):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r + 1))
+        # add log
+        edge_now = client.mobility_manager.get_current_edge()
+        fed_logger.info("[Mobility] ROUND %s START -> current_edge=%s", r + 1, edge_now)
+
         fed_logger.info("receiving splitting info")
         client.gather_split_config()
         fed_logger.info("receiving global weights")
@@ -30,6 +34,10 @@ def run_client(client: FedClient, learning_rate):
         fed_logger.info("start training")
         client.start_offloading_train()
         fed_logger.info("sending local weights")
+        # add log
+        edge_after = client.mobility_manager.get_current_edge()
+        fed_logger.info("[Mobility] ROUND %s END -> current_edge=%s", r + 1, edge_after)
+
         client.scatter_local_weights()
         fed_logger.info('ROUND: {} END'.format(r + 1))
 

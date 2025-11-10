@@ -23,6 +23,13 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         fed_logger.info('====================================>')
         fed_logger.info('==> Round {:} Start'.format(r + 1))
 
+        # هر اِج دقیقاً با چه کلاینت‌هایی در اون راند در ارتباطه
+        try:
+            clients = [f"{n.ip}:{n.port}" for n in edge_server.neighbors]
+            fed_logger.info("[Edge] ROUND %s -> connected_clients=%s", r + 1, clients)
+        except Exception as e:
+            fed_logger.info("[Edge] ROUND %s -> connected_clients=<unavailable> (%s)", r + 1, e)
+
         fed_logger.info("sending global weights")
         edge_server.scatter_global_weights([NodeType.CLIENT])
 
