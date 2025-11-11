@@ -68,6 +68,14 @@ class MobilityManager:
 
     def initialize_neighbors(self):
         closest_edge = self.find_closest_edge()
+        # Clearing all previous edges from the neighbor list
+        edges_to_remove = []
+        for n in list(self.client.neighbors):
+            if HTTPCommunicator.get_node_type(n) == NodeType.EDGE:
+                edges_to_remove.append(n)
+        for old_edge in edges_to_remove:
+            self.client.remove_neighbor(old_edge)
+            HTTPCommunicator.remove_neighbor(old_edge, self.client.ip, self.client.port)
 
         if closest_edge:
             fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
