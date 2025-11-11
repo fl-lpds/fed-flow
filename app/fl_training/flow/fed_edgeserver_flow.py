@@ -8,7 +8,6 @@ from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_type import NodeType
 from app.util import graph_utils, model_utils
 
-
 def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
     edge_server.initialize(learning_rate)
     fed_logger.info(f"Split Config : {edge_server.split_layers}")
@@ -19,16 +18,13 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
     accuracy = []
     for r in range(config.R):
         config.current_round = r
+
+        client_neighbors = edge_server.get_neighbors([NodeType.CLIENT])
+        fed_logger.info("[Edge] ROUND %d -> connected_clients=%s", r + 1, [str(n) for n in client_neighbors])
+
         rounds.append(r)
         fed_logger.info('====================================>')
         fed_logger.info('==> Round {:} Start'.format(r + 1))
-
-        # هر اِج دقیقاً با چه کلاینت‌هایی در اون راند در ارتباطه
-        try:
-            clients = [f"{n.ip}:{n.port}" for n in edge_server.neighbors]
-            fed_logger.info("[Edge] ROUND %s -> connected_clients=%s", r + 1, clients)
-        except Exception as e:
-            fed_logger.info("[Edge] ROUND %s -> connected_clients=<unavailable> (%s)", r + 1, e)
 
         fed_logger.info("sending global weights")
         edge_server.scatter_global_weights([NodeType.CLIENT])
