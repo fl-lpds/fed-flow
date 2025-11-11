@@ -75,12 +75,11 @@ class MobilityManager:
             # add connecting log
             fed_logger.info("[Mobility] add_neighbor() done; calling HTTPCommunicator.add_neighbor ...")
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
-            fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s", self.client.ip, self.client.port,
-                            closest_edge)
             # add connecting log
             fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s", self.client.ip, self.client.port, closest_edge)
         else:
             fed_logger.warning("[Mobility] No edge has coordinates yet; skipping initial neighbor setup for now.")
+        return
 
     def get_current_edge(self) -> NodeIdentifier:
         for neighbor in self.client.neighbors:
@@ -93,9 +92,9 @@ class MobilityManager:
         current_edge = self.get_current_edge()
         if current_edge:
             self.client.remove_neighbor(current_edge)
+            HTTPCommunicator.remove_neighbor(current_edge, self.client.ip, self.client.port)
 
         self.client.add_neighbor(new_edge)
-
         HTTPCommunicator.add_neighbor(new_edge, self.client.ip, self.client.port)
 
         if current_edge:
