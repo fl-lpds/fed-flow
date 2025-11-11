@@ -1,0 +1,158 @@
+version: '3'
+services:
+  broker:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: rabbitmq
+      RABBITMQ_MAX_MESSAGE_SIZE: 536870912
+
+  edge_defaults: &edge_defaults
+    image: autlpdslab/fedflow:mega-v0.0.1
+    working_dir: /fed-flow/app/fl_training/runner
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '2G'
+        reservations:
+          cpus: '1'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure
+
+  client_defaults: &client_defaults
+    image: autlpdslab/fedflow:mega-v0.0.1
+    working_dir: /fed-flow/app/fl_training/runner
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '1G'
+      restart_policy:
+        condition: on-failure
+
+  edge1:
+    <<: *edge_defaults
+    hostname: edge1
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py
+      -o True
+      -s fake_decentralized_splitting
+      --decentralized True
+      --ip edge1
+      --port 8079
+      --neighbors client1,8081 client3,8083 edge2,8080
+      --coordinates "10,10,10"
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/edge1"
+
+    ports:
+      - "5003:5001"
+      - "8079:8079"
+    depends_on:
+      - broker
+
+  edge2:
+    <<: *edge_defaults
+    hostname: edge2
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_edgeserver_run.py
+      -o True
+      -s fake_decentralized_splitting
+      --decentralized True
+      --ip edge2
+      --port 8080
+      --neighbors client2,8082 client4,8084 edge1,8079
+      --coordinates "40.05015,116.300418,492.0"
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/edge2"
+
+    ports:
+      - "5004:5001"
+      - "8080:8080"
+    depends_on:
+      - broker
+
+  client1:
+    <<: *client_defaults
+    hostname: client1
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      -o True
+      -s fake_decentralized_splitting
+      --decentralized True
+      --ip client1
+      --port 8081
+      --neighbors edge1,8079
+      --mobility True
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client1"
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv
+
+  client2:
+    <<: *client_defaults
+    hostname: client2
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      -o True
+      -s fake_decentralized_splitting
+      --decentralized True
+      --ip client2
+      --port 8082
+      --neighbors edge2,8080
+      --mobility True
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client2"
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv
+
+  client3:
+    <<: *client_defaults
+    hostname: client3
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      -o True
+      -s fake_decentralized_splitting
+      --decentralized True
+      --ip client3
+      --port 8083
+      --neighbors edge1,8079
+      --mobility True
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client3"
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./processed_data/009/009_data.csv:/fed-flow/app/dataset/mobility_data/data.csv
+
+  client4:
+    <<: *client_defaults
+    hostname: client4
+    entrypoint: >
+      bash -c "python3 /fed-flow/app/fl_training/runner/fed_client_run.py
+      -o True
+      -s fake_decentralized_splitting
+      --decentralized True
+      --ip client4
+      --port 8084
+      --neighbors edge2,8080
+      --mobility True
+      --rabbitmq-url amqp://rabbitmq:rabbitmq@broker:5672/client4"
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./config.py:/fed-flow/app/config/config.py
+      - ./processed_data/012/012_data.csv:/fed-flow/app/dataset/mobility_data/data.csv
