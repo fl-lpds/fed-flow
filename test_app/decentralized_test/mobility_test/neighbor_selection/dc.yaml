@@ -63,22 +63,21 @@ services:
       IP: "client1"
       PORT: "8080"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client1"
-      NEIGHBORS: ""
+      NEIGHBORS: "edge1, 8081"
       NODE_TYPE: "client"
       ROUND_COUNT: "3"
-      DEVICE_COUNT: "2"
+      DEVICE_COUNT: "3"
       COORDINATES: "2.0,37.0,4.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "8"
+          cpus: "6"
           memory: 1G
     volumes:
        - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
        - ./Results:/fed-flow/Results
        - ./data:/fed-flow/app/dataset/data
-
        - ./config.py:/fed-flow/app/config/config.py
 
 
@@ -95,25 +94,57 @@ services:
       MODEL: "VGG"
       DATASET: "cifar10"
       NODE_INDEX: "0"
-      IP: "client2"
+      IP: "client3"
       PORT: "8082"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client2"
-      NEIGHBORS: ""
+      NEIGHBORS: "edge2, 8083"
       NODE_TYPE: "client"
       ROUND_COUNT: "3"
-      DEVICE_COUNT: "2"
+      DEVICE_COUNT: "3"
       COORDINATES: "20.0,20.0,5.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "8"
+          cpus: "6"
           memory: 1G
     volumes:
       - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
 
+  client3:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client2"
+      PORT: "8084"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client2"
+      NEIGHBORS: "edge1, 8081"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "3"
+      COORDINATES: "39.9970,116.3285,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "6"
+          memory: 1G
+    volumes:
+      - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
       - ./config.py:/fed-flow/app/config/config.py
 
 
@@ -143,7 +174,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "12"
+          cpus: "11"
           memory: 1G
     volumes:
       - ./Results:/fed-flow/Results
@@ -176,7 +207,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "12"
+          cpus: "11"
           memory: 1G
     volumes:
       - ./Results:/fed-flow/Results
