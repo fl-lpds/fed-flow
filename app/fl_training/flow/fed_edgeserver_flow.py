@@ -45,16 +45,38 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
             if neighbor_type not in neighbors_bandwidth_by_type:
                 neighbors_bandwidth_by_type[neighbor_type] = []
             neighbors_bandwidth_by_type[neighbor_type].append(bw.bandwidth)
-        client_bw.append(
-            sum(neighbors_bandwidth_by_type[NodeType.CLIENT]) / len(neighbors_bandwidth_by_type[NodeType.CLIENT]))
+        client_bandwidths = neighbors_bandwidth_by_type.get(NodeType.CLIENT, [])
+
+        if not client_bandwidths:
+            # هیچ کلاینتی به این اج وصل نیست، این راند رو برای این اج رد کن
+            fed_logger.warning(
+                "[Edge] ROUND %d: no client neighbors when computing bandwidth; skipping split & train for this edge",
+                r + 1,
+            )
+            client_bw.append(0)
+
+            if NodeType.EDGE in neighbors_bandwidth_by_type:
+                edge_bw.append(
+                    sum(neighbors_bandwidth_by_type[NodeType.EDGE])/len(neighbors_bandwidth_by_type[NodeType.EDGE]))
+            else:
+                edge_bw.append(0)
+
+            # این راند برای این اج دیگه split / train انجام نمی‌دیم
+            continue
+
+        # اگر کلاینت داریم، مثل قبل عمل کن
+        client_bw.append(sum(client_bandwidths) / len(client_bandwidths))
+
         if NodeType.EDGE in neighbors_bandwidth_by_type:
             edge_bw.append(
-                sum(neighbors_bandwidth_by_type[NodeType.EDGE]) / len(neighbors_bandwidth_by_type[NodeType.EDGE]))
+                sum(neighbors_bandwidth_by_type[NodeType.EDGE])
+                / len(neighbors_bandwidth_by_type[NodeType.EDGE])
+            )
         else:
             edge_bw.append(0)
 
         fed_logger.info("splitting")
-        edge_server.split(neighbors_bandwidth_by_type[NodeType.CLIENT], options)
+        edge_server.split(client_bandwidths, options)
         fed_logger.info(f"Split Config : {edge_server.split_layers}")
         edge_server.scatter_split_layers([NodeType.CLIENT])
 
