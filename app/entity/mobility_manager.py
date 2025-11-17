@@ -67,6 +67,14 @@ class MobilityManager:
         return closest_edge
 
     def initialize_neighbors(self):
+        existing_edge = self.get_current_edge()
+        if existing_edge is not None:
+            fed_logger.info(
+                "[Mobility] initialize_neighbors: keep existing edge=%s (no initial switch)",
+                existing_edge,
+            )
+            return
+        
         closest_edge = self.find_closest_edge()
         # Clearing all previous edges from the neighbor list
         edges_to_remove = []
