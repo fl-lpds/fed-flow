@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+This is a project that mimics the flow and Federation Learning. It connects clients, edge server and servers to each other using RabbitMQs intances. Each node has its own RabbitMQ instance and can send/recieve messages to other nodes. Currently it supports different architectures which are:
+- centralized: having a single aggregator server that gets weights from edge/clients (based on the architecure) and aggregate them and send back to them
+- semi-decentralied: having many edge servers that each of them has its own set of clients, each of them aggregates weights of its client and send the aggregated weight to its neighbors. The connectivity architecuture of edge servers can get customized. They can be a ring, fully connected or star and other things.
+- decentralized: only clients are there. they can send and recieve weights to each other and aggregate them. There is no central server or any edge server in this mode.
+- D2D: clients has been partitioned into different clusters. Clients do gossip (share weight) with each other in each cluster. Also there is a single centralized server that in each round, samples weight from one of the nodes in each cluster randomly and aggregate them and send back to the clinets.
+
+There is a scenario_creator file in @evaluation/scenario_creator.py file. You can check that on how to create a scenario docker-compose file and run it.
