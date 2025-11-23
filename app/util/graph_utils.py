@@ -18,30 +18,49 @@ from app.entity.node import Node
 
 
 def report_results(node: Node, training_times: list[float], client_bandwidths: list[float],
-                   accuracy: list[float], neighbor_bandwidths: Optional[list[float]] = None, accuracy_duration: bool = True):
+                   accuracy: list[float], neighbor_bandwidths: Optional[list[float]] = None,
+                   accuracy_duration: bool = True):
+    # چند دور واقعی انجام شده؟
+    rounds_count = len(training_times)
+
+    if rounds_count == 0:
+        fed_logger.warning(f"[Graph] No training rounds for {node}. Skipping plot generation.")
+        return
+
     current_time = time.strftime("%Y-%m-%d %H:%M")
     runtime_config = f'{current_time} {config.SCENARIO_DESCRIPTION}'
     save_path = f"Results/{runtime_config}"
-    rounds_count = config.R
-    draw_graph(10, 5, range(1, rounds_count + 1), training_times, str(node), "FL Rounds", "Training Time (s)",
+
+    # محور x واقعی بر اساس تعداد واقعی راند
+    x = range(1, rounds_count + 1)
+
+    # trim برای هماهنگی لیست‌ها
+    client_bandwidths = client_bandwidths[:rounds_count]
+    accuracy = accuracy[:rounds_count]
+    if neighbor_bandwidths:
+        neighbor_bandwidths = neighbor_bandwidths[:rounds_count]
+
+    draw_graph(10, 5, x, training_times, str(node), "FL Rounds", "Training Time (s)",
                save_path, f"training-time-{str(node)}")
-    draw_graph(10, 5, range(1, rounds_count + 1), client_bandwidths, str(node), "FL Rounds", "Bandwidths (bytes/s)",
+    draw_graph(10, 5, x, client_bandwidths, str(node), "FL Rounds", "Bandwidths (bytes/s)",
                save_path, f"bandwidth-{str(node)}")
-    draw_graph(10, 5, range(1, rounds_count + 1), accuracy, str(node), "FL Rounds", "Accuracy (%)",
+    draw_graph(10, 5, x, accuracy, str(node), "FL Rounds", "Accuracy (%)",
                save_path, f"accuracy-{str(node)}")
     if neighbor_bandwidths:
-        draw_graph(10, 5, range(1, rounds_count + 1), neighbor_bandwidths, str(node), "FL Rounds",
+        draw_graph(10, 5, x, neighbor_bandwidths, str(node), "FL Rounds",
                    "Neighbors Bandwidths (bytes/s)",
                    save_path, f"neighbor-bandwidths-{str(node)}")
+
     if accuracy_duration:
         timeline = [0]
         for duration in training_times:
             timeline.append(timeline[-1] + duration)
         draw_graph(10, 5, timeline[1:], accuracy, str(node), "Time (s)", "Accuracy (%)",
                    save_path, f"accuracy-duration-{str(node)}")
+
     copy_compose_file_if_exists(save_path)
     fed_logger.info(f"Results created successfully at {save_path}")
-    #این خط رو اضافه کردم
+
     _write_results_index(results_root="Results", limit=5)
 
 
