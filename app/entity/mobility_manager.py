@@ -15,6 +15,19 @@ class MobilityManager:
 
     def __init__(self, client):
         self.client = client
+        self._migration_enabled = True
+        self._lock = threading.Lock()
+
+    def enable_migration(self):
+        with self._lock:
+            self._migration_enabled = True
+        fed_logger.info("[Mobility] migration ENABLED (between rounds)")
+
+    def disable_migration(self):
+        with self._lock:
+            self._migration_enabled = False
+        fed_logger.info("[Mobility] migration DISABLED (during training)")
+
 
     def discover_edges(self):
         fed_logger.info("[Mobility] discover_edges: seed neighbors=%s", list(self.client.neighbors))
@@ -121,7 +134,9 @@ class MobilityManager:
             while True:
                 time.sleep(1)
 
-                if self.is_training:
+                with self._lock:
+                    can_migrate = self._migration_enabled
+                if not can_migrate:
                     continue
 
                 closest_edge = self.find_closest_edge()
