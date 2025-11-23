@@ -80,30 +80,29 @@ class MobilityManager:
         return closest_edge
 
     def initialize_neighbors(self):
-        existing_edge = self.get_current_edge()
-        if existing_edge is not None:
-            fed_logger.info(
-                "[Mobility] initialize_neighbors: keep existing edge=%s (no initial switch)", existing_edge,)
-            return
 
         closest_edge = self.find_closest_edge()
-        # Clearing all previous edges from the neighbor list
-        edges_to_remove = []
-        for n in list(self.client.neighbors):
-            if HTTPCommunicator.get_node_type(n) == NodeType.EDGE:
-                edges_to_remove.append(n)
-        for old_edge in edges_to_remove:
-            self.client.remove_neighbor(old_edge)
-            HTTPCommunicator.remove_neighbor(old_edge, self.client.ip, self.client.port)
 
+        # اگر edge پیدا شد، همه‌ی edgeهای قبلی را پاک کن و فقط همین را نگه داریم
         if closest_edge:
+            # اختیاری: پاک کردن edgeهای قبلی از لیست همسایه‌ها
+            edges_to_remove = []
+            for n in list(self.client.neighbors):
+                if HTTPCommunicator.get_node_type(n) == NodeType.EDGE:
+                    edges_to_remove.append(n)
+            for old_edge in edges_to_remove:
+                self.client.remove_neighbor(old_edge)
+                HTTPCommunicator.remove_neighbor(old_edge, self.client.ip, self.client.port)
+
             fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
+            # هم در خود کلاینت، هم سمت اج ثبتش کن
             self.client.add_neighbor(closest_edge)
-            # add connecting log
             fed_logger.info("[Mobility] add_neighbor() done; calling HTTPCommunicator.add_neighbor ...")
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
-            # add connecting log
-            fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s", self.client.ip, self.client.port, closest_edge)
+            fed_logger.info(
+                "[Mobility] CONNECTED client=%s:%s -> edge=%s",
+                self.client.ip, self.client.port, closest_edge
+            )
         else:
             fed_logger.warning("[Mobility] No edge has coordinates yet; skipping initial neighbor setup for now.")
         return
