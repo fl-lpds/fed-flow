@@ -120,7 +120,7 @@ class FedClient(FedBaseNodeInterface):
     def no_offloading_train(self):
         self.net.to(self.device)
         self.net.train()
-        for batch_idx, (inputs, targets) in enumerate(tqdm.tqdm(self.train_loader)):
+        for batch_idx, (inputs, targets) in enumerate(tqdm(self.train_loader)):
             inputs, targets = inputs.to(self.device), targets.to(self.device)
             self.optimizer.zero_grad()
             outputs = self.net(inputs)
