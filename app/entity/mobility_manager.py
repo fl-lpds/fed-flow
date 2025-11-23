@@ -70,11 +70,9 @@ class MobilityManager:
         existing_edge = self.get_current_edge()
         if existing_edge is not None:
             fed_logger.info(
-                "[Mobility] initialize_neighbors: keep existing edge=%s (no initial switch)",
-                existing_edge,
-            )
+                "[Mobility] initialize_neighbors: keep existing edge=%s (no initial switch)", existing_edge,)
             return
-        
+
         closest_edge = self.find_closest_edge()
         # Clearing all previous edges from the neighbor list
         edges_to_remove = []
@@ -122,6 +120,9 @@ class MobilityManager:
             fed_logger.info("[Mobility] monitor loop started (THRESHOLD=%sm)", self.THRESHOLD_DISTANCE)
             while True:
                 time.sleep(1)
+
+                if self.is_training:
+                    continue
 
                 closest_edge = self.find_closest_edge()
                 current_edge = self.get_current_edge()
