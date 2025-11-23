@@ -21,8 +21,10 @@ def run_client(client: FedClient, learning_rate):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r + 1))
-        # add log
-        edge_now = client.mobility_manager.get_current_edge()
+        if hasattr(client, "mobility_manager") and client.mobility_manager is not None:
+            client.mobility_manager.disable_migration()
+
+        edge_now = client.mobility_manager.get_current_edge() if hasattr(client, "mobility_manager") else None
         fed_logger.info("[Mobility] ROUND %s START -> current_edge=%s", r + 1, edge_now)
 
         fed_logger.info("receiving splitting info")
@@ -40,6 +42,9 @@ def run_client(client: FedClient, learning_rate):
 
         client.scatter_local_weights()
         fed_logger.info('ROUND: {} END'.format(r + 1))
+
+        if hasattr(client, "mobility_manager") and client.mobility_manager is not None:
+            client.mobility_manager.enable_migration()
 
 
 def run_d2d(client: FedClient):
