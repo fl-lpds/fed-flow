@@ -127,6 +127,55 @@ class MobilityManager:
             HTTPCommunicator.remove_neighbor(current_edge, self.client.ip, self.client.port)
         fed_logger.info("[Mobility] MIGRATED. Now connected edge = %s", self.get_current_edge())
 
+
+    def check_and_migrate_per_round(self):
+        """
+        این تابع فقط یک‌بار (مثلاً اول هر راند) صدا زده می‌شود:
+        فاصله تا اج فعلی را حساب می‌کند و اگر از THRESHOLD بیشتر بود
+        و یک اج نزدیک‌تر پیدا شد، مهاجرت انجام می‌دهد.
+        """
+        # اگر هنوز مختصات کلاینت ست نشده، هیچی نکن
+        if not self.client.node_coordinate:
+            fed_logger.warning("[Mobility] per-round check: client has no coordinates yet")
+            return
+
+        current_edge = self.get_current_edge()
+        if current_edge is None:
+            fed_logger.warning("[Mobility] per-round check: no current EDGE neighbor, skipping")
+            return
+
+        closest_edge = self.find_closest_edge()
+        if closest_edge is None:
+            fed_logger.warning("[Mobility] per-round check: no closest edge found")
+            return
+
+        current_edge_coords = HTTPCommunicator.get_node_coordinate(current_edge)
+        if not current_edge_coords:
+            fed_logger.warning("[Mobility] per-round check: current edge has no coordinates")
+            return
+
+        current_coords = (self.client.node_coordinate.latitude, self.client.node_coordinate.longitude)
+        edge_coords = (current_edge_coords['latitude'], current_edge_coords['longitude'])
+
+        distance_to_current_edge = geodesic(current_coords, edge_coords).meters
+
+        fed_logger.info(
+            "[Mobility] per-round check: current_edge=%s distance=%.1f m, closest_edge=%s",
+            current_edge, distance_to_current_edge, closest_edge
+        )
+
+        if distance_to_current_edge > self.THRESHOLD_DISTANCE and closest_edge != current_edge:
+            fed_logger.info(
+                "[Mobility] per-round check: migrating from %s to %s (distance=%.1f m > %s m)",
+                current_edge, closest_edge, distance_to_current_edge, self.THRESHOLD_DISTANCE
+            )
+            self.migrate_to_edge(closest_edge)
+        else:
+            fed_logger.info(
+                "[Mobility] per-round check: stay on %s (distance=%.1f m, closest_edge=%s)",
+                current_edge, distance_to_current_edge, closest_edge
+            )
+
     def monitor_and_migrate(self):
         def monitor():
             fed_logger.info("[Mobility] monitor loop started (THRESHOLD=%sm)", self.THRESHOLD_DISTANCE)
