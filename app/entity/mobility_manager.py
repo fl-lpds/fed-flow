@@ -80,12 +80,30 @@ class MobilityManager:
         return closest_edge
 
     def initialize_neighbors(self):
+        """
+        مرحله‌ی اولیه:
+        1) اگر از روی dc.yaml همین الان یک EDGE همسایه داریم، همان را نگه می‌داریم
+           (یعنی کلاینت از اج خودش شروع می‌کند).
+        2) فقط اگر هیچ EDGE قبلی وجود نداشت، نزدیک‌ترین اج را بر اساس مختصات پیدا می‌کنیم.
+        در هر دو حالت، سمت سرور (Edge) هم با HTTPCommunicator.add_neighbor ثبت می‌شود.
+        """
 
+        # ۱) ببینیم از کانفیگ (dc.yaml) قبلاً یک EDGE به‌عنوان همسایه داریم یا نه
+        existing_edge = self.get_current_edge()
+        if existing_edge is not None:
+            fed_logger.info(
+                "[Mobility] initialize_neighbors: keep existing edge=%s (from config, no initial switch)",
+                existing_edge,
+            )
+            # فقط مطمئن شو سمت اج هم این کلاینت ثبت شده باشد
+            HTTPCommunicator.add_neighbor(existing_edge, self.client.ip, self.client.port)
+            fed_logger.info("[Mobility] CONNECTED client=%s:%s -> edge=%s (from config)", self.client.ip, self.client.port, existing_edge)
+            return
+
+        # ۲) اگر هیچ EDGE قبلی نداریم، بر اساس نزدیک‌ترین اج عمل کن
         closest_edge = self.find_closest_edge()
-
-        # اگر edge پیدا شد، همه‌ی edgeهای قبلی را پاک کن و فقط همین را نگه داریم
         if closest_edge:
-            # اختیاری: پاک کردن edgeهای قبلی از لیست همسایه‌ها
+            # هر EDGE قدیمی‌ای که توی لیست همسایه‌ها هست پاک شود (برای تمیزی)
             edges_to_remove = []
             for n in list(self.client.neighbors):
                 if HTTPCommunicator.get_node_type(n) == NodeType.EDGE:
@@ -95,17 +113,15 @@ class MobilityManager:
                 HTTPCommunicator.remove_neighbor(old_edge, self.client.ip, self.client.port)
 
             fed_logger.info("[Mobility] initialize_neighbors: add %s as primary neighbor", closest_edge)
-            # هم در خود کلاینت، هم سمت اج ثبتش کن
             self.client.add_neighbor(closest_edge)
-            fed_logger.info("[Mobility] add_neighbor() done; calling HTTPCommunicator.add_neighbor ...")
             HTTPCommunicator.add_neighbor(closest_edge, self.client.ip, self.client.port)
             fed_logger.info(
-                "[Mobility] CONNECTED client=%s:%s -> edge=%s",
+                "[Mobility] CONNECTED client=%s:%s -> edge=%s (from closest)",
                 self.client.ip, self.client.port, closest_edge
             )
         else:
-            fed_logger.warning("[Mobility] No edge has coordinates yet; skipping initial neighbor setup for now.")
-        return
+            fed_logger.warning(
+                "[Mobility] initialize_neighbors: No edge has coordinates yet; skipping initial setup.")
 
     def get_current_edge(self) -> NodeIdentifier:
         for neighbor in self.client.neighbors:
