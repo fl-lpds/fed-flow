@@ -1,3 +1,5 @@
+import time
+
 import torch.nn as nn
 from torch import optim
 from tqdm import tqdm
@@ -113,6 +115,15 @@ class FedClient(FedBaseNodeInterface):
         self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()]), [NodeType.EDGE])
 
     def scatter_random_local_weights(self):
+        server_neighbors = self.get_neighbors([NodeType.SERVER])
+        if server_neighbors:
+            server = server_neighbors[0]
+            fed_logger.info("waiting for leader election to complete")
+            while not HTTPCommunicator.get_leader_election_completed(server):
+                fed_logger.info("leader election not completed yet, waiting...")
+                time.sleep(1)
+            fed_logger.info("leader election completed")
+        
         is_leader = HTTPCommunicator.get_is_leader(self)
         if is_leader:
             self.scatter_msg(GlobalWeightMessage([self.net.to(self.device).state_dict()]), [NodeType.SERVER])

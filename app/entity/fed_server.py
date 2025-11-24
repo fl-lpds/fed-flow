@@ -213,4 +213,8 @@ class FedServer(FedBaseNodeInterface):
                 random_clients[cluster] = random_client
                 HTTPCommunicator.set_leader(random_client, random_client.ip, random_client.port, True)
 
+        self.leader_election_completed = True
         return random_clients
+
+    def reset_leader_election_status(self):
+        self.leader_election_completed = False
