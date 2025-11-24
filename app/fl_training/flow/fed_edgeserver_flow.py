@@ -42,56 +42,48 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         neighbors_bandwidth_by_type: dict[NodeType, list[float]] = {}
         for neighbor, bw in neighbors_bandwidth.items():
             neighbor_type = HTTPCommunicator.get_node_type(neighbor)
-            if neighbor_type not in neighbors_bandwidth_by_type:
-                neighbors_bandwidth_by_type[neighbor_type] = []
+            neighbors_bandwidth_by_type.setdefault(neighbor_type, [])
             neighbors_bandwidth_by_type[neighbor_type].append(bw.bandwidth)
+
         client_bandwidths = neighbors_bandwidth_by_type.get(NodeType.CLIENT, [])
+        has_client_neighbors = len(client_bandwidths) > 0
 
-        if not client_bandwidths:
-            # هیچ کلاینتی به این اج وصل نیست، این راند رو برای این اج رد کن
-            fed_logger.warning(
-                "[Edge] ROUND %d: no client neighbors when computing bandwidth; skipping split & train for this edge",
-                r + 1,
-            )
+        # ثبت میانگین پهنای باند کلاینت و اج
+        if has_client_neighbors:
+            client_bw.append(sum(client_bandwidths) / len(client_bandwidths))
+        else:
             client_bw.append(0)
-
-            if NodeType.EDGE in neighbors_bandwidth_by_type:
-                edge_bw.append(
-                    sum(neighbors_bandwidth_by_type[NodeType.EDGE])/len(neighbors_bandwidth_by_type[NodeType.EDGE]))
-            else:
-                edge_bw.append(0)
-
-            # این راند برای این اج دیگه split / train انجام نمی‌دیم
-            continue
-
-        # اگر کلاینت داریم، مثل قبل عمل کن
-        client_bw.append(sum(client_bandwidths) / len(client_bandwidths))
+            fed_logger.warning(
+                "[Edge] ROUND %d: no client neighbors; skipping split/train for this edge (but WILL gossip)", r + 1,)
 
         if NodeType.EDGE in neighbors_bandwidth_by_type:
-            edge_bw.append(
-                sum(neighbors_bandwidth_by_type[NodeType.EDGE])
-                / len(neighbors_bandwidth_by_type[NodeType.EDGE])
-            )
+            edge_values = neighbors_bandwidth_by_type[NodeType.EDGE]
+            edge_bw.append(sum(edge_values) / len(edge_values))
         else:
             edge_bw.append(0)
 
-        fed_logger.info("splitting")
-        edge_server.split(client_bandwidths, options)
-        fed_logger.info(f"Split Config : {edge_server.split_layers}")
-        edge_server.scatter_split_layers([NodeType.CLIENT])
+        # --- فقط اگر کلاینت داریم، split + train + aggregate ---
+        if has_client_neighbors:
+            fed_logger.info("splitting")
+            edge_server.split(client_bandwidths, options)
+            fed_logger.info(f"Split Config : {edge_server.split_layers}")
+            edge_server.scatter_split_layers([NodeType.CLIENT])
 
-        fed_logger.info("start training")
-        edge_server.start_decentralized_training()
+            fed_logger.info("start training")
+            edge_server.start_decentralized_training()
 
-        fed_logger.info("receiving local weights")
-        local_weights = edge_server.gather_local_weights()
+            fed_logger.info("receiving local weights")
+            local_weights = edge_server.gather_local_weights()
 
-        fed_logger.info("aggregating weights")
-        edge_server.aggregate(local_weights)
+            fed_logger.info("aggregating weights")
+            edge_server.aggregate(local_weights)
+        else:
+            fed_logger.info(
+                "[Edge] ROUND %d: no clients -> skipping split/train/aggregate, keeping current model", r + 1,)
 
+        # --- مهم: در هر صورت، gossip انجام می‌شود ---
         fed_logger.info("start gossiping with neighbors")
         edge_server.gossip_with_neighbors()
-        #
         e_time = time.time()
 
         # Recording each round training time, bandwidth and test_app accuracy
@@ -107,7 +99,6 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(training_time))
     graph_utils.report_results(edge_server, training_times, client_bw, accuracy, edge_bw)
-
 
 def run_centralized(edge_server: FedEdgeServer, learning_rate):
     edge_server.gather_and_scatter_split_config()
