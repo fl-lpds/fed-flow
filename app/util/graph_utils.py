@@ -1,3 +1,4 @@
+import csv
 import os
 import random
 import shutil
@@ -14,12 +15,49 @@ from app.config.logger import fed_logger
 from app.entity.node import Node
 
 
+def save_results_to_csv(node: Node, training_times: list[float], client_bandwidths: list[float],
+                        accuracy: list[float], save_path: str, neighbor_bandwidths: Optional[list[float]] = None):
+    """Save numerical results to a CSV file."""
+    if not os.path.exists(save_path):
+        os.makedirs(save_path, exist_ok=True)
+    
+    csv_file = os.path.join(save_path, f"results-{str(node)}.csv")
+    rounds_count = len(training_times)
+    
+    # Prepare data for CSV
+    headers = ["Round", "Training Time (s)", "Bandwidth (bytes/s)", "Accuracy (%)"]
+    if neighbor_bandwidths:
+        headers.append("Neighbor Bandwidth (bytes/s)")
+    
+    with open(csv_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        
+        for i in range(rounds_count):
+            row = [
+                i + 1,  # Round number
+                training_times[i],
+                client_bandwidths[i],
+                accuracy[i]
+            ]
+            if neighbor_bandwidths:
+                row.append(neighbor_bandwidths[i])
+            writer.writerow(row)
+    
+    fed_logger.info(f"CSV results saved to {csv_file}")
+
+
 def report_results(node: Node, training_times: list[float], client_bandwidths: list[float],
                    accuracy: list[float], neighbor_bandwidths: Optional[list[float]] = None, accuracy_duration: bool = True):
     current_time = time.strftime("%Y-%m-%d %H:%M")
     runtime_config = f'{current_time} {config.SCENARIO_DESCRIPTION}'
     save_path = f"Results/{runtime_config}"
     rounds_count = config.R
+    
+    # Save numerical data to CSV
+    save_results_to_csv(node, training_times, client_bandwidths, accuracy, save_path, neighbor_bandwidths)
+    
+    # Generate plots
     draw_graph(10, 5, range(1, rounds_count + 1), training_times, str(node), "FL Rounds", "Training Time (s)",
                save_path, f"training-time-{str(node)}")
     draw_graph(10, 5, range(1, rounds_count + 1), client_bandwidths, str(node), "FL Rounds", "Bandwidths (bytes/s)",
