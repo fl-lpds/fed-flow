@@ -35,12 +35,19 @@ def run_client(client: FedClient, learning_rate):
 
 
 def run_d2d(client: FedClient):
+    first_round = True
     for r in range(config.R):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r + 1))
         fed_logger.info("receiving global weights")
         client.gather_global_weights(NodeType.SERVER)
+        if first_round:
+            first_round = False
+            cooldown = random.uniform(0, 60)
+            fed_logger.info(f'Random startup delay: {cooldown:.2f}s to stagger GPU usage')
+            time.sleep(cooldown)
+            fed_logger.info('Starting federated learning training')
         fed_logger.info("start training")
         client.no_offloading_train()
         fed_logger.info("gossip with neighbors")
@@ -55,11 +62,6 @@ def run(options_ins):
     index = config.index
     learning_rate = config.learning_rate
 
-    cooldown = random.uniform(0, 60)
-    fed_logger.info(f'Random startup delay: {cooldown:.2f}s to stagger GPU usage')
-    time.sleep(cooldown)
-    fed_logger.info('Starting federated learning training')
-    
     fed_logger.info('Preparing Client')
     fed_logger.info('Preparing Data.')
     indices = list(range(N))
