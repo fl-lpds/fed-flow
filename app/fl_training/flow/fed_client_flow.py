@@ -21,10 +21,13 @@ def run_client(client: FedClient, learning_rate):
         config.current_round = r
         fed_logger.info('====================================>')
         fed_logger.info('ROUND: {} START'.format(r + 1))
+        #  موبیلیتی: چک کردن فاصله و مایگریت فقط یک‌بار، اول هر راند
         if hasattr(client, "mobility_manager") and client.mobility_manager is not None:
-            client.mobility_manager.disable_migration()
-
-        edge_now = client.mobility_manager.get_current_edge() if hasattr(client, "mobility_manager") else None
+            fed_logger.info("[Mobility] ROUND %s: per-round distance check before training", r + 1)
+            client.mobility_manager.check_and_migrate_per_round()
+            edge_now = client.mobility_manager.get_current_edge()
+        else:
+            edge_now = None
         fed_logger.info("[Mobility] ROUND %s START -> current_edge=%s", r + 1, edge_now)
 
         fed_logger.info("receiving splitting info")
@@ -42,10 +45,6 @@ def run_client(client: FedClient, learning_rate):
 
         client.scatter_local_weights()
         fed_logger.info('ROUND: {} END'.format(r + 1))
-
-        if hasattr(client, "mobility_manager") and client.mobility_manager is not None:
-            client.mobility_manager.enable_migration()
-
 
 def run_d2d(client: FedClient):
     for r in range(config.R):
@@ -103,8 +102,8 @@ def run(options_ins):
         fed_logger.info("[Mobility] Current edge before training = %s", client.mobility_manager.get_current_edge())
         assert client.mobility_manager.get_current_edge() is not None, "No EDGE neighbor set! Did initialize_neighbors() run?"
 
-        fed_logger.info("[Mobility] Start monitor and migrate")
-        client.mobility_manager.monitor_and_migrate()
+        # fed_logger.info("[Mobility] Start monitor and migrate")
+        # client.mobility_manager.monitor_and_migrate()
     if d2d:
         run_d2d(client)
 
