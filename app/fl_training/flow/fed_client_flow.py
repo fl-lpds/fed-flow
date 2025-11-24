@@ -55,6 +55,11 @@ def run(options_ins):
     index = config.index
     learning_rate = config.learning_rate
 
+    cooldown = random.uniform(0, 60)
+    fed_logger.info(f'Random startup delay: {cooldown:.2f}s to stagger GPU usage')
+    time.sleep(cooldown)
+    fed_logger.info('Starting federated learning training')
+    
     fed_logger.info('Preparing Client')
     fed_logger.info('Preparing Data.')
     indices = list(range(N))
@@ -90,10 +95,6 @@ def run(options_ins):
         # client.mobility_manager.discover_edges()
         # client.mobility_manager.monitor_and_migrate()
     
-    cooldown = random.uniform(0, 60)
-    fed_logger.info(f'Random startup delay: {cooldown:.2f}s to stagger GPU usage')
-    time.sleep(cooldown)
-    fed_logger.info('Starting federated learning training')
     if d2d:
         fed_logger.info('Running in D2D mode')
         run_d2d(client)
