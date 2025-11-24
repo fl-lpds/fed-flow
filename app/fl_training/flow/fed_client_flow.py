@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 import warnings
 
@@ -89,6 +90,9 @@ def run(options_ins):
         # client.mobility_manager.discover_edges()
         # client.mobility_manager.monitor_and_migrate()
     
+    cooldown = random.uniform(0, 60)
+    fed_logger.info(f'Random startup delay: {cooldown:.2f}s to stagger GPU usage')
+    time.sleep(cooldown)
     fed_logger.info('Starting federated learning training')
     if d2d:
         fed_logger.info('Running in D2D mode')
