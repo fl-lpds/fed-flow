@@ -15,7 +15,7 @@ simnet = False
 dataset_name = ''
 home = sys.path[0].split('fed-flow')[0] + 'fed-flow' + "/app"
 dataset_path = home + '/dataset/data/'
-N = 10  # data # length
+N = 20  # data # length
 
 mq_url = "amqp://rabbitmq:rabbitmq@localhost:5672/"
 current_node_mq_url = "Will be set by input options"
