@@ -66,16 +66,16 @@ services:
       NEIGHBORS: "edge1,8081"
       NODE_TYPE: "client"
       ROUND_COUNT: "3"
-      DEVICE_COUNT: "3"
-      COORDINATES: "2.0,37.0,4.0"
+      DEVICE_COUNT: "12"
+      COORDINATES: "40.004176,116.326091,50.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "6"
+          cpus: "3"
           memory: 1G
     volumes:
-       - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+       - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
        - ./Results:/fed-flow/Results
        - ./data:/fed-flow/app/dataset/data
        - ./config.py:/fed-flow/app/config/config.py
@@ -97,16 +97,16 @@ services:
       IP: "client2"
       PORT: "8082"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client2"
-      NEIGHBORS: "edge2,8083"
+      NEIGHBORS: "edge1,8081"
       NODE_TYPE: "client"
       ROUND_COUNT: "3"
-      DEVICE_COUNT: "3"
-      COORDINATES: "20.0,20.0,5.0"
+      DEVICE_COUNT: "12"
+      COORDINATES: "40.004476,116.326291,50.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "6"
+          cpus: "3"
           memory: 1G
     volumes:
       - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
@@ -133,8 +133,206 @@ services:
       NEIGHBORS: "edge1,8081"
       NODE_TYPE: "client"
       ROUND_COUNT: "3"
-      DEVICE_COUNT: "3"
+      DEVICE_COUNT: "12"
       COORDINATES: "39.9970,116.3285,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client4:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client4"
+      PORT: "8086"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client4"
+      NEIGHBORS: "edge2,8083"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "39.979873,116.330951,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client5:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client5"
+      PORT: "8088"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client5"
+      NEIGHBORS: "edge2,8083"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "39.980173,116.331151,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client6:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client6"
+      PORT: "8090"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client6"
+      NEIGHBORS: "edge2,8083"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "39.979623,116.331051,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/008/008_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client7:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client7"
+      PORT: "8092"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client7"
+      NEIGHBORS: "edge3,8087"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "40.047500,116.298611,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/009/009_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client8:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client8"
+      PORT: "8094"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client8"
+      NEIGHBORS: "edge3,8087"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "40.047800,116.298811,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/009/009_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client9:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client3"
+      PORT: "8096"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client3"
+      NEIGHBORS: "edge3,8087"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "40.047250,116.298711,50.0"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
@@ -142,7 +340,106 @@ services:
           cpus: "6"
           memory: 1G
     volumes:
-      - ./processed_data/001/001_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./processed_data/009/009_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client10:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client10"
+      PORT: "8098"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client10"
+      NEIGHBORS: "edge4,8087"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "39.983899,116.326083,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/012/012_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client11:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client11"
+      PORT: "8100"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client11"
+      NEIGHBORS: "edge4,8087"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "39.984199,116.326283,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/012/012_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  client12:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "client12"
+      PORT: "8102"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client12"
+      NEIGHBORS: "edge4,8087"
+      NODE_TYPE: "client"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "12"
+      COORDINATES: "39.983649,116.326183,50.0"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "3"
+          memory: 1G
+    volumes:
+      - ./processed_data/012/012_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./config.py:/fed-flow/app/config/config.py
@@ -165,16 +462,16 @@ services:
       IP: "edge1"
       PORT: "8081"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge1"
-      NEIGHBORS: "edge2,8083"
+      NEIGHBORS: "edge2,8083,edge3,8085,edge4,8087"
       NODE_TYPE: "edge"
       ROUND_COUNT: "3"
-      DEVICE_COUNT: "2"
-      COORDINATES: "39.980800,116.330200,50"
+      DEVICE_COUNT: "4"
+      COORDINATES: "40.004176,116.328500,50"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "11"
+          cpus: "5"
           memory: 1G
     volumes:
       - ./Results:/fed-flow/Results
@@ -198,21 +495,87 @@ services:
       IP: "edge2"
       PORT: "8083"
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge2"
-      NEIGHBORS: "edge1,8081"
+      NEIGHBORS: "edge1,8081,edge3,8085,edge4,8087"
       NODE_TYPE: "edge"
-      ROUND_COUNT: "3"
-      DEVICE_COUNT: "2"
-      COORDINATES: "40.001700,116.328000,50"
+      ROUND_COUNT: "10"
+      DEVICE_COUNT: "3"
+      COORDINATES: "39.979873,116.327000,50"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
       resources:
         limits:
-          cpus: "11"
+          cpus: "5"
           memory: 1G
     volumes:
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
       - ./config.py:/fed-flow/app/config/config.py
+
+  edge3:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "edge3"
+      PORT: "8085"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge3"
+      NEIGHBORS: "edge1,8081,edge2,8083,edge4,8087"
+      NODE_TYPE: "edge"
+      ROUND_COUNT: "10"
+      DEVICE_COUNT: "3"
+      COORDINATES: "40.045000,116.304000,50"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "5"
+          memory: 1G
+    volumes:
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+  edge4:
+    <<: *node_base
+    environment:
+      AGGREGATION: "fedavg"
+      DECENTRALIZED: "True"
+      D2D: "False"
+      MOBILITY: "True"
+      CLUSTERING: "none_clustering"
+      OFFLOADING: "True"
+      SPLITTING_METHOD: "fake_decentralized_splitting"
+      MODEL: "VGG"
+      DATASET: "cifar10"
+      NODE_INDEX: "0"
+      IP: "edge4"
+      PORT: "8087"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge4"
+      NEIGHBORS: "edge1,8081,edge2,8083,edge3,8085"
+      NODE_TYPE: "edge"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "4"
+      COORDINATES: "39.985500,116.322000,50"
+      SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
+    deploy:
+      resources:
+        limits:
+          cpus: "5"
+          memory: 1G
+    volumes:
+      - ./Results:/fed-flow/Results
+      - ./data:/fed-flow/app/dataset/data
+      - ./config.py:/fed-flow/app/config/config.py
+
+
 
   broker:
     image: rabbitmq:3-management
