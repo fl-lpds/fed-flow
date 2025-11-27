@@ -325,9 +325,9 @@ services:
       MODEL: "VGG"
       DATASET: "cifar10"
       NODE_INDEX: "0"
-      IP: "client3"
+      IP: "client9"
       PORT: "8096"
-      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client3"
+      RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/client9"
       NEIGHBORS: "edge3,8085"
       NODE_TYPE: "client"
       ROUND_COUNT: "3"
@@ -337,7 +337,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "6"
+          cpus: "3"
           memory: 1G
     volumes:
       - ./processed_data/009/009_data.csv:/fed-flow/app/dataset/mobility_data/data.csv:ro
