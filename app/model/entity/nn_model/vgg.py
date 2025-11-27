@@ -1,6 +1,7 @@
 import torch.nn as nn
 
 from app.model.interface.nn_model_interface import NNModel
+from app.util import data_utils
 
 
 # Build the VGG nn_model according to location and split_layer
@@ -67,10 +68,11 @@ class VGG(NNModel):
         return out
 
     def get_config(self):
+        num_classes = data_utils.get_num_classes()
         return [('C', 3, 32, 3, 32 * 32 * 32, 32 * 32 * 32 * 3 * 3 * 3),
                 ('M', 32, 32, 2, 32 * 16 * 16, 0),
                 ('C', 32, 64, 3, 64 * 16 * 16, 64 * 16 * 16 * 3 * 3 * 32),
                 ('M', 64, 64, 2, 64 * 8 * 8, 0),
                 ('C', 64, 64, 3, 64 * 8 * 8, 64 * 8 * 8 * 3 * 3 * 64),
                 ('D', 8 * 8 * 64, 128, 1, 64, 128 * 8 * 8 * 64),
-                ('D', 128, 10, 1, 10, 128 * 10)]
+                ('D', 128, num_classes, 1, num_classes, 128 * num_classes)]

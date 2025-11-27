@@ -59,3 +59,26 @@ def get_class():
     for comp in parts[1:]:
         m = getattr(m, comp)
     return m
+
+
+def get_num_classes(dataset_name: str = None) -> int:
+    """
+    Get the number of classes for a given dataset name.
+    
+    Args:
+        dataset_name: Name of the dataset. If None, uses config.dataset_name.
+        
+    Returns:
+        Number of classes for the dataset.
+    """
+    if dataset_name is None:
+        dataset_name = config.dataset_name
+    
+    # Map dataset names to number of classes
+    dataset_classes = {
+        'cifar10': 10,
+        'cifar100': 100,
+    }
+    
+    num_classes = dataset_classes.get(dataset_name.lower(), 10)  # Default to 10 if unknown
+    return num_classes
