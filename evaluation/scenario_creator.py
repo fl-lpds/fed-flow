@@ -109,7 +109,7 @@ def create_d2d_cluster_neighbors(cluster_clients, topology, client_ports, server
 def create_node(port: int, decentralized: bool, offloading: bool, splitting_method: str, node_index: int,
                 node_type: str, round_count: int, device_count: int, neighbors: list[str],
                 scenario_description: str, cpu_limit: str = '1', memory_limit: str = '1G',
-                d2d: bool = False, use_gpu: bool = False, gpu_device_ids: str = None) -> dict:
+                d2d: bool = False, use_gpu: bool = False, gpu_device_ids: str = None, dataset: str = 'cifar10') -> dict:
     return {
         'port': port,
         'decentralized': str(decentralized),
@@ -128,7 +128,8 @@ def create_node(port: int, decentralized: bool, offloading: bool, splitting_meth
         'memory_limit': memory_limit,
         'd2d_arg': "-d2d True" if d2d else "",
         'use_gpu': use_gpu,
-        'gpu_device_ids': 'all' if use_gpu else None
+        'gpu_device_ids': 'all' if use_gpu else None,
+        'dataset': dataset
     }
 
 
@@ -152,9 +153,10 @@ def render_docker_compose_template(data):
 @click.option('--d2d', is_flag=True, default=False, prompt='Is D2D enabled?')
 @click.option('--num-clusters', default=1, prompt='Number of D2D clusters')
 @click.option('--use-gpu', is_flag=True, default=True, prompt='Enable GPU support?')
+@click.option('--dataset', default='cifar10', prompt='Dataset name (e.g., cifar10, cifar100)')
 def create_docker_compose(num_clients, num_edges, decentralized, offloading, splitting_method,
                           topology, round_count, client_cpu_limit, client_memory_limit, d2d, num_clusters,
-                          use_gpu):
+                          use_gpu, dataset):
 
     data = {
         'clients': [],
@@ -209,12 +211,12 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
             neighbors = all_neighbors.get(cid, [])
             client = create_node(port, decentralized, offloading, splitting_method, cid, 'client', round_count,
                                  num_clients, neighbors, scenario_description,
-                                 client_cpu_limit, client_memory_limit, d2d, use_gpu, 'all' if use_gpu else None)
+                                 client_cpu_limit, client_memory_limit, d2d, use_gpu, 'all' if use_gpu else None, dataset)
             data['clients'].append(client)
 
         server_neighbors = [f"client{i},{client_ports[i]}" for i in sorted(client_ports)]
         server = create_node(server_port, decentralized, offloading, splitting_method, 1, 'server', round_count,
-                             num_clients, server_neighbors, scenario_description, '2', '2G', d2d, use_gpu, 'all' if use_gpu else None)
+                             num_clients, server_neighbors, scenario_description, '2', '2G', d2d, use_gpu, 'all' if use_gpu else None, dataset)
         data['servers'].append(server)
 
     else:
@@ -225,14 +227,14 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
         for i in range(1, num_clients + 1):
             client = create_node(current_port, decentralized, offloading, splitting_method, i, 'client', round_count,
                                  num_clients, [], scenario_description, client_cpu_limit, client_memory_limit,
-                                 d2d=False, use_gpu=use_gpu, gpu_device_ids='all' if use_gpu else None)
+                                 d2d=False, use_gpu=use_gpu, gpu_device_ids='all' if use_gpu else None, dataset=dataset)
             data['clients'].append(client)
             client_ports[i] = current_port
             current_port += 1
 
         for i in range(1, num_edges + 1):
             edge = create_node(current_port, decentralized, offloading, splitting_method, i, 'edge', round_count,
-                               num_clients, [], scenario_description, use_gpu=use_gpu, gpu_device_ids='all' if use_gpu else None)
+                               num_clients, [], scenario_description, use_gpu=use_gpu, gpu_device_ids='all' if use_gpu else None, dataset=dataset)
             data['edges'].append(edge)
             current_port += 1
 
@@ -244,7 +246,7 @@ def create_docker_compose(num_clients, num_edges, decentralized, offloading, spl
         if not decentralized:
             server = create_node(current_port, decentralized, offloading, splitting_method, 1, 'server', round_count,
                                  num_clients, [], scenario_description, '2', '2G', d2d=False, 
-                                 use_gpu=use_gpu, gpu_device_ids='all' if use_gpu else None)
+                                 use_gpu=use_gpu, gpu_device_ids='all' if use_gpu else None, dataset=dataset)
             data['servers'].append(server)
             current_port += 1
 
