@@ -140,35 +140,58 @@ class MobilityManager:
             if r.status_code == 200:
                 data = r.json()
                 return data.get("connected_clients", [])
-        except:
+        except Exception as e:
+            fed_logger.warning(
+                "[Mobility] get_clients_of_edge(%s:%s) failed: %s",
+                edge_ip, edge_port, e
+            )
             return []
         return []
 
     def check_and_migrate_per_round(self):
-        fed_logger.info("[Mobility] per round check: current_edge=%s", self.get_current_edge())
+        """
+        هر راند:
+        1) نزدیک‌ترین Edge را پیدا می‌کنیم.
+        2) اگر Edge فعلی همان نزدیک‌ترین بود، هیچی.
+        3) اگر نزدیک‌ترین Edge فرق داشت، فقط وقتی مهاجرت می‌کنیم که
+           روی Edge فعلی بیشتر از 1 کلاینت وصل باشد (که آخرین کلاینت نباشیم).
+        """
 
-        closest_edge = self.find_closest_edge()
         current_edge = self.get_current_edge()
+        closest_edge = self.find_closest_edge()
 
+        fed_logger.info(
+            "[Mobility] per round check: current_edge=%s, closest_edge=%s",
+            current_edge, closest_edge
+        )
+
+        # اگر هنوز روی هیچ اجی نیستیم یا نزدیک‌ترین اج پیدا نشد
+        if current_edge is None or closest_edge is None:
+            fed_logger.info("[Mobility] per round: skip (no current_edge or closest_edge)")
+            return
+
+        # اگر همین اج فعلی نزدیک‌ترین است، لازم نیست جابه‌جا شویم
         if closest_edge == current_edge:
             fed_logger.info("[Mobility] staying on same edge (closest edge is current)")
             return
 
-        # جلوگیری از خروج آخرین کلاینت
-        """
+        # جلوگیری از خروج آخرین کلاینت از یک Edge
         edge_clients = MobilityManager.get_clients_of_edge(current_edge.ip, current_edge.port)
+        fed_logger.info(
+            "[Mobility] edge %s currently has %d clients",
+            current_edge, len(edge_clients)
+        )
 
         if len(edge_clients) <= 1:
             fed_logger.info(
-                "[Mobility] Preventing migration: client %s:%s is the last client on edge %s",
-                self.client.ip,
-                self.client.port,
-                current_edge,
+                "[Mobility] Preventing migration: client %s is the last client on edge %s",
+                self.client.node_identifier, current_edge
             )
             return
-        """
+
+        # فقط اگر بیشتر از یک کلاینت هست، اجازهٔ مهاجرت می‌دهیم
         fed_logger.info(
-            "[Mobility] migrating from %s to %s (distance-based)",
+            "[Mobility] migrating from %s to %s (distance-based, per-round)",
             current_edge, closest_edge
         )
         self.migrate_to_edge(closest_edge)
