@@ -173,13 +173,6 @@ class MobilityManager:
         )
         self.migrate_to_edge(closest_edge)
 
-        # اگر آخرین کلاینت نبود → مهاجرت به edge نزدیک‌تر
-        fed_logger.info(
-            "[Mobility] migrating from %s to %s (distance-based)",
-            self.current_edge, closest_edge
-        )
-        self.migrate_to_edge(closest_edge)
-
     def monitor_and_migrate(self):
         def monitor():
             fed_logger.info("[Mobility] monitor loop started (THRESHOLD=%sm)", self.THRESHOLD_DISTANCE)
