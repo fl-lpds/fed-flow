@@ -12,7 +12,7 @@ fed_logger.info("[BOOT] mobility_manager LOADED at %s", __file__)
 
 
 class MobilityManager:
-    THRESHOLD_DISTANCE = 300
+    THRESHOLD_DISTANCE = 200
 
     def __init__(self, client):
         self.client = client
@@ -155,6 +155,7 @@ class MobilityManager:
             return
 
         # جلوگیری از خروج آخرین کلاینت
+        """
         edge_clients = MobilityManager.get_clients_of_edge(current_edge.ip, current_edge.port)
 
         if len(edge_clients) <= 1:
@@ -165,7 +166,7 @@ class MobilityManager:
                 current_edge,
             )
             return
-
+        """
         fed_logger.info(
             "[Mobility] migrating from %s to %s (distance-based)",
             current_edge, closest_edge
