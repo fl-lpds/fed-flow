@@ -497,8 +497,8 @@ services:
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge2"
       NEIGHBORS: "edge1,8081 edge3,8085 edge4,8087"
       NODE_TYPE: "edge"
-      ROUND_COUNT: "10"
-      DEVICE_COUNT: "3"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "4"
       COORDINATES: "39.979873,116.327000,50"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
@@ -529,8 +529,8 @@ services:
       RABBITMQ_URL: "amqp://rabbitmq:rabbitmq@broker:5672/edge3"
       NEIGHBORS: "edge1,8081 edge2,8083 edge4,8087"
       NODE_TYPE: "edge"
-      ROUND_COUNT: "10"
-      DEVICE_COUNT: "3"
+      ROUND_COUNT: "3"
+      DEVICE_COUNT: "4"
       COORDINATES: "40.045000,116.304000,50"
       SCENARIO_DESCRIPTION: "Centralized  1 1 Offloading"
     deploy:
