@@ -184,9 +184,7 @@ class MobilityManager:
 
         if len(edge_clients) <= 1:
             fed_logger.info(
-                "[Mobility] Preventing migration: client %s is the last client on edge %s",
-                self.client.node_identifier, current_edge
-            )
+                "[Mobility] Preventing migration: client %s:%s is the last client on edge %s", self.client.ip, self.client.port, current_edge,)
             return
 
         # فقط اگر بیشتر از یک کلاینت هست، اجازهٔ مهاجرت می‌دهیم
