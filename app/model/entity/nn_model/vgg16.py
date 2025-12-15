@@ -1,12 +1,13 @@
 import torch.nn as nn
 
 from app.model.interface.nn_model_interface import NNModel
+from app.util import data_utils
 
 
 # Build the VGG nn_model according to location and split_layer
 class VGG16(NNModel):
     def _make_layers(self, edge_based):
-        num_classes = 10
+        num_classes = data_utils.get_num_classes()
         features = []
         denses = []
         cfg = self.get_config()

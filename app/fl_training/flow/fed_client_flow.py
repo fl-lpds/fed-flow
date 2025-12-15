@@ -1,4 +1,5 @@
 import logging
+import random
 import time
 import warnings
 
@@ -59,31 +60,44 @@ def run(options_ins):
     indices = list(range(N))
     part_tr = indices[int((N / K) * index): int((N / K) * (index + 1))]
     train_loader = data_utils.get_trainloader(data_utils.get_trainset(), part_tr, 0)
+    fed_logger.info('Data preparation completed. Training samples: {}'.format(len(part_tr)))
 
     estimate_energy = options_ins.get("energy") == "True"
     mobility = options_ins.get('mobility')
     d2d = options_ins.get('d2d')
+    fed_logger.info('Configuration parsed - Energy: {}, Mobility: {}, D2D: {}'.format(estimate_energy, mobility, d2d))
 
     if estimate_energy:
         energy_estimation.init(os.getpid())
+        fed_logger.info('Energy estimation initialized')
 
     ip = options_ins.get('ip')
     port = options_ins.get('port')
     cluster = options_ins.get('cluster')
+    fed_logger.info('Network configuration - IP: {}, Port: {}, Cluster: {}'.format(ip, port, cluster))
 
     aggregator = create_aggregator(options_ins.get('aggregation'))
+    fed_logger.info('Aggregator created: {}'.format(options_ins.get('aggregation')))
 
     client = FedClient(ip=ip, port=port, model_name=options_ins.get('model'),
                        dataset=options_ins.get('dataset'), train_loader=train_loader, LR=learning_rate,
                        cluster=cluster, aggregator=aggregator, neighbors=config.CURRENT_NODE_NEIGHBORS)
+    fed_logger.info('FedClient initialized - Model: {}, Dataset: {}'.format(options_ins.get('model'), options_ins.get('dataset')))
+    
     if mobility:
         start_mobility_simulation_thread(client)
+        fed_logger.info('Mobility simulation thread started')
         # client.mobility_manager.discover_edges()
         # client.mobility_manager.monitor_and_migrate()
+    
     if d2d:
+        fed_logger.info('Running in D2D mode')
         run_d2d(client)
-
     else:
+        fed_logger.info('Running in client mode')
         run_client(client, learning_rate)
+    
+    fed_logger.info('Training completed. Cleaning up...')
     time.sleep(10)
     client.stop_server()
+    fed_logger.info('Client server stopped')

@@ -124,3 +124,14 @@ class HTTPCommunicator:
         else:
             raise Exception(
                 f"Failed to get is_leader status from node {node_identifier}, status code: {response.status_code}")
+
+    @staticmethod
+    def get_leader_election_completed(node_identifier: NodeIdentifier) -> bool:
+        HTTPCommunicator._wait_for_neighbor_to_get_ready(node_identifier)
+        request_url = f"http://{node_identifier.ip}:{node_identifier.port}/get-leader-election-completed"
+        response = requests.get(request_url)
+        if response.status_code == 200:
+            return response.json()['leader_election_completed']
+        else:
+            raise Exception(
+                f"Failed to get leader_election_completed status from node {node_identifier}, status code: {response.status_code}")

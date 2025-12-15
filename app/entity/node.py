@@ -22,6 +22,7 @@ class Node:
     discovered_edges: set[NodeIdentifier]
     cluster: str
     is_leader: False
+    leader_election_completed: bool
 
     def __init__(self, ip: str, port: int, node_type: NodeType, cluster, neighbors: list[NodeIdentifier] = None):
         self._server_started = False
@@ -39,6 +40,7 @@ class Node:
         self._start_server_in_thread(port)
         self.cluster = cluster
         self.is_leader = False
+        self.leader_election_completed = False
 
     def __str__(self):
         return f'{self.ip}:{self.port}'
@@ -53,6 +55,7 @@ class Node:
         self._app.add_route("/get-cluster", self.get_cluster, methods=["GET"])
         self._app.add_route("/set-leader", self.set_leader_api, methods=["POST"])
         self._app.add_route("/get-is-leader", self.get_is_leader_api, methods=["GET"])
+        self._app.add_route("/get-leader-election-completed", self.get_leader_election_completed_api, methods=["GET"])
 
     async def get_node_type(self, _: Request):
         return JSONResponse({'node_type': self._node_type.name}, http.HTTPStatus.OK)
@@ -158,3 +161,6 @@ class Node:
 
     async def get_is_leader_api(self, _: Request):
         return JSONResponse({'is_leader': self.is_leader}, http.HTTPStatus.OK)
+
+    async def get_leader_election_completed_api(self, _: Request):
+        return JSONResponse({'leader_election_completed': self.leader_election_completed}, http.HTTPStatus.OK)

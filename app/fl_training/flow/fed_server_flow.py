@@ -77,6 +77,8 @@ def run_d2d(server: FedServer, options):
         rounds.append(r)
         fed_logger.info('====================================>')
         fed_logger.info('==> Round {:} Start'.format(r + 1))
+        fed_logger.info("resetting leader election status")
+        server.reset_leader_election_status()
         fed_logger.info("sending global weights")
         server.scatter_global_weights([NodeType.CLIENT])
 

@@ -9,7 +9,7 @@
       OFFLOADING: "{{ node.offloading }}"
       SPLITTING_METHOD: "{{ node.splitting_method }}"
       MODEL: "VGG"
-      DATASET: "cifar10"
+      DATASET: "{{ node.dataset }}"
       NODE_INDEX: "{{ node.node_index }}"
       IP: "{{ node.ip }}"
       PORT: "{{ node.port }}"
@@ -19,8 +19,28 @@
       ROUND_COUNT: "{{ node.round_count }}"
       DEVICE_COUNT: "{{ node.device_count }}"
       SCENARIO_DESCRIPTION: "{{ node.scenario_description }}"
+{% if node.use_gpu %}
+{% if node.gpu_device_ids != 'all' %}
+      CUDA_VISIBLE_DEVICES: "{{ node.gpu_device_ids }}"
+      NVIDIA_VISIBLE_DEVICES: "{{ node.gpu_device_ids }}"
+      GPU_DEVICE_ID: "0"
+{% else %}
+      GPU_DEVICE_ID: "0"
+{% endif %}
+{% endif %}
     deploy:
       resources:
         limits:
           cpus: "{{ node.cpu_limit }}"
           memory: {{ node.memory_limit }}
+{% if node.use_gpu %}
+        reservations:
+          devices:
+            - driver: nvidia
+{% if node.gpu_device_ids == 'all' %}
+              count: all
+{% else %}
+              device_ids: [{% for id in node.gpu_device_ids.split(',') %}'{{ id.strip() }}'{% if not loop.last %}, {% endif %}{% endfor %}]
+{% endif %}
+              capabilities: [gpu]
+{% endif %}

@@ -41,3 +41,4 @@ node_base: &node_base
     volumes:
       - ./Results:/fed-flow/Results
       - ./data:/fed-flow/app/dataset/data
+      # - ../app/dataset:/fed-flow/app/dataset
