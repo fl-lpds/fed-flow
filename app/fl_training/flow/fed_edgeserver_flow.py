@@ -8,6 +8,7 @@ from app.entity.http_communicator import HTTPCommunicator
 from app.entity.node_type import NodeType
 from app.util import graph_utils, model_utils
 
+
 def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
     edge_server.initialize(learning_rate)
     fed_logger.info(f"Split Config : {edge_server.split_layers}")
@@ -83,7 +84,12 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
 
         # --- مهم: در هر صورت، gossip انجام می‌شود ---
         fed_logger.info("start gossiping with neighbors")
-        edge_server.gossip_with_neighbors()
+        # added
+        if not edge_server.is_active_this_round:
+            pass
+        else:
+            edge_server.gossip_with_neighbors()
+
         e_time = time.time()
 
         # Recording each round training time, bandwidth and test_app accuracy
@@ -99,6 +105,7 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         fed_logger.info('==> Round {:} End'.format(r + 1))
         fed_logger.info('==> Round Training Time: {:}'.format(training_time))
     graph_utils.report_results(edge_server, training_times, client_bw, accuracy, edge_bw)
+
 
 def run_centralized(edge_server: FedEdgeServer, learning_rate):
     edge_server.gather_and_scatter_split_config()

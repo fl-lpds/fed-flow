@@ -134,6 +134,10 @@ class FedClient(FedBaseNodeInterface):
         edge_neighbors = self.get_neighbors([NodeType.CLIENT])
         msg = GlobalWeightMessage([self.uninet.to(self.device).state_dict()])
         self.scatter_msg(msg, [NodeType.CLIENT])
+        # added
+        edge_neighbors = self.get_neighbors([NodeType.CLIENT])
+        if not edge_neighbors:
+            return
         gathered_msgs = self.gather_msgs(GlobalWeightMessage.MESSAGE_TYPE, [NodeType.CLIENT])
         gathered_models = [(msg.message.weights[0], config.N / len(edge_neighbors)) for msg in gathered_msgs]
         zero_model = model_utils.zero_init(self.uninet).state_dict()
