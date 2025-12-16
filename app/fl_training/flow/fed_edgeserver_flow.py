@@ -85,7 +85,7 @@ def run_decentralized(edge_server: FedEdgeServer, learning_rate, options: dict):
         # --- مهم: در هر صورت، gossip انجام می‌شود ---
         fed_logger.info("start gossiping with neighbors")
         # added
-        if not edge_server.is_active_this_round:
+        if not getattr(edge_server, "is_active_this_round", True):
             pass
         else:
             edge_server.gossip_with_neighbors()
