@@ -182,7 +182,7 @@ class MobilityManager:
             current_edge, len(edge_clients)
         )
 
-        if len(edge_clients) <= 1:
+        if len(edge_clients) == 1:
             fed_logger.info(
                 "[Mobility] Preventing migration: client %s:%s is the last client on edge %s", self.client.ip, self.client.port, current_edge,)
             return
