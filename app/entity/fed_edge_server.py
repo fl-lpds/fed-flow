@@ -115,6 +115,10 @@ class FedEdgeServer(FedBaseNodeInterface):
         self.scatter_split_layers([NodeType.CLIENT])
 
     def start_decentralized_training(self):
+        # added
+        if not getattr(self, "is_active_this_round", True):
+            return
+
         self.threads = {}
         client_neighbors = self.get_neighbors([NodeType.CLIENT])
         for neighbor in client_neighbors:
@@ -130,9 +134,17 @@ class FedEdgeServer(FedBaseNodeInterface):
 
     def _thread_decentralized_training(self, neighbor: NodeIdentifier):
         neighbor_rabbitmq_url = HTTPCommunicator.get_rabbitmq_url(neighbor)
+        # added
+        if neighbor not in self.get_neighbors([NodeType.CLIENT]) or not getattr(self, "is_active_this_round", True):
+            return
+
         flag: bool = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url,
                                    IterationFlagMessage.MESSAGE_TYPE).flag
         while flag:
+            # added
+            if neighbor not in self.get_neighbors([NodeType.CLIENT]) or not getattr(self, "is_active_this_round", True):
+                return
+
             flag = self.recv_msg(neighbor.get_exchange_name(), config.current_node_mq_url,
                                  IterationFlagMessage.MESSAGE_TYPE).flag
             if not flag:
